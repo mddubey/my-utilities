@@ -1,0 +1,11 @@
+alias gst="git status"
+alias gp="git push"
+alias gps="git push origin master"
+alias gc="git checkout"
+alias gg="/usr/local/opt/git/libexec/git-core/git-gui"
+alias gpr="git pull --rebase"
+alias gsh="git stash"
+
+alias vopen="vagrant up && vagrant ssh"
+alias subl="/Applications/Sublime\ Text\ 2.app/Contents/SharedSupport/bin/subl"
+alias nw="nodewebkit"
