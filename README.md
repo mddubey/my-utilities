@@ -1,2 +1,2 @@
 # generals
-A repository to keep general settings for my machine
+A repository to keep utitlities for my machine
