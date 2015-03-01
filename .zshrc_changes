@@ -1,3 +1,4 @@
+#aliases for git
 alias gst="git status"
 alias gp="git push"
 alias gps="git push origin master"
@@ -9,3 +10,10 @@ alias gsh="git stash"
 alias vopen="vagrant up && vagrant ssh"
 alias subl="/Applications/Sublime\ Text\ 2.app/Contents/SharedSupport/bin/subl"
 alias nw="nodewebkit"
+alias mci="mvn clean install"
+
+#alias for project work
+alias B="cd ~/Documents/projects/bdshr/"
+
+#exports
+export PATH=$PATH:~/Documents/utils/git-plus
