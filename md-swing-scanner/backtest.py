@@ -46,11 +46,13 @@ CORP_ACTION_MOVE_PCT = 0.35  # single-day |close-to-close| move this large is a 
                               # don't have — so crediting/blaming the strategy for that day's "return"
                               # is simply wrong, not bad luck. Trades spanning such a day are
                               # right-censored (see simulate_ticker) rather than left in as-is.
-ATR_TRAIL_MULT = 3.0         # Breakout Continuation only now (VCP trails on 21-EMA instead, see below) —
+ATR_TRAIL_MULT = 3.0         # Breakout Continuation's base stop pre-engagement (see TRAIL_ENGAGE_PCT
+                              # below — it tightens onto the 21-EMA once working, same as VCP) —
                               # published Chandelier Exit standard is 3x ATR on a 22-day lookback;
                               # testing at the sourced value in place of our earlier ad-hoc 2.0
 MAX_INITIAL_RISK_PCT = 0.08  # Coiled Spring/VCP only — Minervini's published hard-cap stop
-TRAIL_ENGAGE_PCT = 1.03      # Coiled Spring/VCP only — give a normal pivot retest room before trailing
+TRAIL_ENGAGE_PCT = 1.03      # Both patterns (2026-08-30, was VCP-only) — give a normal pivot retest
+                              # room before trailing tightens onto the 21-EMA
 CLIMAX_VOL_LOOKBACK = 20     # "heaviest volume of the run" — Wyckoff buying-climax / O'Neil exhaustion
 CLIMAX_WEAK_CLOSE_PCT = 0.30 # close in the bottom 30% of the day's range — symmetric with the existing
                               # CLOSE_NEAR_HIGH_PCT=0.70 entry filter (signals.py), not a new arbitrary number
@@ -128,12 +130,21 @@ def detect_entry(ticker, rows, i):
 def current_stop_level(pattern, state, row):
     """The actual stop PRICE for `state`/`row` right now — same computation check_exit
     uses internally to decide hit_stop, exposed separately so a live position-monitor
-    can report "move your SL to X" without re-deriving the logic by hand."""
-    if pattern == "coiled_spring":
-        if state["peak_close"] >= state["entry_price"] * TRAIL_ENGAGE_PCT:
-            return max(state["structural_low"], row.ema21)
-        return state["structural_low"]
-    return state["peak_close"] - ATR_TRAIL_MULT * row.atr14
+    can report "move your SL to X" without re-deriving the logic by hand.
+
+    Both patterns now share ONE mechanism (2026-08-30): a pattern-specific base stop,
+    which tightens to the 21-EMA once the trade is up TRAIL_ENGAGE_PCT — previously
+    only Coiled Spring/VCP had this second stage, Breakout Continuation trailed at a
+    flat 3xATR for the whole hold no matter how extended (giving back the same % of
+    any move, small or huge). The base stop itself still differs per pattern on
+    purpose — VCP's is the real structural base low, Breakout Continuation's is the
+    ATR chandelier — that's each pattern's actual entry logic, not incidental
+    variation to remove."""
+    base_stop = (state["structural_low"] if pattern == "coiled_spring"
+                 else state["peak_close"] - ATR_TRAIL_MULT * row.atr14)
+    if state["peak_close"] >= state["entry_price"] * TRAIL_ENGAGE_PCT:
+        return max(base_stop, row.ema21)
+    return base_stop
 
 
 def check_exit(pattern, state, row, use_resistance=True):
@@ -317,5 +328,6 @@ if __name__ == "__main__":
     # which is hard-constrained to names that actually have options.
     tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
     trades = run(tickers, True, weekly_pivots, 0.0)
-    trades.to_csv("runs/trades_v24.csv", index=False)
-    summarize(trades, "v24: v23 + NIFTY 500 universe (500 tickers) instead of the F&O-only 210")
+    trades.to_csv("runs/trades_v25.csv", index=False)
+    summarize(trades, "v25: v24 + Breakout Continuation tightens onto the 21-EMA past "
+                       "TRAIL_ENGAGE_PCT, same mechanism VCP already used (current_stop_level)")

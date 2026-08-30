@@ -14,23 +14,32 @@ the pure-swing scanner isn't. Two independent entry patterns:
 
 Both patterns share an ADX-based market-regime gate (only trade when Nifty is
 genuinely trending, ADX≥20) plus a Nifty-above-its-own-200-day-SMA structural filter
-(don't go long against a falling broad market). Exits are pattern-specific — a
-Chandelier-style ATR trail for Breakout Continuation, a structural stop + 21-day EMA
-trail for VCP — plus a shared moving resistance target and a gated climax-top exit for
-both.
+(don't go long against a falling broad market). Exits share ONE mechanism now
+(`current_stop_level`, 2026-08-30): a pattern-specific base stop (structural low for
+VCP, ATR chandelier for Breakout Continuation) that tightens onto the 21-day EMA once
+the trade is up `TRAIL_ENGAGE_PCT` — previously only VCP had this second stage,
+Breakout Continuation trailed at a flat 3xATR the whole hold. Plus a shared moving
+resistance target and a gated climax-top exit for both.
 
 ## Current status
 
-As of 2026-08-30, the validated stock-level config (**v24**) backtested over 5 years
-(2021-2026) across the full 500-stock NIFTY 500 universe: **n=676 trades, 58.0% win
-rate, median +1.66%/trade, top-10-of-total concentration 30.8%** (the best
-concentration figure of the whole project — broader universe, more diversified, not
-just diluted with noise). v24 supersedes v23 (n=329 on the 210-stock F&O-only
-universe, 60.5% win/1.92% median/43.4% concentration — still a valid result, just a
-narrower universe). This has NOT yet been pushed through the options-translation layer
-(`option_backtest.py`/`portfolio.py`) — those numbers describe the underlying stock
-signal only, not real options economics, and that layer is correctly scoped to
-`fo_universe.csv` specifically (options only exist on F&O-eligible names).
+As of 2026-08-30, the validated stock-level config (**v25**) backtested over 5 years
+(2021-2026) across the full 500-stock NIFTY 500 universe: **n=677 trades, 58.3% win
+rate, median +1.64%/trade, top-10-of-total concentration 30.7%**. v25 supersedes v24
+(n=676, 58.0% win, +1.66% median, 30.8% concentration) — same overall shape, but
+Breakout Continuation specifically improved (65.4%→67.2% win rate, avg win 6.24%→5.48%,
+avg loss -7.11%→-6.16%, avg hold 25.5d→21.8d: smaller wins AND smaller losses, faster
+in/out, same mean). Real exit-attribution breakdown (677 closed trades): resistance
+47.9%, base/structural stop 26.4%, 21-EMA trail 25.3%, climax 0.1% — roughly half of
+ALL stop-exits in BOTH patterns now go through the tightened trail (50.8% breakout_cont
+/ 48.1% coiled_spring), confirming the shared mechanism is pulling real, comparable
+weight in both, not a cosmetic edge case. v24 in turn superseded v23 (n=329 on the
+210-stock F&O-only universe, 60.5% win/1.92% median/43.4% concentration — still a valid
+result, just a narrower universe). This has NOT yet been pushed through the
+options-translation layer (`option_backtest.py`/`portfolio.py`) — those numbers describe
+the underlying stock signal only, not real options economics, and that layer is
+correctly scoped to `fo_universe.csv` specifically (options only exist on F&O-eligible
+names).
 
 The full history of what was tried, what was rejected and why, and every bug found
 along the way is recorded as comments directly next to the relevant code (see
@@ -91,7 +100,7 @@ pip install -r requirements.txt
 ```
 python3 fetch_prices.py       # refresh data_cache/ (incremental — fast after the first run)
 python3 market_regime.py      # refresh the Nifty regime cache
-python3 backtest.py           # writes runs/trades_v24.csv, prints the summary stats
+python3 backtest.py           # writes runs/trades_v25.csv, prints the summary stats
 ```
 
 ## Daily usage
@@ -135,7 +144,7 @@ any change to `signals.py`, `vcp.py`, `pivots.py`, `market_regime.py`, or `backt
   Black-Scholes back-out).
 - Shared-capital-pool sizing for the options layer isn't built — `portfolio.py` still
   uses a fixed 3-slot, 1-lot model.
-- The options/portfolio pipeline hasn't been rerun against v24 yet — the last full run
+- The options/portfolio pipeline hasn't been rerun against v25 yet — the last full run
   predates several of the fixes recorded in `backtest.py`'s comments, and would need to
   run against `fo_universe.csv` specifically (options don't exist on the broader
   NIFTY 500 names).
