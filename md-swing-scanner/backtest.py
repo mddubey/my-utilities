@@ -97,7 +97,7 @@ def support_level(entry_price, row):
     return None
 
 
-def detect_entry(ticker, rows, i):
+def detect_entry(ticker, rows, i, require_regime=True):
     """Two fully independent entry gates, checked in this order only because
     entry_signal() is cheap and VCP's trend-template + zigzag scan is not; first match
     wins (a ticker can't be both on the same day). Returns (pattern, structural_low) if
@@ -108,17 +108,25 @@ def detect_entry(ticker, rows, i):
     Pulled out of simulate_ticker's loop (2026-08-30) so a live daily scanner can call
     the EXACT same entry logic against today's data instead of duplicating it — two
     copies of "what counts as a signal" drifting apart over time is a real risk for a
-    tool meant to inform real trades."""
+    tool meant to inform real trades.
+
+    require_regime=False (2026-08-30) skips the Nifty regime gate below entirely, for
+    daily_scan.py's observation-only mode during a regime drought (see its own
+    --ignore-regime flag) — lets a real pattern breakout still surface for watching,
+    without implying it's a validated signal to trade. The backtest itself (run()/
+    simulate_ticker()) never passes False here — the validated v25 numbers assume the
+    gate is on, so this only ever changes daily_scan.py's live output, not any
+    backtested result."""
     row = rows.iloc[i]
     if entry_signal(row):
         # regime gate, Breakout Continuation only originally, now both patterns:
         # verified directly that this pattern's edge is real but concentrated outside
         # choppy markets (52% win rate / +0.25% median when Nifty ADX<20, vs 71-73% /
         # ~+2% otherwise).
-        if market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True):
+        if not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True):
             return "breakout_cont", None
         return None
-    if stage2_trend_template(row, ticker, row.Date) and market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True):
+    if stage2_trend_template(row, ticker, row.Date) and (not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True)):
         # VCP is explicitly a bull-market pattern in the original methodology, not a
         # regime-agnostic one — same regime gate that rescued Breakout Continuation.
         vcp = vcp_breakout(rows, i)
