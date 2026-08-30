@@ -73,14 +73,39 @@ CLIMAX_MIN_GAIN_PCT = 1.15   # bug found by direct inspection (2026-08-30): with
 # didn't belong here once the entry became a real multi-week base.
 
 
-def load(ticker, pivot_fn=weekly_pivots):
-    df = pd.read_csv(CACHE_DIR / f"{ticker}.csv", index_col="Date", parse_dates=True)
+def _finish_load(df, pivot_fn):
     df = build_indicators(df)
     df = df.join(pivot_fn(df))
     df["corp_action_day"] = df.Close.pct_change().abs() > CORP_ACTION_MOVE_PCT
     df["vol_max_run"] = df.Volume.rolling(CLIMAX_VOL_LOOKBACK).max()  # today's own volume included —
                                                                        # "is today the heaviest in the window"
     return df
+
+
+def load(ticker, pivot_fn=weekly_pivots):
+    df = pd.read_csv(CACHE_DIR / f"{ticker}.csv", index_col="Date", parse_dates=True)
+    return _finish_load(df, pivot_fn)
+
+
+def load_with_extra_row(ticker, extra_row, pivot_fn=weekly_pivots):
+    """Like load(), but appends one synthetic OHLCV row in-memory before computing
+    indicators — for daily_scan.py's --live mode (2026-08-30): a partial-day intraday
+    bar (extra_row: dict with Date/Open/High/Low/Close/Volume) run through the EXACT
+    same build_indicators()/pivot_fn() as any real cached day, so vol_zscore/ema/rsi/etc
+    are computed identically, not a special partial-day formula. If extra_row's date is
+    already <= the last cached date (today's real close already landed), this is a
+    no-op — falls back to the real cached data, nothing synthetic to add."""
+    raw = pd.read_csv(CACHE_DIR / f"{ticker}.csv", index_col="Date", parse_dates=True)
+    date = pd.Timestamp(extra_row["Date"])
+    if len(raw) and date <= raw.index.max():
+        df = raw
+    else:
+        new_row = pd.DataFrame([{
+            "Open": extra_row["Open"], "High": extra_row["High"], "Low": extra_row["Low"],
+            "Close": extra_row["Close"], "Adj Close": extra_row["Close"], "Volume": extra_row["Volume"],
+        }], index=pd.Index([date], name="Date"))
+        df = pd.concat([raw, new_row])
+    return _finish_load(df, pivot_fn)
 
 
 def resistance_target(entry_price, row):

@@ -115,7 +115,12 @@ python3 monitor_positions.py   # current stop/target for your open positions
 ```
 
 `daily_scan.py` scans the full NIFTY 500 universe with the exact same entry logic the backtest
-validated. `monitor_positions.py` reads `open_positions.csv` (columns: `ticker,
+validated. Two observation-only flags, neither backtest-validated (use for watching, not trading
+as-is): `--ignore-regime` bypasses the Nifty ADX/200-SMA gate so pattern breakouts still surface
+during a regime drought; `--live [--cutoff HH:MM]` (default 14:45 IST) checks a same-day intraday
+snapshot instead of waiting for tomorrow's close — two-pass, so only a cheap EOD pre-filter
+(`shortlist_primed`, typically ~30/500 tickers) gets an actual intraday fetch, not the full
+universe. `monitor_positions.py` reads `open_positions.csv` (columns: `ticker,
 entry_date, entry_price, pattern`) — log each real position you take there — and
 replays the exact same exit logic from your entry date to today, reporting:
 
