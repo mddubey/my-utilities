@@ -1,3 +1,5 @@
+from datetime import date
+
 import pandas as pd
 
 import fetch_prices
@@ -27,8 +29,8 @@ def test_fetch_all_brand_new_ticker_fetches_full_period(tmp_path, monkeypatch):
         return _multi_index_df(yf_tickers, dates)
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
-    ok, empty = fetch_prices.fetch_all(["NEWCO"])
-    assert ok == ["NEWCO"] and empty == []
+    result = fetch_prices.fetch_all(["NEWCO"])
+    assert result == {"new": ["NEWCO"], "updated": [], "current": [], "empty": []}
     written = pd.read_csv(tmp_path / "NEWCO.csv", index_col="Date", parse_dates=True)
     assert len(written) == 5
 
@@ -45,8 +47,8 @@ def test_fetch_all_existing_ticker_appends_only_new_rows(tmp_path, monkeypatch):
         return _multi_index_df(yf_tickers, new_dates)
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
-    ok, empty = fetch_prices.fetch_all(["EXISTS"])
-    assert ok == ["EXISTS"]
+    result = fetch_prices.fetch_all(["EXISTS"])
+    assert result == {"new": [], "updated": ["EXISTS"], "current": [], "empty": []}
     written = pd.read_csv(tmp_path / "EXISTS.csv", index_col="Date", parse_dates=True)
     assert len(written) == 6  # 5 old + only the 1 genuinely new day (01-06)
     assert not written.index.duplicated().any()
@@ -63,8 +65,8 @@ def test_fetch_all_existing_ticker_already_current_is_a_no_op(tmp_path, monkeypa
         return _multi_index_df(yf_tickers, pd.date_range("2024-01-05", periods=1, freq="D"))
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
-    ok, empty = fetch_prices.fetch_all(["CURRENT"])
-    assert ok == ["CURRENT"]  # up to date counts as success, not a failure
+    result = fetch_prices.fetch_all(["CURRENT"])
+    assert result == {"new": [], "updated": [], "current": ["CURRENT"], "empty": []}
     written = pd.read_csv(tmp_path / "CURRENT.csv", index_col="Date", parse_dates=True)
     assert len(written) == 5  # unchanged
 
@@ -76,6 +78,40 @@ def test_fetch_all_marks_empty_when_new_ticker_has_no_data(tmp_path, monkeypatch
         return _multi_index_df(yf_tickers, pd.DatetimeIndex([]))
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
-    ok, empty = fetch_prices.fetch_all(["DELISTED"])
-    assert ok == [] and empty == ["DELISTED"]
+    result = fetch_prices.fetch_all(["DELISTED"])
+    assert result == {"new": [], "updated": [], "current": [], "empty": ["DELISTED"]}
     assert not (tmp_path / "DELISTED.csv").exists()
+
+
+def test_fetch_all_weekend_run_reports_current_not_fetched(tmp_path, monkeypatch):
+    """The exact scenario that caused real confusion (2026-08-30): running on a
+    weekend/holiday with an already-current cache must be reported as 'current', not
+    lumped in with tickers that genuinely got new rows."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    old_dates = pd.date_range("2024-01-01", periods=5, freq="D")  # last cached day: 01-05
+    for t in ("A", "B"):
+        _multi_index_df([f"{t}.NS"], old_dates)[f"{t}.NS"].to_csv(tmp_path / f"{t}.csv")
+
+    def fake_download(yf_tickers, **kwargs):
+        # yfinance genuinely has nothing newer than 01-05 (e.g. a weekend)
+        return _multi_index_df(yf_tickers, pd.DatetimeIndex([]))
+
+    monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
+    result = fetch_prices.fetch_all(["A", "B"])
+    assert result == {"new": [], "updated": [], "current": ["A", "B"], "empty": []}
+
+
+def test_fetch_all_same_day_rerun_skips_the_network_call_entirely(tmp_path, monkeypatch):
+    """Already fetched through today (or later) — a rerun must not call yf.download at
+    all, since a future start date can never have data. Distinct from the
+    weekend/holiday case above, where the network still has to be asked."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    dates_through_today = pd.date_range(end=pd.Timestamp(date.today()), periods=5, freq="D")
+    _multi_index_df(["A.NS"], dates_through_today)["A.NS"].to_csv(tmp_path / "A.csv")
+
+    def fake_download(yf_tickers, **kwargs):
+        raise AssertionError("should not have called yf.download for a same-day rerun")
+
+    monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
+    result = fetch_prices.fetch_all(["A"])
+    assert result == {"new": [], "updated": [], "current": ["A"], "empty": []}

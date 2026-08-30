@@ -1,6 +1,7 @@
 """Run once/day, after refreshing data_cache (`python3 fetch_prices.py`) and the Nifty
-regime cache (`python3 market_regime.py`) for today. Scans the full F&O universe for a
-NEW entry signal as of the latest cached trading day — reuses backtest.py's detect_entry()
+regime cache (`python3 market_regime.py`) for today. Scans the full NIFTY 500 universe
+(the pure-swing default, see relative_strength.py's UNIVERSE_FILE comment) for a NEW
+entry signal as of the latest cached trading day — reuses backtest.py's detect_entry()
 directly, so this can never drift from what the validated backtest actually tested."""
 import pandas as pd
 
@@ -37,7 +38,7 @@ def scan(tickers):
 
 
 if __name__ == "__main__":
-    tickers = pd.read_csv("fo_universe.csv", header=None)[0].tolist()
+    tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
     scan_date, candidates = scan(tickers)
     print(f"scan date: {scan_date.date() if scan_date is not None else 'no data'}")
     if not candidates:

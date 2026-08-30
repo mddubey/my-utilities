@@ -310,7 +310,12 @@ def run(tickers, use_resistance, pivot_fn=weekly_pivots, min_rr=0.0):
 
 
 if __name__ == "__main__":
-    tickers = pd.read_csv("fo_universe.csv", header=None)[0].tolist()
+    # NIFTY 500 (500 tickers) — ADOPTED (2026-08-30) as the pure-swing universe, a strict
+    # superset of fo_universe.csv's 210 F&O-eligible names. See relative_strength.py's
+    # UNIVERSE_FILE comment for the full before/after numbers. fo_universe.csv stays the
+    # right list ONLY for the options-specific layer (option_backtest.py/portfolio.py),
+    # which is hard-constrained to names that actually have options.
+    tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
     trades = run(tickers, True, weekly_pivots, 0.0)
-    trades.to_csv("runs/trades_v23.csv", index=False)
-    summarize(trades, "v23: v22 + weekly_pivots off-by-one-week bug fixed (found by the first deterministic test) — target/resistance now correctly refreshes every day of the week, not just Fridays")
+    trades.to_csv("runs/trades_v24.csv", index=False)
+    summarize(trades, "v24: v23 + NIFTY 500 universe (500 tickers) instead of the F&O-only 210")
