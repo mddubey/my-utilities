@@ -35,6 +35,23 @@ VCP_VOL_ZSCORE_MIN = 0.5      # actual default — verified via sweep (2026-08-3
                                # loosest z-score version (>=0, "just above average") tripled
                                # the sample (14->41) AND improved every quality metric versus
                                # the flat 1.8x ratio; 0.5 was the smooth optimum, not a cherry-pick
+LAST_LEG_TOLERANCE = 0.40     # ADOPTED (2026-08-31): the strict last_depth<=depths[-2] rule
+                               # required the final leg to be tighter than the PRIOR leg with
+                               # zero slack — a human reading a chart wouldn't reject a base
+                               # over a fractional-percentage-point wobble on the last leg (real
+                               # case: AUROPHARMA missed by 4.97% vs 4.40%, a 13% relative miss,
+                               # on an otherwise clean 4-leg tightening base, later confirmed to
+                               # be a genuine breakout). Full-backtest sweep 0%-100%: gains
+                               # mostly land by 20-30%, then plateau flat/noisy out to 100% —
+                               # 40% sits in that plateau (n 543->654, win 56.2%->57.2%, median
+                               # +1.46%->+1.60%, conc 37.5%->31.6%), tied-or-better than 30% on
+                               # every metric, no principled reason to prefer 30 over 40. Checked
+                               # the marginal trades specifically (the 130 unlocked at 40% that
+                               # don't exist at 0%), not just before/after averages: they're
+                               # BETTER quality than the existing pool (60.8% win/+2.63% median
+                               # vs baseline 56.2%/+1.46%), though thinner (70% concentration
+                               # for that subgroup alone vs ~32% overall) — still under the 100%
+                               # reject line, not disqualifying.
 
 
 def _find_swings(high, low, pct=ZIGZAG_PCT):
@@ -103,7 +120,8 @@ def base_pivot(df, i):
 
     depths = [(h_p - l_p) / h_p for _, h_p, _, l_p in legs]
     first_depth, last_depth = depths[0], depths[-1]
-    if not (last_depth <= TIGHTENING_RATIO * first_depth and last_depth <= depths[-2]):
+    if not (last_depth <= TIGHTENING_RATIO * first_depth
+            and last_depth <= depths[-2] * (1 + LAST_LEG_TOLERANCE)):
         return None
 
     first_leg_vol = window.Volume.iloc[legs[0][0]:legs[0][2] + 1].mean()

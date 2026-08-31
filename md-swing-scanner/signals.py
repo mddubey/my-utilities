@@ -3,6 +3,20 @@ import pandas as pd
 CLOSE_NEAR_HIGH_PCT = 0.70   # close sits in top 30% of day's range — not specified in source spec, my pick
 VOL_SURGE_MIN = 1.20         # volume must be >=20% above yesterday's, not just "more"
 BREAKOUT_MIN_PCT = 1.005     # close must clear yesterday's high by >=0.5%, not just any amount
+VOL_ZSCORE_WINDOW = 8        # ADOPTED (2026-08-31): a 20-day trailing window can straddle two
+                              # different phases — an active prior move plus the quiet base that
+                              # followed it — and the prior move's volume inflates the mean/std
+                              # enough to mute a genuinely strong NEW volume day (real case:
+                              # AUROPHARMA 2026-08-31 initially scored z=0.23 against a stale
+                              # 20d window that still included an unrelated earlier spike, vs
+                              # z=+2.17 against just the 14-day quiet base that actually followed
+                              # it). Full-backtest sweep of windows 20/15/12/10/8/5: ALL metrics
+                              # improve 20->8 (ALL: n 677->808, win 58.3%->60.1%, conc 30.7%->
+                              # 25.2%; VCP: conc 37.5%->30.7%), then flatten — 8 is the shortest
+                              # window that captures the full gain on BOTH patterns jointly
+                              # (Breakout Cont's concentration specifically improves at 8/5, not
+                              # at 10-15). Drought-only trades: 0 unlocked at every window —
+                              # orthogonal to the regime-gate drought, general quality fix only.
 # Coiled Spring/VCP lives entirely in vcp.py now — the single-5-day-window version that
 # used to live here was a much-too-loose simplification of the real pattern (checked
 # directly against the standard Minervini VCP/Trend-Template definition, 2026-08-30:
@@ -91,12 +105,12 @@ def build_indicators(df):
     df["sma200_20ago"] = df.sma200.shift(20)  # for "200MA trending up for at least a month"
     df["high_252"] = df.High.rolling(252).max()
     df["low_252"] = df.Low.rolling(252).min()
-    # z-score volume (prior 20 days, excludes today — same no-lookahead convention as
-    # the rest of this file), for testing as an alternative to the flat "1.2x yesterday"
-    # checklist item
-    vol_prior20 = df.Volume.shift(1).rolling(20)
-    df["vol_mean20_prior"] = vol_prior20.mean()
-    df["vol_std20_prior"] = vol_prior20.std()
+    # z-score volume (prior VOL_ZSCORE_WINDOW days, excludes today — same no-lookahead
+    # convention as the rest of this file), for testing as an alternative to the flat
+    # "1.2x yesterday" checklist item
+    vol_prior = df.Volume.shift(1).rolling(VOL_ZSCORE_WINDOW)
+    df["vol_mean20_prior"] = vol_prior.mean()
+    df["vol_std20_prior"] = vol_prior.std()
     df["vol_zscore"] = (df.Volume - df.vol_mean20_prior) / df.vol_std20_prior
     return df
 

@@ -28,40 +28,53 @@ def schedule(trades):
 
 
 def simulate_lots(admitted, total_capital=TOTAL_CAPITAL):
-    """Real rupee sizing: each of the MAX_CONCURRENT slots gets an equal share of
-    capital, buys as many WHOLE lots as it can afford at entry, and skips the
-    trade entirely if it can't afford even 1 lot. Leftover cash (after buying
-    whole lots) just sits idle in that slot until the position closes."""
-    balances = [total_capital / MAX_CONCURRENT] * MAX_CONCURRENT
-    free_slots = list(range(MAX_CONCURRENT))
-    occupied = []  # heap of (exit_date, slot_index)
+    """Real rupee sizing, ONE shared cash pool (rewritten 2026-08-31 — the original
+    split total_capital into MAX_CONCURRENT equal, independent per-slot balances,
+    which meant a trade's affordability depended on the arbitrary slot it happened
+    to be scheduled into, not on the portfolio's real total cash. Verified this was
+    a genuine artifact: at ₹1L vs ₹1.5L on the same ATM-next trade set, realized
+    return went +126.0% -> -8.1% -> +128.2% at ₹2L, purely from which slot each
+    trade landed in changing as the split boundaries moved — money is fungible in
+    a real brokerage account, so it should be here too.
+
+    Capital is actually locked out of `balance` while a position is open (deducted
+    at entry, returned + realized P&L at exit) — the concurrency cap (at most
+    MAX_CONCURRENT positions open at once) still comes entirely from `schedule()`
+    upstream; this function only adds the capital constraint on top. Still fixed
+    1 lot per trade, never scaled up with available balance — that's a separate
+    sizing-policy question, deliberately not changed in the same pass as the
+    capital-pooling fix (one variable at a time)."""
+    balance = total_capital
+    occupied = []  # heap of (exit_date, capital_deployed, rupee_pnl) — locked-up capital + its outcome
     rows = []
 
+    def release_expired(before_date):
+        nonlocal balance
+        while occupied and occupied[0][0] < before_date:
+            _, deployed, pnl = heapq.heappop(occupied)
+            balance += deployed + pnl
+
     for _, t in admitted.sort_values("entry_date").iterrows():
-        while occupied and occupied[0][0] < t.entry_date:
-            _, slot = heapq.heappop(occupied)
-            free_slots.append(slot)
-        if not free_slots:
-            continue  # shouldn't happen if `admitted` already respects MAX_CONCURRENT
-        slot = free_slots.pop()
+        release_expired(t.entry_date)
 
         cost_per_lot = t.lot_size * t.entry_opt_price
         n_lots = 1  # fixed 1 lot per trade, never scale up with available balance
-        if balances[slot] < cost_per_lot:
-            free_slots.append(slot)  # can't afford even 1 lot — skip, slot stays free
-            continue
+        capital_deployed = n_lots * cost_per_lot
+        if balance < capital_deployed:
+            continue  # can't afford even 1 lot from the shared pool right now — skip
 
+        balance -= capital_deployed  # locked up for the life of the position
         rupee_pnl = n_lots * t.lot_size * (t.exit_opt_price - t.entry_opt_price)
-        balances[slot] += rupee_pnl
-        heapq.heappush(occupied, (t.exit_date, slot))
+        heapq.heappush(occupied, (t.exit_date, capital_deployed, rupee_pnl))
 
         rows.append(dict(
             ticker=t.ticker, entry_date=t.entry_date, exit_date=t.exit_date,
-            lot_size=t.lot_size, n_lots=n_lots, capital_deployed=n_lots * cost_per_lot,
-            rupee_pnl=rupee_pnl, slot=slot, slot_balance_after=balances[slot],
+            lot_size=t.lot_size, n_lots=n_lots, capital_deployed=capital_deployed,
+            rupee_pnl=rupee_pnl, cash_after_entry=balance,
         ))
 
-    return pd.DataFrame(rows), sum(balances)
+    release_expired(pd.Timestamp.max)  # settle whatever's still open at data end
+    return pd.DataFrame(rows), balance
 
 
 if __name__ == "__main__":

@@ -53,7 +53,7 @@ import yfinance as yf
 from backtest import load, load_with_extra_row, detect_entry, resistance_target, stage2_trend_template
 from signals import base_filters_pass
 from vcp import base_pivot
-from pivots import weekly_pivots
+from pivots import daily_pivots
 
 LIVE_CUTOFF_DEFAULT = "14:45"  # IST
 
@@ -65,7 +65,7 @@ def shortlist_primed(tickers):
     primed = set()
     for t in tickers:
         try:
-            df = load(t, weekly_pivots)
+            df = load(t, daily_pivots)
         except FileNotFoundError:
             continue
         rows = df.reset_index()
@@ -117,6 +117,24 @@ def fetch_live_bars(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT):
     return bars
 
 
+def _annotate(ticker, pattern, structural_low, row, prev_row, live):
+    """Points about TODAY's move specifically, on top of the raw entry (2026-08-31) —
+    close/target alone can't distinguish a fresh breakout with real room to run from
+    one that's already basically arrived (real case: CGPOWER close=916.00 vs
+    target=917.97 is only 0.2% of headroom left) or one that already got rejected at
+    that exact level intraday (real case: KAJARIACER's High today already exceeded its
+    own target before closing back below it)."""
+    target = resistance_target(row.Close, row)
+    return dict(
+        ticker=ticker, pattern=pattern, close=row.Close, target=target,
+        structural_low=structural_low, live=live,
+        pct_chg=(row.Close / prev_row.Close - 1) * 100 if prev_row.Close else None,
+        pct_to_target=(target / row.Close - 1) * 100 if target else None,
+        target_tested_today=target is not None and row.High >= target,
+        vol_zscore=row.vol_zscore,
+    )
+
+
 def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAULT):
     """candidates: real, gate-respecting signals (empty if require_regime and the
     gate's shut). watchlist: candidates whose PATTERN fired but only the regime gate
@@ -137,9 +155,9 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
     for ticker in tickers:
         try:
             if ticker in live_bars:
-                df = load_with_extra_row(ticker, live_bars[ticker], weekly_pivots)
+                df = load_with_extra_row(ticker, live_bars[ticker], daily_pivots)
             else:
-                df = load(ticker, weekly_pivots)
+                df = load(ticker, daily_pivots)
         except FileNotFoundError:
             continue
         rows = df.reset_index()
@@ -153,21 +171,15 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
         result = detect_entry(ticker, rows, i, require_regime=require_regime)
         if result is not None:
             pattern, structural_low = result
-            target = resistance_target(row.Close, row)
-            candidates.append(dict(
-                ticker=ticker, pattern=pattern, close=row.Close, target=target,
-                structural_low=structural_low, live=(ticker in live_bars),
-            ))
+            candidates.append(_annotate(ticker, pattern, structural_low, row, rows.iloc[i - 1],
+                                         live=(ticker in live_bars)))
             continue
         if require_regime:
             ungated = detect_entry(ticker, rows, i, require_regime=False)
             if ungated is not None:
                 pattern, structural_low = ungated
-                target = resistance_target(row.Close, row)
-                watchlist.append(dict(
-                    ticker=ticker, pattern=pattern, close=row.Close, target=target,
-                    structural_low=structural_low, live=(ticker in live_bars),
-                ))
+                watchlist.append(_annotate(ticker, pattern, structural_low, row, rows.iloc[i - 1],
+                                            live=(ticker in live_bars)))
     return scan_date, candidates, watchlist, live_shortlist
 
 
@@ -194,9 +206,13 @@ if __name__ == "__main__":
         print("  numbers assume the gate is on). Observation only, do not trade these as-is.")
 
     def print_row(c):
-        target_str = f"₹{c['target']:.2f}" if c['target'] is not None else "n/a"
+        target_str = f"₹{c['target']:.2f} ({c['pct_to_target']:+.1f}% away)" if c['target'] is not None else "n/a"
         live_tag = " [LIVE]" if c.get("live") else ""
-        print(f"  {c['ticker']:<14} {c['pattern']:<14} close=₹{c['close']:.2f}  target={target_str}{live_tag}")
+        chg_str = f"{c['pct_chg']:+.1f}% today" if c['pct_chg'] is not None else "n/a"
+        print(f"  {c['ticker']:<14} {c['pattern']:<14} close=₹{c['close']:.2f} ({chg_str})  "
+              f"target={target_str}  vol_z={c['vol_zscore']:+.1f}{live_tag}")
+        if c["target_tested_today"]:
+            print(f"    ⚠ already touched/exceeded this target intraday today — thin or no room left")
 
     print(f"\nTradable Today ({len(candidates)}):")
     if not candidates:

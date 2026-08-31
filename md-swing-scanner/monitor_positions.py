@@ -8,7 +8,7 @@ only, not a validated exit rule on its own, but a useful "is this stalling" data
 import pandas as pd
 
 from backtest import load, check_exit, current_stop_level, resistance_target, MAX_INITIAL_RISK_PCT
-from pivots import weekly_pivots
+from pivots import daily_pivots
 from vcp import base_pivot
 
 POSITIONS_FILE = "open_positions.csv"
@@ -18,7 +18,7 @@ def monitor(positions_df):
     for _, pos in positions_df.iterrows():
         ticker, entry_date, entry_price, pattern = pos.ticker, pos.entry_date, pos.entry_price, pos.pattern
         try:
-            df = load(ticker, weekly_pivots)
+            df = load(ticker, daily_pivots)
         except FileNotFoundError:
             print(f"{ticker}: no cached price data — run fetch_prices.py first")
             continue

@@ -121,7 +121,18 @@ computed automatically at no extra cost, for observation only, not a validated t
 Checked directly (2026-08-31, both a four-way gate-isolation test and a market-breadth gate
 alternative) that loosening the regime gate does NOT rescue the current drought with quality
 trades — the watchlist is for keeping an eye on things, not a hint that these are secretly
-tradable. Two more observation-only flags, neither backtest-validated: `--ignore-regime` bypasses
+tradable.
+
+Each row also annotates TODAY's move specifically (2026-08-31), since close/target alone can hide
+how much real room is left: `%chg` (today's move vs prior close), `target=... (X% away)` (room
+left to the resistance exit target — real case: a close of 916 against a 917.97 target is only
+0.2% away, i.e. basically already arrived), `vol_z` (today's volume z-score, confirms or questions
+the move), and a `⚠ already touched/exceeded this target intraday today` flag when the day's own
+High already reached the target before closing back below it (checked directly: this is roughly a
+wash historically, not a strong red flag on its own — but combined with near-zero room left, it's
+still worth knowing).
+
+Two more observation-only flags, neither backtest-validated: `--ignore-regime` bypasses
 the gate entirely (collapses to a single Tradable Today list, no watchlist split — there's no
 gate left to fail on); `--live [--cutoff HH:MM]` (default 14:45 IST) checks a same-day intraday
 snapshot instead of waiting for tomorrow's close — two-pass, so only a cheap EOD pre-filter

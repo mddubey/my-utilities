@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from signals import build_indicators, entry_signal, breakout_continuation
-from pivots import weekly_pivots, daily_pivots
+from pivots import daily_pivots
 from market_regime import market_trending
 from vcp import stage2_trend_template, vcp_breakout
 
@@ -82,12 +82,12 @@ def _finish_load(df, pivot_fn):
     return df
 
 
-def load(ticker, pivot_fn=weekly_pivots):
+def load(ticker, pivot_fn=daily_pivots):
     df = pd.read_csv(CACHE_DIR / f"{ticker}.csv", index_col="Date", parse_dates=True)
     return _finish_load(df, pivot_fn)
 
 
-def load_with_extra_row(ticker, extra_row, pivot_fn=weekly_pivots):
+def load_with_extra_row(ticker, extra_row, pivot_fn=daily_pivots):
     """Like load(), but appends one synthetic OHLCV row in-memory before computing
     indicators — for daily_scan.py's --live mode (2026-08-30): a partial-day intraday
     bar (extra_row: dict with Date/Open/High/Low/Close/Volume) run through the EXACT
@@ -347,7 +347,7 @@ def summarize(trades_df, label):
         })))
 
 
-def run(tickers, use_resistance, pivot_fn=weekly_pivots, min_rr=0.0, require_regime=True):
+def run(tickers, use_resistance, pivot_fn=daily_pivots, min_rr=0.0, require_regime=True):
     all_trades = []
     for t in tickers:
         try:
@@ -365,7 +365,14 @@ if __name__ == "__main__":
     # right list ONLY for the options-specific layer (option_backtest.py/portfolio.py),
     # which is hard-constrained to names that actually have options.
     tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
-    trades = run(tickers, True, weekly_pivots, 0.0)
-    trades.to_csv("runs/trades_v25.csv", index=False)
-    summarize(trades, "v25: v24 + Breakout Continuation tightens onto the 21-EMA past "
-                       "TRAIL_ENGAGE_PCT, same mechanism VCP already used (current_stop_level)")
+    trades = run(tickers, True, daily_pivots, 0.0)
+    trades.to_csv("runs/trades_v27.csv", index=False)
+    summarize(trades, "v27: v26 (daily pivots) + vcp.LAST_LEG_TOLERANCE=0.40 (base-tightening "
+                       "rule allows the final leg to be up to 40% deeper than the second-to-last, "
+                       "not zero slack) + signals.VOL_ZSCORE_WINDOW=8 (was 20 — a longer window "
+                       "can straddle an old, unrelated volume spike and mute a genuinely strong "
+                       "new one). All three verified individually AND combined (2026-08-31) — they "
+                       "stack constructively: n 677->924, win 58.3%->62.9%, median +1.64%->+2.90%, "
+                       "concentration 30.7%->16.1% (best in project history). Drought-only trades "
+                       "still 0 at every step — all three changes are orthogonal to the regime-gate "
+                       "drought, general detection-quality fixes only, not a backdoor around it.")

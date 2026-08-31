@@ -1,8 +1,9 @@
-from datetime import date
+from datetime import date, datetime
 
 import pandas as pd
 
 import fetch_prices
+from fetch_prices import IST
 
 
 def _multi_index_df(tickers, dates):
@@ -115,3 +116,62 @@ def test_fetch_all_same_day_rerun_skips_the_network_call_entirely(tmp_path, monk
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["A"])
     assert result == {"new": [], "updated": [], "current": ["A"], "empty": []}
+
+
+def test_fetch_all_before_safe_hour_does_not_cache_todays_row(tmp_path, monkeypatch):
+    """The actual incident (2026-08-31): a fetch before SAME_DAY_SAFE_HOUR returned a
+    real-looking (non-null) Close for today that Yahoo hadn't finished settling yet —
+    silently wrong by ~1%, and since the cache is purely incremental, it would have
+    been stuck forever. Before the safe hour, today's row must not be written at all,
+    so a later same-day run can still pick it up once it's actually safe."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    today = date(2026, 8, 31)
+    monkeypatch.setattr(fetch_prices, "_now_ist", lambda: datetime(2026, 8, 31, 15, 59, tzinfo=IST))
+    old_dates = pd.date_range(end="2026-08-28", periods=4, freq="D")  # last cached: 08-28
+    _multi_index_df(["A.NS"], old_dates)["A.NS"].to_csv(tmp_path / "A.csv")
+
+    def fake_download(yf_tickers, **kwargs):
+        # yfinance returns a real-looking (not null) row for today, still in flux
+        return _multi_index_df(yf_tickers, pd.DatetimeIndex([pd.Timestamp(today)]))
+
+    monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
+    result = fetch_prices.fetch_all(["A"])
+    assert result == {"new": [], "updated": [], "current": ["A"], "empty": []}
+    written = pd.read_csv(tmp_path / "A.csv", index_col="Date", parse_dates=True)
+    assert written.index.max() == pd.Timestamp("2026-08-28")  # today NOT appended
+
+
+def test_fetch_all_at_safe_hour_caches_todays_row(tmp_path, monkeypatch):
+    """Same setup as above, but at/after SAME_DAY_SAFE_HOUR — now safe to trust."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    today = date(2026, 8, 31)
+    monkeypatch.setattr(fetch_prices, "_now_ist", lambda: datetime(2026, 8, 31, 16, 0, tzinfo=IST))
+    old_dates = pd.date_range(end="2026-08-28", periods=4, freq="D")
+    _multi_index_df(["A.NS"], old_dates)["A.NS"].to_csv(tmp_path / "A.csv")
+
+    def fake_download(yf_tickers, **kwargs):
+        return _multi_index_df(yf_tickers, pd.DatetimeIndex([pd.Timestamp(today)]))
+
+    monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
+    result = fetch_prices.fetch_all(["A"])
+    assert result == {"new": [], "updated": ["A"], "current": [], "empty": []}
+    written = pd.read_csv(tmp_path / "A.csv", index_col="Date", parse_dates=True)
+    assert written.index.max() == pd.Timestamp("2026-08-31")
+
+
+def test_fetch_all_new_ticker_before_safe_hour_drops_todays_row(tmp_path, monkeypatch):
+    """The new-ticker (full history) path is exposed to the exact same risk — a brand
+    new ticker's freshly-pulled 5y history can still end with an unsettled today."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(fetch_prices, "_now_ist", lambda: datetime(2026, 8, 31, 12, 0, tzinfo=IST))
+    dates = pd.date_range(end="2026-08-31", periods=5, freq="D")
+
+    def fake_download(yf_tickers, **kwargs):
+        return _multi_index_df(yf_tickers, dates)
+
+    monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
+    result = fetch_prices.fetch_all(["NEWCO"])
+    assert result == {"new": ["NEWCO"], "updated": [], "current": [], "empty": []}
+    written = pd.read_csv(tmp_path / "NEWCO.csv", index_col="Date", parse_dates=True)
+    assert len(written) == 4  # 5 fetched, today (08-31) dropped as unsafe
+    assert written.index.max() == pd.Timestamp("2026-08-30")
