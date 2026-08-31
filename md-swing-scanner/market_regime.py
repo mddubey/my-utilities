@@ -50,6 +50,7 @@ def refresh():
     df = yf.download("^NSEI", period="5y", interval="1d", auto_adjust=True)
     df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
     df["adx14"], df["plus_di14"], df["minus_di14"] = _compute_adx(df)
+    df["sma50"] = df.Close.rolling(50).mean()
     df["sma200"] = df.Close.rolling(200).mean()
     df.to_csv(NIFTY_FILE)
 
@@ -57,7 +58,7 @@ def refresh():
 @functools.lru_cache(maxsize=None)
 def _regime_frame():
     df = pd.read_csv(NIFTY_FILE, index_col="Date", parse_dates=True)
-    return df[["Close", "adx14", "plus_di14", "minus_di14", "sma200"]]
+    return df[["Close", "adx14", "plus_di14", "minus_di14", "sma50", "sma200"]]
 
 
 def market_trending(date, require_rising=False, require_uptrend=False, require_above_sma200=False):

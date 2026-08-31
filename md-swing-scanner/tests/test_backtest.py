@@ -196,7 +196,7 @@ def test_corp_action_day_right_censors_open_position(monkeypatch):
 
     call_count = {"n": 0}
 
-    def fake_detect_entry(ticker, rows, i):
+    def fake_detect_entry(ticker, rows, i, require_regime=True):
         call_count["n"] += 1
         if i == 0:
             return "breakout_cont", None

@@ -223,13 +223,18 @@ def check_exit(pattern, state, row, use_resistance=True):
     return None, state
 
 
-def simulate_ticker(ticker, df, use_resistance, min_rr=0.0):
+def simulate_ticker(ticker, df, use_resistance, min_rr=0.0, require_regime=True):
     """Pure stock-level swing test — no options mechanics at all. Whether a real
     front-month contract exists, and when it would expire, is a separate downstream
     question (option_backtest.py), deliberately not asked here: mixing "is the option
     tradeable" into "is the stock signal any good" made it impossible to see the raw
     swing edge on its own (checked directly, 2026-08-30 — v12's numbers had both a
-    contract-availability filter on entry and an expiry-driven forced exit baked in)."""
+    contract-availability filter on entry and an expiry-driven forced exit baked in).
+
+    require_regime=False (2026-08-31): threads through to detect_entry() to disable the
+    Nifty regime gate for BOTH patterns in this run — used for the gate-isolation
+    experiment (is the SMA200 gate pulling its weight for Breakout Continuation too, or
+    only VCP). Default True preserves the exact v25 behavior for the real backtest."""
     trades = []
     in_position = False
     entry_date = pattern = None
@@ -255,7 +260,7 @@ def simulate_ticker(ticker, df, use_resistance, min_rr=0.0):
             prev_row = row
             continue  # don't evaluate a fresh entry off a corrupted day either
         if not in_position:
-            candidate = detect_entry(ticker, rows, i)
+            candidate = detect_entry(ticker, rows, i, require_regime=require_regime)
             if candidate is not None:
                 pattern_candidate, structural_low = candidate
                 target = resistance_target(row.Close, row) if use_resistance else None
@@ -342,14 +347,14 @@ def summarize(trades_df, label):
         })))
 
 
-def run(tickers, use_resistance, pivot_fn=weekly_pivots, min_rr=0.0):
+def run(tickers, use_resistance, pivot_fn=weekly_pivots, min_rr=0.0, require_regime=True):
     all_trades = []
     for t in tickers:
         try:
             df = load(t, pivot_fn)
         except FileNotFoundError:
             continue
-        all_trades.extend(simulate_ticker(t, df, use_resistance, min_rr))
+        all_trades.extend(simulate_ticker(t, df, use_resistance, min_rr, require_regime))
     return pd.DataFrame(all_trades)
 
 

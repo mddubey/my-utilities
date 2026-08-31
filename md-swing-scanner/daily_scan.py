@@ -4,12 +4,22 @@ regime cache (`python3 market_regime.py`) for today. Scans the full NIFTY 500 un
 entry signal as of the latest cached trading day — reuses backtest.py's detect_entry()
 directly, so this can never drift from what the validated backtest actually tested.
 
---ignore-regime (2026-08-30): bypasses the Nifty ADX/200-SMA gate for THIS SCAN ONLY,
-so pattern breakouts still surface for watching during a regime drought (e.g. the
-Feb-Aug 2026 SMA200 closure) instead of a blank "no candidates" every day. These are
-explicitly NOT validated trade signals — the v25 backtest numbers assume the gate is
-on — hence the loud banner below. Purely for observing how candidates would have
-looked, not for taking real positions.
+Default output is now two sections (2026-08-31): "Tradable Today" (gate-respecting,
+real signals) and "Watchlist — fails only on regime" (pattern fired, only the ADX/
+200-SMA gate blocked it — computed automatically, no flag needed, cheap since it only
+costs one extra detect_entry(require_regime=False) call per ticker that didn't
+already pass). Checked directly (2026-08-31) that loosening the gate on breadth or an
+isolation basis doesn't rescue the current drought with quality trades (see
+backtest.py comments/memory) — this watchlist is for observation, not a signal that
+these are secretly tradable, same caveat as before.
+
+--ignore-regime (2026-08-30): bypasses the Nifty ADX/200-SMA gate for THIS SCAN ONLY
+(collapses to a single "Tradable Today" list with no watchlist split, since there's
+no gate left to fail on), so pattern breakouts still surface during a regime drought
+instead of relying on the watchlist section alone. These are explicitly NOT validated
+trade signals — the v25 backtest numbers assume the gate is on — hence the loud
+banner below. Purely for observing how candidates would have looked, not for taking
+real positions.
 
 --live [--cutoff HH:MM] (2026-08-30): same-day intraday check instead of waiting for
 tomorrow's cached close, so a real breakout can be caught same-day near the close
@@ -108,6 +118,13 @@ def fetch_live_bars(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT):
 
 
 def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAULT):
+    """candidates: real, gate-respecting signals (empty if require_regime and the
+    gate's shut). watchlist: candidates whose PATTERN fired but only the regime gate
+    blocked them (2026-08-31) — always computed, regardless of require_regime, so a
+    normal run shows both "what's tradable today" and "what to keep an eye on" without
+    needing a separate --ignore-regime invocation. Cheap: only costs one extra
+    detect_entry(require_regime=False) call, and only for tickers that didn't already
+    pass with the gate on."""
     live_bars = {}
     live_shortlist = []
     if live:
@@ -115,6 +132,7 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
         live_bars = fetch_live_bars(live_shortlist, cutoff_ist)
 
     candidates = []
+    watchlist = []
     scan_date = None
     for ticker in tickers:
         try:
@@ -133,15 +151,24 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
         if row.corp_action_day:
             continue  # today's own data looks like a corporate-action glitch — skip
         result = detect_entry(ticker, rows, i, require_regime=require_regime)
-        if result is None:
+        if result is not None:
+            pattern, structural_low = result
+            target = resistance_target(row.Close, row)
+            candidates.append(dict(
+                ticker=ticker, pattern=pattern, close=row.Close, target=target,
+                structural_low=structural_low, live=(ticker in live_bars),
+            ))
             continue
-        pattern, structural_low = result
-        target = resistance_target(row.Close, row)
-        candidates.append(dict(
-            ticker=ticker, pattern=pattern, close=row.Close, target=target,
-            structural_low=structural_low, live=(ticker in live_bars),
-        ))
-    return scan_date, candidates, live_shortlist
+        if require_regime:
+            ungated = detect_entry(ticker, rows, i, require_regime=False)
+            if ungated is not None:
+                pattern, structural_low = ungated
+                target = resistance_target(row.Close, row)
+                watchlist.append(dict(
+                    ticker=ticker, pattern=pattern, close=row.Close, target=target,
+                    structural_low=structural_low, live=(ticker in live_bars),
+                ))
+    return scan_date, candidates, watchlist, live_shortlist
 
 
 if __name__ == "__main__":
@@ -155,7 +182,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
-    scan_date, candidates, live_shortlist = scan(
+    scan_date, candidates, watchlist, live_shortlist = scan(
         tickers, require_regime=not args.ignore_regime, live=args.live, cutoff_ist=args.cutoff,
     )
     print(f"scan date: {scan_date.date() if scan_date is not None else 'no data'}")
@@ -165,9 +192,23 @@ if __name__ == "__main__":
     if args.ignore_regime:
         print("⚠ REGIME GATE DISABLED — these are NOT validated trade signals (v25's backtest")
         print("  numbers assume the gate is on). Observation only, do not trade these as-is.")
-    if not candidates:
-        print("no candidates today")
-    for c in candidates:
+
+    def print_row(c):
         target_str = f"₹{c['target']:.2f}" if c['target'] is not None else "n/a"
         live_tag = " [LIVE]" if c.get("live") else ""
         print(f"  {c['ticker']:<14} {c['pattern']:<14} close=₹{c['close']:.2f}  target={target_str}{live_tag}")
+
+    print(f"\nTradable Today ({len(candidates)}):")
+    if not candidates:
+        print("  none")
+    for c in candidates:
+        print_row(c)
+
+    if not args.ignore_regime:
+        print(f"\nWatchlist — fails only on regime ({len(watchlist)}):")
+        print("  Pattern fired but the Nifty ADX/200-SMA gate blocked it — not validated")
+        print("  trade signals, for watching only in case the regime opens back up.")
+        if not watchlist:
+            print("  none")
+        for c in watchlist:
+            print_row(c)

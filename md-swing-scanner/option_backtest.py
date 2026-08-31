@@ -93,7 +93,20 @@ def liquid(row):
     return row.OpnIntrst > 0 and row.TtlTradgVol > 0
 
 
-def pick_contract(ticker, entry_date, spot_price):
+ITM_PCT = 0.05  # contract-selection isolation experiment (2026-08-31): how far in-the-money
+                 # the "itm" moneyness variant targets. No real delta available (no IV column
+                 # in the bhavcopy, would need a Black-Scholes back-out — see README's known
+                 # limitations), so this is a moneyness PROXY: the real, available strike
+                 # closest to spot*(1-ITM_PCT), not an actual 0.60-0.70 delta band.
+
+
+def pick_contract(ticker, entry_date, spot_price, moneyness="atm", expiry_choice="current"):
+    """moneyness: 'atm' (nearest strike to spot, default/original behavior) or 'itm'
+    (nearest strike to spot*(1-ITM_PCT) — less theta/vega sensitivity, closer to
+    tracking the underlying 1:1, at a higher premium).
+    expiry_choice: 'current' (front month, rolling to next if <MIN_EXPIRY_RUNWAY_DAYS
+    left — default/original behavior) or 'next' (always skip straight to the next
+    month, more runway from day one; no trade if only one expiry is listed)."""
     day_df = load_day(entry_date.strftime("%Y%m%d"))
     if day_df is None:
         return None
@@ -104,14 +117,22 @@ def pick_contract(ticker, entry_date, spot_price):
     expiries = sorted(e for e in chain.XpryDt.unique() if e >= entry_date)
     if not expiries:
         return None
-    expiry = expiries[0]  # nearest available expiry — front month, same as a real trader would buy
-    if len(expiries) > 1 and trading_days_between(entry_date, expiry) < MIN_EXPIRY_RUNWAY_DAYS:
-        expiry = expiries[1]  # front-month is about to die — roll to next month instead of buying a corpse
+    if expiry_choice == "current":
+        expiry = expiries[0]  # nearest available expiry — front month, same as a real trader would buy
+        if len(expiries) > 1 and trading_days_between(entry_date, expiry) < MIN_EXPIRY_RUNWAY_DAYS:
+            expiry = expiries[1]  # front-month is about to die — roll to next month instead of buying a corpse
+    elif expiry_choice == "next":
+        if len(expiries) < 2:
+            return None
+        expiry = expiries[1]
+    else:
+        raise ValueError(expiry_choice)
 
     strikes = chain[(chain.XpryDt == expiry) & chain.apply(liquid, axis=1)]
     if strikes.empty:
         return None
-    idx = (strikes.StrkPric - spot_price).abs().idxmin()
+    target = spot_price if moneyness == "atm" else spot_price * (1 - ITM_PCT)
+    idx = (strikes.StrkPric - target).abs().idxmin()
     row = strikes.loc[idx]
     return expiry, row.StrkPric, row.NewBrdLotQty
 
@@ -140,8 +161,8 @@ def stock_close(ticker, date):
     return s.loc[date]
 
 
-def simulate_option_trade(trade):
-    contract = pick_contract(trade.ticker, trade.entry_date, trade.entry_price)
+def simulate_option_trade(trade, moneyness="atm", expiry_choice="current"):
+    contract = pick_contract(trade.ticker, trade.entry_date, trade.entry_price, moneyness, expiry_choice)
     if contract is None:
         return None
     expiry, strike, lot_size = contract
@@ -206,13 +227,13 @@ def simulate_option_trade(trade):
     )
 
 
-def run(trades_csv):
+def run(trades_csv, moneyness="atm", expiry_choice="current"):
     trades = pd.read_csv(trades_csv, parse_dates=["entry_date", "exit_date"])
     trades = trades[~trades.open_at_end]
 
     results, skipped = [], 0
     for _, trade in trades.iterrows():
-        r = simulate_option_trade(trade)
+        r = simulate_option_trade(trade, moneyness, expiry_choice)
         if r is None:
             skipped += 1
         else:
@@ -223,7 +244,11 @@ def run(trades_csv):
 
 
 if __name__ == "__main__":
-    out = run("runs/trades_rr_0.0.csv")
+    # runs/trades_rr_0.0.csv was a pre-v3 artifact, completely stale — pointing this at
+    # the current validated F&O-scoped swing config instead (2026-08-30). Full v23 spans
+    # 2021-2026 but options_cache/ only covers Nov 2024 onward, so trades_v23_recent.csv
+    # is v23 pre-filtered to that actually-testable window (see the ad-hoc filter run).
+    out = run("runs/trades_v23_recent.csv")
     out.to_csv("runs/option_trades.csv", index=False)
 
     wins = out[out.pnl_pct > 0]

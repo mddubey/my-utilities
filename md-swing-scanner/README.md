@@ -115,9 +115,15 @@ python3 monitor_positions.py   # current stop/target for your open positions
 ```
 
 `daily_scan.py` scans the full NIFTY 500 universe with the exact same entry logic the backtest
-validated. Two observation-only flags, neither backtest-validated (use for watching, not trading
-as-is): `--ignore-regime` bypasses the Nifty ADX/200-SMA gate so pattern breakouts still surface
-during a regime drought; `--live [--cutoff HH:MM]` (default 14:45 IST) checks a same-day intraday
+validated. Output is always two sections: **Tradable Today** (gate-respecting, real signals) and
+**Watchlist — fails only on regime** (pattern fired, only the Nifty ADX/200-SMA gate blocked it —
+computed automatically at no extra cost, for observation only, not a validated trade signal).
+Checked directly (2026-08-31, both a four-way gate-isolation test and a market-breadth gate
+alternative) that loosening the regime gate does NOT rescue the current drought with quality
+trades — the watchlist is for keeping an eye on things, not a hint that these are secretly
+tradable. Two more observation-only flags, neither backtest-validated: `--ignore-regime` bypasses
+the gate entirely (collapses to a single Tradable Today list, no watchlist split — there's no
+gate left to fail on); `--live [--cutoff HH:MM]` (default 14:45 IST) checks a same-day intraday
 snapshot instead of waiting for tomorrow's close — two-pass, so only a cheap EOD pre-filter
 (`shortlist_primed`, typically ~30/500 tickers) gets an actual intraday fetch, not the full
 universe. `monitor_positions.py` reads `open_positions.csv` (columns: `ticker,
