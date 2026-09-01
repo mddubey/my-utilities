@@ -58,6 +58,7 @@ from backtest import (load, load_with_extra_row, detect_entry, resistance_target
 from signals import base_filters_pass, entry_signal
 from vcp import base_pivot, vcp_breakout
 from pivots import daily_pivots
+from sector_strength import sector_rs
 
 LIVE_CUTOFF_DEFAULT = "14:45"  # IST
 
@@ -180,6 +181,7 @@ def _annotate(ticker, pattern, structural_low, row, prev_row, live, rows, i):
     that exact level intraday (real case: KAJARIACER's High today already exceeded its
     own target before closing back below it)."""
     target = resistance_target(row.Close, row)
+    sector, sector_rs_pct = sector_rs(ticker, row.Date)
     return dict(
         ticker=ticker, pattern=pattern, close=row.Close, target=target,
         structural_low=structural_low, live=live,
@@ -190,6 +192,7 @@ def _annotate(ticker, pattern, structural_low, row, prev_row, live, rows, i):
         is_fo=ticker in _fo_tickers(),
         dual_pattern=_also_qualifies_other_pattern(ticker, pattern, rows, i),
         stop=_initial_stop(pattern, structural_low, row),
+        sector=sector, sector_rs=sector_rs_pct,
     )
 
 
@@ -269,8 +272,11 @@ if __name__ == "__main__":
         chg_str = f"{c['pct_chg']:+.1f}% today" if c['pct_chg'] is not None else "n/a"
         fo_tag = "[F&O]" if c["is_fo"] else "[NO OPTIONS]"
         dual_tag = " [BOTH]" if c["dual_pattern"] else ""
+        sector_str = (f"{c['sector']} (sector RS {c['sector_rs']:.0f})"
+                      if c["sector"] and c["sector_rs"] is not None else "sector n/a")
         print(f"  {c['ticker']:<14} {fo_tag:<12} {c['pattern']:<14} close=₹{c['close']:.2f} ({chg_str})  "
               f"stop=₹{c['stop']:.2f}  target={target_str}  vol_z={c['vol_zscore']:+.1f}{live_tag}{dual_tag}")
+        print(f"    {sector_str}")
         if c["target_tested_today"]:
             print(f"    ⚠ already touched/exceeded this target intraday today — thin or no room left")
         if c["dual_pattern"]:

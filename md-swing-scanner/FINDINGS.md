@@ -146,6 +146,32 @@ revisiting as a live natural experiment: if Nifty's SMA50 keeps rising and price
 genuinely recovers over the coming weeks, that's more real evidence accumulating for
 free, without having gated real trades on an unproven signal today.
 
+**Sector leadership — ADOPTED as a ranking signal (2026-09-01), but does NOT explain
+the VCP weak window (5th hypothesis tested, also ruled out).** Built `sectors.py`
+(ticker→sector via yfinance, cached, 499/500 classified) and `sector_strength.py`
+(sector-level relative strength, same methodology as `relative_strength.py`'s
+per-stock RS but grouped by sector). Two separate results:
+- **General signal, real and worth keeping**: bucketing all v28 trades by sector-RS
+  percentile at entry, VCP specifically shows a clean pattern — win 56.1%/60.8%/
+  55.3% in the bottom three quartiles vs **68.1%** in the top quartile (leading
+  sector), and concentration drops from a lumpy 75-200% down to a healthy 30.5%.
+  Leading-sector trades aren't just winning more, they're winning broadly. Adopted as
+  a `daily_scan.py` annotation (`sector`, `sector_rs` fields — shown as
+  "{sector} (sector RS {N})" under each candidate), **NOT a hard filter** — same
+  reasoning as keeping MOMENTUM_20D_MIN/MIN_TRADED_VALUE as candidate-list controls
+  rather than proven gates: helps decide which of several same-day candidates to
+  prioritize, doesn't shrink the list.
+- **Does not explain the Oct'24-Feb'26 weak window specifically**: sector-RS during
+  that window was only mildly lower than outside it (median 63.6 vs 72.7), and
+  splitting the weak-window trades themselves by sector strength doesn't discriminate
+  at all — above-median-sector trades still lost (46.2% win, -1.1% median), nearly
+  identical to below-median (46.9% win, -2.3% median). There IS a real compositional
+  shift (Industrials' share of VCP trades dropped from 34% outside the window to 17%
+  inside it, Financial Services and Basic Materials grew) but sector quality itself
+  stopped mattering during this specific stretch, so the shift isn't the actual
+  driver. Fifth hypothesis for the VCP collapse ruled out, same as the four
+  regime-gate ideas above — remaining candidates: volatility regime, market breadth.
+
 **Does a stock qualifying for BOTH patterns on the same day mean higher confidence?
 Checked, and no — not yet, on this sample (2026-09-01).** `detect_entry()` itself
 short-circuits (Breakout Cont checked first, first match wins, VCP's own check never
@@ -341,8 +367,9 @@ where they came from rather than presented as this project's own original thinki
   spec doesn't intend) and a true volume-dry-up check near the pivot (last few days
   specifically, not just the last leg's average) — both untested refinements to
   `vcp.py`'s base detection.
-- Sector-leadership tracking and earnings/event-proximity annotation — neither built.
-  Sector leadership ties directly into item 5's next hypothesis.
+- Sector-leadership tracking — DONE (2026-09-01), see the "Sector leadership" entry
+  in the "Swing side" section above. Earnings/event-proximity annotation — still not
+  built.
 - Options: back out approximate delta/IV instead of a fixed 5% ITM offset; a premium
   stop or time stop (-35% to -50% premium loss, or exit if the stock hasn't moved in
   3-5 sessions) as an options-specific exit distinct from the stock's own stop; using

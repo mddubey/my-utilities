@@ -92,6 +92,12 @@ without relying on any single session's memory.
   to `nifty500_universe.csv` — set it to `fo_universe.csv` only for the options-specific
   layer, since RS is a ranking and which universe it's ranked against genuinely changes
   the result.
+- `sectors.py` — ticker→sector classification (`data_cache/_sectors.csv`, via
+  yfinance, 499/500 classified), refreshed standalone, not on every scan.
+- `sector_strength.py` — sector-level relative strength (same RS methodology as
+  `relative_strength.py`, grouped by sector). Feeds `daily_scan.py`'s `sector`/
+  `sector_rs` annotation — a ranking signal, not a filter, see its own module comment
+  and `FINDINGS.md` for the backtest evidence behind it.
 - `runs/` — every backtest/portfolio script writes its output CSVs here (also gitignored — regeneratable, not source).
 
 **Signal logic**
@@ -175,6 +181,14 @@ condition too, not just the one that actually claimed it — checked directly be
 it is **purely informational**, not a validated confidence signal (win rate identical either way,
 65.0%, on the 40 real dual-qualified trades out of 1430 in v28 — see `FINDINGS.md`). Don't use it
 to rank candidates against each other.
+
+A third field, added 2026-09-01: `{sector} (sector RS N)` shows the candidate's sector and how
+that sector currently ranks (0-100 percentile) against every other sector's trailing relative
+strength. Unlike `[BOTH]`, this one IS meant as a ranking signal when choosing between several
+same-day candidates — real backtest evidence (see `FINDINGS.md`) shows VCP trades in the top
+sector-RS quartile win 68.1% (vs 55-61% in the bottom three) with much healthier concentration.
+Still not a hard gate — nothing gets excluded from the list on this basis, same reasoning as
+`MOMENTUM_20D_MIN`/`MIN_TRADED_VALUE` staying candidate-list controls rather than proven filters.
 
 Two more observation-only flags, neither backtest-validated: `--ignore-regime` bypasses
 the gate entirely (collapses to a single Tradable Today list, no watchlist split — there's no
