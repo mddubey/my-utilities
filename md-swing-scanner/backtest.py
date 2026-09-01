@@ -83,6 +83,14 @@ def _finish_load(df, pivot_fn):
 
 
 def load(ticker, pivot_fn=daily_pivots):
+    """pivot_fn defaults to daily_pivots, not weekly_pivots (2026-08-31, v27) — a
+    weekly resistance ladder is fixed Mon-Fri and can be fully used up by a single
+    big-range day (real case: CGPOWER hit its entire week's R2 on day one, then had
+    zero room the rest of the week), whereas a daily-recomputed ladder stays in
+    lockstep with the stock's actual pace. Clean re-test on the same v25 entries:
+    win 58.3%->61.8%, median +1.64%->+2.83%, concentration 30.7%->22.6%,
+    resistance-exit share 47.9%->59.2%. weekly_pivots is kept in pivots.py (still
+    tested) but no longer wired in anywhere in this file or the live-use scripts."""
     df = pd.read_csv(CACHE_DIR / f"{ticker}.csv", index_col="Date", parse_dates=True)
     return _finish_load(df, pivot_fn)
 

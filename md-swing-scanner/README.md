@@ -23,28 +23,46 @@ resistance target and a gated climax-top exit for both.
 
 ## Current status
 
-As of 2026-08-30, the validated stock-level config (**v25**) backtested over 5 years
-(2021-2026) across the full 500-stock NIFTY 500 universe: **n=677 trades, 58.3% win
-rate, median +1.64%/trade, top-10-of-total concentration 30.7%**. v25 supersedes v24
-(n=676, 58.0% win, +1.66% median, 30.8% concentration) — same overall shape, but
-Breakout Continuation specifically improved (65.4%→67.2% win rate, avg win 6.24%→5.48%,
-avg loss -7.11%→-6.16%, avg hold 25.5d→21.8d: smaller wins AND smaller losses, faster
-in/out, same mean). Real exit-attribution breakdown (677 closed trades): resistance
-47.9%, base/structural stop 26.4%, 21-EMA trail 25.3%, climax 0.1% — roughly half of
-ALL stop-exits in BOTH patterns now go through the tightened trail (50.8% breakout_cont
-/ 48.1% coiled_spring), confirming the shared mechanism is pulling real, comparable
-weight in both, not a cosmetic edge case. v24 in turn superseded v23 (n=329 on the
-210-stock F&O-only universe, 60.5% win/1.92% median/43.4% concentration — still a valid
-result, just a narrower universe). This has NOT yet been pushed through the
-options-translation layer (`option_backtest.py`/`portfolio.py`) — those numbers describe
-the underlying stock signal only, not real options economics, and that layer is
-correctly scoped to `fo_universe.csv` specifically (options only exist on F&O-eligible
-names).
+As of 2026-09-01, the validated stock-level config (**v27**) backtested over 5 years
+(2021-2026) across the full 500-stock NIFTY 500 universe: **n=924 trades, 62.9% win
+rate, median +2.90%/trade, top-10-of-total concentration 16.1%** (v25 was n=677/58.3%/
++1.64%/30.7%). v27 = v25 + three changes, each verified individually AND combined:
+`pivots.daily_pivots` replaces `weekly_pivots` as the default everywhere (a weekly
+resistance ladder can get fully used up in a single day and then stay stale for up to
+5 days; daily recompute tracks the stock's actual pace — resistance-exit share rose
+47.9%→59.2%), `vcp.LAST_LEG_TOLERANCE=0.40` (was 0.0 — the base-tightening rule
+required zero slack between the final two contraction legs, rejecting real breakouts
+over sub-percentage-point technicalities), `signals.VOL_ZSCORE_WINDOW=8` (was 20 — a
+20-day window can straddle an old, unrelated volume spike and mute a genuinely strong
+new one). Caveat worth knowing before quoting the headline number: concentration
+partly improves mechanically from a larger n (splitting the 5yr window in half, each
+half's own concentration is 25.8% and 31.6% respectively — still a real improvement
+over v25's per-half 46.3%/51.3%, just less dramatic than the pooled 16.1% figure
+suggests). See `FINDINGS.md` for this and other narrative conclusions that don't map
+to a single code parameter.
+
+Options layer (`option_backtest.py`/`portfolio.py`, scoped to `fo_universe.csv`):
+contract-selection isolation across ATM/ITM × current/next-month expiry, re-run on
+v27's swing entries, points to **ITM + next-month** as the strongest candidate (62.6%
+win, +15.35% median, 77.1% concentration — first time under the 100% comfort line).
+`portfolio.py`'s capital-constrained simulator was rewritten (2026-08-31) from
+independent per-slot capital splits to one shared cash pool — see its own comments.
+Real costs (transaction charges, STT on exercised ITM options, slippage, bid-ask
+spread) are NOT modeled anywhere in this layer yet — flagged as a real, unaudited gap,
+not confirmed safe. `FINDINGS.md` also covers a scheduler-fragility finding: portfolio-
+level P&L rankings between similar-quality contract-selection variants aren't reliable
+without tracing which specific trades actually drive the difference — a `portfolio.py`
+comparison, on its own, is not sufficient evidence that one rule is really better than
+another this close.
 
 The full history of what was tried, what was rejected and why, and every bug found
 along the way is recorded as comments directly next to the relevant code (see
-`backtest.py`, `signals.py`, `vcp.py`, `pivots.py`, `market_regime.py`) — that's the
-actual decision log, not duplicated here.
+`backtest.py`, `signals.py`, `vcp.py`, `pivots.py`, `market_regime.py`, `fetch_prices.py`,
+`portfolio.py`) — that's the actual decision log for anything tied to a parameter.
+`FINDINGS.md` covers everything else: analysis conclusions that never changed a
+parameter (entry-day-momentum vs waiting for a pullback, why big-momentum days skew
+toward one pattern, the outside-critique review history), so the repo is self-contained
+without relying on any single session's memory.
 
 ## Layout
 
@@ -58,7 +76,8 @@ actual decision log, not duplicated here.
   ticker with no cache yet gets the full 5-year history, an already-cached ticker only
   fetches and appends days since its own last cached date. Defaults to the NIFTY 500
   list, which already covers the F&O subset too (a strict superset).
-- `fetch_stock_options.py` — NSE F&O bhavcopy cache for the options layer (`options_cache/`, ~2.7GB).
+- `fetch_stock_options.py` — NSE F&O bhavcopy cache for the options layer (`options_cache/`, ~2.7GB), UDiFF format, 2024-01 onward.
+- `fetch_stock_options_pre2024.py` — extends `options_cache/` back to 2022-06 by normalizing NSE's discontinued pre-UDiFF bhavcopy format, which never carried a lot-size column; backfills each ticker's lot size from its earliest 2024+ reference value (position-sizing approximation only, doesn't affect the option's own % return — see the file's own comments).
 - `market_regime.py` — Nifty ADX/±DI/200-SMA regime data (`data_cache/_NIFTY.csv`).
 - `relative_strength.py` — cross-sectional RS percentile rank. `UNIVERSE_FILE` defaults
   to `nifty500_universe.csv` — set it to `fo_universe.csv` only for the options-specific
@@ -100,7 +119,7 @@ pip install -r requirements.txt
 ```
 python3 fetch_prices.py       # refresh data_cache/ (incremental — fast after the first run)
 python3 market_regime.py      # refresh the Nifty regime cache
-python3 backtest.py           # writes runs/trades_v25.csv, prints the summary stats
+python3 backtest.py           # writes runs/trades_v27.csv, prints the summary stats
 ```
 
 ## Daily usage
@@ -164,11 +183,23 @@ any change to `signals.py`, `vcp.py`, `pivots.py`, `market_regime.py`, or `backt
 
 - IV-percentile filtering isn't built (no IV column in the bhavcopy; would need a
   Black-Scholes back-out).
-- Shared-capital-pool sizing for the options layer isn't built — `portfolio.py` still
-  uses a fixed 3-slot, 1-lot model.
-- The options/portfolio pipeline hasn't been rerun against v25 yet — the last full run
-  predates several of the fixes recorded in `backtest.py`'s comments, and would need to
-  run against `fo_universe.csv` specifically (options don't exist on the broader
-  NIFTY 500 names).
+- `portfolio.py` has a shared cash pool now (fixed 2026-08-31), but still a fixed
+  3-concurrent-position cap and fixed 1-lot-per-trade sizing — no scaling up when more
+  capital is available.
+- **No real transaction costs modeled anywhere in the options layer**: no brokerage,
+  no STT on exercised ITM options, no slippage, no bid-ask spread (the bhavcopy gives
+  traded prices, not what you could actually execute at) — flagged by outside review,
+  not yet audited. Backtested returns should be read as upper bounds, not expected
+  real-money returns, until this is checked.
+- **No walk-forward / out-of-sample validation** — every parameter (VCP tolerance,
+  volume window, RSI bands, daily pivots) has been tuned and evaluated on the same
+  5-year historical window. In-sample robustness has been checked several ways (split-
+  half consistency, marginal-trade quality, combined-vs-individual interaction), but
+  none of that is a substitute for testing on genuinely unseen future data.
 - `daily_scan.py`/`monitor_positions.py` are stock-only; they don't yet account for
   which option contract you'd actually be holding or when it expires.
+- The Dec'24-May'25 VCP losing patch (32 trades, 34.4% win vs ~56-61% everywhere else)
+  is confirmed real, root cause still unidentified.
+- The regime-gate drought (Nifty below its own 200-SMA since 2026-02-26) is unresolved
+  — three independent gate-loosening experiments were all rejected as fixes; it's
+  candidate-scarcity, not a filter problem.
