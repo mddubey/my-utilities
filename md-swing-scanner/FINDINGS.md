@@ -172,6 +172,53 @@ per-stock RS but grouped by sector). Two separate results:
   driver. Fifth hypothesis for the VCP collapse ruled out, same as the four
   regime-gate ideas above — remaining candidates: volatility regime, market breadth.
 
+**Volatility regime and market breadth — 6th and 7th hypotheses tested (2026-09-01),
+both ruled out, and the VCP collapse investigation is paused here.**
+
+| metric | weak window (Oct'24-Feb'26) | outside window | gap |
+|---|---|---|---|
+| Nifty index ATR% (n=351 vs 884 days) | median 1.07% | median 1.10% | none |
+| per-stock ATR% at VCP entry (n=198 vs 465 trades) | median 3.56% | median 3.49% | none |
+| market breadth at VCP entry (n=198 vs 465 trades) | median 62.6% | median 85.6% | real, ~23pt gap |
+
+Per-trade split within the weak window (n=198 VCP trades):
+
+| split by | bucket | n | win% | median pnl |
+|---|---|---|---|---|
+| per-stock ATR% | below median | 99 | 45.5% | -3.3% |
+| per-stock ATR% | above median | 99 | 47.5% | -0.4% |
+| breadth | below median | 102 | 57.8% | +2.4% |
+| breadth | above median | 96 | 34.4% | -5.4% |
+
+Volatility (both index-level and per-stock) shows no gap at either the window level
+or the per-trade level — ruled out cleanly. Breadth shows a real, large gap at the
+window level (62.6 vs 85.6) but the sign FLIPS at the trade level — lower-breadth
+days within the window actually did better (57.8% win) than higher-breadth days
+(34.4% win), the same failure mode as the rejected SMA50-AND gate test: a metric
+that's genuinely different across the whole bad period but backwards as a per-trade
+filter within it.
+
+**Why the investigation stops here rather than continuing to the remaining
+critique-list items (earnings-season clustering, election/macro period effects):**
+across all 9 hypotheses checked for this window (Nifty direction, weak RS, ADX
+rising, ADX uptrend, SMA50-AND, SMA50-OR-recovery, sector concentration, volatility,
+breadth), there's a consistent shape — whenever a metric shows a real difference
+across the whole bad period (SMA50, breadth), it fails or reverses the moment you
+look at individual trades within that period; whenever a metric shows no macro
+difference at all (volatility), there's nothing to find at the trade level either.
+That's not what you'd expect if an external, conditionable factor (market regime,
+sector, volatility, breadth) were actually driving this — at least one should have
+discriminated the real losing trades from the winning ones within the window itself.
+None did. Read as pointing toward something more idiosyncratic (either genuine
+variance in a still-real edge — 56% and 65% win-rate windows both happen normally in
+924+ trades — or something specific to VCP's own base-detection mechanics during
+that stretch, not a macro-conditions question at all), rather than a filter waiting
+to be found. Given the track record, the two remaining critique-list items are lower
+confidence and harder to test than what's already been tried, so this is a
+deliberate stop, not an oversight — the natural next angle if this gets picked back
+up is the base *shapes* of the losing trades themselves (thinner/shorter/different
+than usual), not another macro filter.
+
 **Does a stock qualifying for BOTH patterns on the same day mean higher confidence?
 Checked, and no — not yet, on this sample (2026-09-01).** `detect_entry()` itself
 short-circuits (Breakout Cont checked first, first match wins, VCP's own check never
