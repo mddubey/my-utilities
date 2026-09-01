@@ -264,3 +264,94 @@ summaries (originating from `Options stoploss management.pdf`).
   backtest refinement to paper trading the swing signal (confidence 9/10) while
   auditing the options layer's execution assumptions (confidence 6.5/10 contract
   selection, 5/10 portfolio P&L, 4/10 real-money-ready for options specifically).
+
+## Other ideas worth considering (source: feedback/2026-09-01_05-57-04_IST_veteran_trader_review.md)
+
+Notes from that file, sorted into what's already covered vs genuinely new — logged
+here so they can feed into whatever gets tested or submitted next, attributed to
+where they came from rather than presented as this project's own original thinking.
+
+**Already addressed, or independently confirms our own prior work:**
+- Breakout Continuation RSI ceiling swept in isolation (68/72/75/80) — their exact
+  suggested values, word for word. We'd already done this the same day (item 2, this
+  session) and adopted RSI_MAX=80. Strong independent confirmation of both the
+  question and roughly where the answer landed.
+- Gap-up exhaustion vs intraday accumulation, as a diagnostic not a hard gate — we'd
+  already run this split (item 3, this session): 81% of trades are grind-dominated
+  and healthy (12.5% concentration), the gap-dominated cohort is real but too thin to
+  trust (n=75, 78.5% concentration). Matches their own caution ("do not make it a
+  hard gate until tested").
+- Portfolio-level fragility from the fixed 3-slot scheduler — this is our own
+  scheduler-fragility finding above, already independently confirmed by round 5.
+  Third independent source landing on the same mechanism now.
+- "Treat MOMENTUM_20D_MIN/EMA34_RISING_DAYS_MIN/MIN_TRADED_VALUE as candidate-list
+  controls unless they prove edge" — matches our own leave-one-out ablation
+  (`signals.py`'s own comment, 2026-08-30) almost exactly: those filters showed weak
+  or no backtest edge but are kept anyway to keep the daily candidate list
+  manageable, not for a hidden performance reason.
+- Dec'24-May'25 VCP patch "by sector, breadth, volatility, and events" — this is item
+  5, in progress. Window already corrected (Oct'24-Feb'26, not just Dec-May); four
+  regime-gate ideas tried and rejected/inconclusive; sector/volatility/breadth
+  hypotheses queued next, not yet run.
+- Walk-forward validation — partially done (year-by-year consistency check, item 1)
+  but NOT the full train/test-untouched-by-year version they're asking for. That's
+  still explicitly deprioritized per standing user instruction (portfolio ₹ figures
+  are illustrative only) — logging their ask here for the record, not reopening it
+  without being told to.
+- Options transaction costs (STT, stamp duty) — also still deprioritized per the same
+  standing instruction. Their review adds real sourced numbers worth keeping for
+  whenever that changes: NSE (Apr 2026) lists STT on option sale at 0.15% and on
+  exercised options at 0.15% of intrinsic value, plus 0.003% stamp duty on the buyer
+  side.
+- Two real, currently-true stale-label bugs they caught by direct code reading, not
+  yet fixed: `option_backtest.py`'s `__main__` still points at
+  `runs/trades_v23_recent.csv` (should be `trades_v28.csv`), and `daily_scan.py`'s
+  `--ignore-regime` banner and module docstring still say "v25" (should say
+  whatever's current). Both confirmed still present (2026-09-01).
+- `tradingview_stop_target.pine` being stale against v27 (weekly pivots, old
+  version) — already known, sitting uncommitted/unresolved from earlier in the
+  broader session, now independently flagged too.
+
+**New, not yet addressed at all:**
+- **Same-close entry bias (their "hard block #1", ranked top priority)**: the
+  backtest enters at the signal day's own close, but daily workflow discovers signals
+  after that close has already happened. Is a same-close fill actually attainable, or
+  should the model be tested against next-day open / a live 14:45 cutoff price / a
+  gap-size skip rule instead? We've discussed live-cutoff timing this session but
+  never actually backtested an alternative entry-timing assumption against the
+  current one. Real, unaddressed methodological gap, and their top-ranked item.
+- **Survivorship bias**: the backtest runs the CURRENT NIFTY 500 list across the full
+  2021-2026 window — delisted/merged/removed names from earlier years are entirely
+  absent. Never discussed or checked this session. Doesn't invalidate the project,
+  but the historical stats are probably cleaner than the real opportunity set was at
+  the time.
+- **Options liquidity criteria too weak**: `liquid()` in `option_backtest.py`
+  currently just checks OI>0 and volume>0. Suggested real minimums: contracts traded
+  in lots, premium turnover, OI in lots, excluding single-print contracts,
+  liquidity-bucketed slippage.
+- **R-multiple / MFE / MAE / exit-efficiency reporting** — a whole analytical
+  dimension not built at all. Would answer "does this earn enough per unit of risk,"
+  which win-rate/median/concentration alone don't.
+- **Partial-profit-taking variant ("veteran compromise")**: take partial profit at
+  1R/first pivot, move stop to breakeven, trail the remainder — instead of the
+  current all-or-nothing resistance exit. Untested. Their own hedge: "full exits at
+  daily pivot resistance probably leave money on the table in the best trend leaders.
+  They also probably improve hit rate and median. Both can be true."
+- VCP minimum base age check (could be accepting compact structures the multi-week
+  spec doesn't intend) and a true volume-dry-up check near the pivot (last few days
+  specifically, not just the last leg's average) — both untested refinements to
+  `vcp.py`'s base detection.
+- Sector-leadership tracking and earnings/event-proximity annotation — neither built.
+  Sector leadership ties directly into item 5's next hypothesis.
+- Options: back out approximate delta/IV instead of a fixed 5% ITM offset; a premium
+  stop or time stop (-35% to -50% premium loss, or exit if the stock hasn't moved in
+  3-5 sessions) as an options-specific exit distinct from the stock's own stop; using
+  the actual next-tradable option price rather than an idealized same-close fill if a
+  signal is discovered after the close (same root issue as the top hard block, just
+  options-specific). None built.
+- `oi_buildup_bullish()` sits unused in `option_backtest.py` — either integrate and
+  test it or remove it, per their suggestion. Real dead code, not yet acted on.
+- Epistemic caution worth keeping in mind rather than acting on directly: treat
+  `VOL_ZSCORE_WINDOW=8` and `vcp.LAST_LEG_TOLERANCE=0.40` as "this general adjustment
+  direction helped," not "this exact number is the true one" — both were chosen from
+  in-sample sweeps, same caveat as everything else pending walk-forward validation.
