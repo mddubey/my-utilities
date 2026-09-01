@@ -116,6 +116,24 @@ discriminate the VCP patch at all) — "closes the gate faster during the bad pa
 necessary but not sufficient; the real test is a full backtest re-run (n/win/median/
 concentration) with the SMA50 filter added, not just eyeballing the Nifty-level days.
 
+**Does a stock qualifying for BOTH patterns on the same day mean higher confidence?
+Checked, and no — not yet, on this sample (2026-09-01).** `detect_entry()` itself
+short-circuits (Breakout Cont checked first, first match wins, VCP's own check never
+runs if BC already fired), so `daily_scan.py` now re-checks the OTHER pattern's raw
+condition independently, purely for display (`[BOTH]` tag). Validated against all
+1430 v28 trades before shipping it: only 40 (2.8%) are dual-qualified, and it only
+ever happens on the Breakout Cont side (no VCP trade ever also independently clears
+BC's stricter same-day checklist). Win rate is IDENTICAL either way — 65.0% dual vs
+65.0% single-pattern. Median looks higher for the dual set (+4.07% vs +2.86%) but
+rides on a lumpy distribution (concentration 131% on n=40 — top 10 winners alone sum
+to +139%, e.g. HAL +21.2%, KFINTECH +19.8%, RECLTD +18.9%, while the other 30 trades
+net to -32.9%), not proof of a real edge. Not the same thing as "likely to fail"
+though — the losers in that group aren't unusually frequent (14/40, same ballpark as
+everywhere else), they're just sized enough (several -7% to -14%) to offset the
+smaller wins outside the top 10. Shipped as a purely informational tag, explicitly
+NOT a ranking signal, until there's a much bigger sample (rare event, ~3% of trades)
+to actually trust the median difference either way.
+
 ## Options side
 
 **Conclusion evolution (all real, all previously reported, kept here as the timeline

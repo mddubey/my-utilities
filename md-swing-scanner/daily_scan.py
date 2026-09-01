@@ -50,9 +50,10 @@ from datetime import time as dtime
 import pandas as pd
 import yfinance as yf
 
-from backtest import load, load_with_extra_row, detect_entry, resistance_target, stage2_trend_template
-from signals import base_filters_pass
-from vcp import base_pivot
+from backtest import (load, load_with_extra_row, detect_entry, resistance_target,
+                      stage2_trend_template, current_stop_level, MAX_INITIAL_RISK_PCT)
+from signals import base_filters_pass, entry_signal
+from vcp import base_pivot, vcp_breakout
 from pivots import daily_pivots
 
 LIVE_CUTOFF_DEFAULT = "14:45"  # IST
@@ -132,7 +133,43 @@ def _fo_tickers():
     return _FO_TICKERS
 
 
-def _annotate(ticker, pattern, structural_low, row, prev_row, live):
+def _also_qualifies_other_pattern(ticker, pattern, rows, i):
+    """Checked independently of whichever pattern actually claimed the day (2026-09-01)
+    — detect_entry() itself short-circuits (Breakout Cont checked first, first match
+    wins, VCP's own check never runs if BC already fired), so this re-runs the OTHER
+    pattern's raw condition just for reporting. NOT a validated confidence signal:
+    checked directly against 1430 v28 trades, only 40 (2.8%, all on the BC side — no
+    VCP trade ever independently also clears BC's stricter same-day checklist) turned
+    out dual-qualified, and their win rate was IDENTICAL to single-pattern trades
+    (65.0% both ways) — the higher median (+4.07% vs +2.86%) rides on a lumpy few-
+    big-winners distribution (concentration 131% on n=40), not enough evidence to
+    trust as a real edge yet. Purely descriptive/informational, do not use to rank
+    candidates against each other."""
+    row = rows.iloc[i]
+    if pattern == "breakout_cont":
+        if not stage2_trend_template(row, ticker, row.Date):
+            return False
+        if base_pivot(rows, i) is None:
+            return False
+        return vcp_breakout(rows, i) is not None
+    return entry_signal(row)
+
+
+def _initial_stop(pattern, structural_low, row):
+    """The stop level a fresh entry would start at TODAY, needed for position sizing
+    before a trade even exists yet (2026-09-01) — same state shape simulate_ticker
+    builds at entry (backtest.py), just reused here for a not-yet-taken candidate:
+    peak_close/peak_high both equal today's own values on day zero, so
+    current_stop_level's trail-engagement check can't have fired yet."""
+    entry_price = row.Close
+    if pattern == "coiled_spring":
+        structural_low = max(structural_low, entry_price * (1 - MAX_INITIAL_RISK_PCT))
+    state = dict(entry_price=entry_price, peak_close=entry_price, peak_high=row.High,
+                 structural_low=structural_low, target=None)
+    return current_stop_level(pattern, state, row)
+
+
+def _annotate(ticker, pattern, structural_low, row, prev_row, live, rows, i):
     """Points about TODAY's move specifically, on top of the raw entry (2026-08-31) —
     close/target alone can't distinguish a fresh breakout with real room to run from
     one that's already basically arrived (real case: CGPOWER close=916.00 vs
@@ -148,6 +185,8 @@ def _annotate(ticker, pattern, structural_low, row, prev_row, live):
         target_tested_today=target is not None and row.High >= target,
         vol_zscore=row.vol_zscore,
         is_fo=ticker in _fo_tickers(),
+        dual_pattern=_also_qualifies_other_pattern(ticker, pattern, rows, i),
+        stop=_initial_stop(pattern, structural_low, row),
     )
 
 
@@ -188,14 +227,14 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
         if result is not None:
             pattern, structural_low = result
             candidates.append(_annotate(ticker, pattern, structural_low, row, rows.iloc[i - 1],
-                                         live=(ticker in live_bars)))
+                                         live=(ticker in live_bars), rows=rows, i=i))
             continue
         if require_regime:
             ungated = detect_entry(ticker, rows, i, require_regime=False)
             if ungated is not None:
                 pattern, structural_low = ungated
                 watchlist.append(_annotate(ticker, pattern, structural_low, row, rows.iloc[i - 1],
-                                            live=(ticker in live_bars)))
+                                            live=(ticker in live_bars), rows=rows, i=i))
     return scan_date, candidates, watchlist, live_shortlist
 
 
@@ -226,10 +265,14 @@ if __name__ == "__main__":
         live_tag = " [LIVE]" if c.get("live") else ""
         chg_str = f"{c['pct_chg']:+.1f}% today" if c['pct_chg'] is not None else "n/a"
         fo_tag = "[F&O]" if c["is_fo"] else "[NO OPTIONS]"
+        dual_tag = " [BOTH]" if c["dual_pattern"] else ""
         print(f"  {c['ticker']:<14} {fo_tag:<12} {c['pattern']:<14} close=₹{c['close']:.2f} ({chg_str})  "
-              f"target={target_str}  vol_z={c['vol_zscore']:+.1f}{live_tag}")
+              f"stop=₹{c['stop']:.2f}  target={target_str}  vol_z={c['vol_zscore']:+.1f}{live_tag}{dual_tag}")
         if c["target_tested_today"]:
             print(f"    ⚠ already touched/exceeded this target intraday today — thin or no room left")
+        if c["dual_pattern"]:
+            print(f"    ℹ also independently clears the other pattern's condition today — informational only, "
+                  f"NOT a validated confidence signal (checked: win rate identical either way, see FINDINGS.md)")
 
     print(f"\nTradable Today ({len(candidates)}):")
     if not candidates:

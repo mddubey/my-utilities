@@ -159,6 +159,16 @@ High already reached the target before closing back below it (checked directly: 
 wash historically, not a strong red flag on its own — but combined with near-zero room left, it's
 still worth knowing).
 
+Two more fields, added 2026-09-01: `stop=₹X` is the actual stop-loss level a fresh entry would
+start at today (same `current_stop_level()` logic the backtest and `monitor_positions.py` use —
+Minervini's structural-base-low for Coiled Spring, the published Chandelier Exit's 3xATR trail for
+Breakout Continuation), needed for position sizing before a trade even exists yet. A `[BOTH]` tag
+(plus an explanatory line) marks a candidate that independently clears the OTHER pattern's
+condition too, not just the one that actually claimed it — checked directly before adding this:
+it is **purely informational**, not a validated confidence signal (win rate identical either way,
+65.0%, on the 40 real dual-qualified trades out of 1430 in v28 — see `FINDINGS.md`). Don't use it
+to rank candidates against each other.
+
 Two more observation-only flags, neither backtest-validated: `--ignore-regime` bypasses
 the gate entirely (collapses to a single Tradable Today list, no watchlist split — there's no
 gate left to fail on); `--live [--cutoff HH:MM]` (default 14:45 IST) checks a same-day intraday
