@@ -169,16 +169,37 @@ per-trade paired differences directly, per outside review's independent
 formalization: `Portfolio(A) > Portfolio(B)` does not imply `Trade_i(A) > Trade_i(B)`)
 before trusting the ranking.**
 
-**Survival analysis / capital-efficiency metric** — real, done findings (see the
-critique-response threads for full derivation): eventual stop-outs take ~2x longer to
-resolve than resistance wins across both the swing and options layers; the resulting
-options-layer asymmetry (bigger losses on trades held longer) is a stock-duration
-effect, not options-specific theta bleed, since implied leverage stays symmetric
-(~9.4x losers vs ~9.9x winners). Real leverage across all 4 contract-selection
-variants is flat (9.5-11.5x) — ITM's moneyness offset barely reduces leverage despite
-costing 1.5-2x the capital per lot, so whatever case exists for ITM rests on
-liquidity/theta characteristics, not risk reduction. Computed on the pre-v27 options
-sample; not yet re-run on the bigger v27-derived set.
+**Survival analysis / capital-efficiency metric — re-run on v28's bigger FO-scoped
+set (2026-09-01, was only computed on the pre-v27 sample).** 838 v28 trades are on
+FO-eligible tickers; ITM+next (the standing pick) simulates to n=562 (up from
+131-137) and **gets healthier on the bigger sample**: win 61.6% (was 62.6%), median
++18.63% (was +15.35%), concentration **32.6%** (was 77.1%). Both original findings
+hold:
+- Survival: stop-outs take **1.6-1.75x** longer to resolve than resistance wins on
+  this bigger sample (median stock hold 21 days vs 12; mean 23.4 vs 15.0) — a bit
+  less dramatic than the "~2x" first quoted, same direction and still real. Option
+  holding time tracks the stock's almost exactly (median 21 vs 14, mean 22.9 vs 16.7).
+- Leverage stays roughly symmetric between winners and losers on ITM+next
+  (median 9.7x winners vs 8.6x losers) — no options-specific theta-bleed
+  disproportionately punishing the longer-held losers, confirming it's a
+  stock-duration effect as originally concluded. **Use MEDIAN here, not mean** — same
+  caveat as signals.py's own filter-ablation comment: a few trades where the stock's
+  own pnl landed near zero (division near-zero) produce leverage ratios in the
+  hundreds either direction (e.g. one real case: stock +0.04%, option -59% ->
+  reported "leverage" of -1452x, meaningless) and corrupt the mean badly (it reads
+  4.0x for losers vs the real 8.6x median).
+- Checked leverage across all 4 contract variants too (median, same fix applied):
+  still flat, 9.3-11.5x — ITM+next specifically shows the TIGHTEST winner/loser
+  symmetry (9.7x/8.6x) of any variant, the strongest version of this finding for the
+  config actually in use.
+- New, minor finding from this re-run: 54 of 562 trades (9.6%) have the option's P&L
+  land in the OPPOSITE direction from the stock's own recorded outcome (e.g. stock
+  exits at a resistance win, but the option — often carried to expiry, illiquid along
+  the way — ends up negative because the stock gave back the move before the option's
+  own exit actually settled). Not a bug, a real known mechanism (`simulate_option_trade`'s
+  own comments already document walking forward to the next liquid day or settling at
+  expiry) — just not previously quantified. Worth knowing before assuming "the stock
+  won, so the option trade must have won too."
 
 ## Outside critique review history
 

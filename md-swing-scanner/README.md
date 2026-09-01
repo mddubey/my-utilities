@@ -45,8 +45,15 @@ narrative conclusions that don't map to a single code parameter.
 
 Options layer (`option_backtest.py`/`portfolio.py`, scoped to `fo_universe.csv`):
 contract-selection isolation across ATM/ITM × current/next-month expiry, re-run on
-v27's swing entries, points to **ITM + next-month** as the strongest candidate (62.6%
-win, +15.35% median, 77.1% concentration — first time under the 100% comfort line).
+v28's swing entries (838 FO-eligible trades), points to **ITM + next-month** as the
+strongest candidate — and it gets healthier on the bigger sample (n=562, win 61.6%,
+median +18.63%, concentration **32.6%**, down from 77.1% on the earlier, smaller run).
+Survival analysis and the capital-efficiency/leverage metric were also re-run on this
+bigger set (2026-09-01) — both original findings hold: stop-outs take 1.6-1.75x
+longer to resolve than resistance wins, and leverage stays roughly symmetric between
+winners and losers (median 9.7x vs 8.6x on ITM+next) — see `FINDINGS.md` for the full
+numbers, including a real leverage-metric gotcha (use median, not mean — a few
+near-zero-denominator trades produce meaningless three-digit outlier ratios).
 `portfolio.py`'s capital-constrained simulator was rewritten (2026-08-31) from
 independent per-slot capital splits to one shared cash pool — see its own comments.
 Real costs (transaction charges, STT on exercised ITM options, slippage, bid-ask
