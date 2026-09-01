@@ -17,9 +17,12 @@ these are secretly tradable, same caveat as before.
 (collapses to a single "Tradable Today" list with no watchlist split, since there's
 no gate left to fail on), so pattern breakouts still surface during a regime drought
 instead of relying on the watchlist section alone. These are explicitly NOT validated
-trade signals — the v25 backtest numbers assume the gate is on — hence the loud
-banner below. Purely for observing how candidates would have looked, not for taking
-real positions.
+trade signals — the validated backtest numbers (see README.md's Current status) all
+assume the gate is on — hence the loud banner below. Purely for observing how
+candidates would have looked, not for taking real positions. (2026-09-01: deliberately
+not naming a specific version here anymore — this comment cited "v25" long after the
+project had moved to v27, a stale-label bug caught during a repo review. Point at
+README.md instead of a version number that will go stale again at the next bump.)
 
 --live [--cutoff HH:MM] (2026-08-30): same-day intraday check instead of waiting for
 tomorrow's cached close, so a real breakout can be caught same-day near the close
@@ -257,8 +260,8 @@ if __name__ == "__main__":
         print(f"⚠ LIVE MODE (intraday as of {args.cutoff} IST, not the final close) — checked "
               f"{len(live_shortlist)} pre-filtered tickers: {live_shortlist}")
     if args.ignore_regime:
-        print("⚠ REGIME GATE DISABLED — these are NOT validated trade signals (v25's backtest")
-        print("  numbers assume the gate is on). Observation only, do not trade these as-is.")
+        print("⚠ REGIME GATE DISABLED — these are NOT validated trade signals (the validated")
+        print("  backtest numbers assume the gate is on). Observation only, do not trade these as-is.")
 
     def print_row(c):
         target_str = f"₹{c['target']:.2f} ({c['pct_to_target']:+.1f}% away)" if c['target'] is not None else "n/a"

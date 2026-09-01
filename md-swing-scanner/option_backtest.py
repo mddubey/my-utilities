@@ -244,11 +244,13 @@ def run(trades_csv, moneyness="atm", expiry_choice="current"):
 
 
 if __name__ == "__main__":
-    # runs/trades_rr_0.0.csv was a pre-v3 artifact, completely stale — pointing this at
-    # the current validated F&O-scoped swing config instead (2026-08-30). Full v23 spans
-    # 2021-2026 but options_cache/ only covers Nov 2024 onward, so trades_v23_recent.csv
-    # is v23 pre-filtered to that actually-testable window (see the ad-hoc filter run).
-    out = run("runs/trades_v23_recent.csv")
+    # Points at the current validated F&O-scoped swing trade set (2026-09-01 — was
+    # stale at v23's trades_v23_recent.csv, a stale-label bug caught during a repo
+    # review, see FINDINGS.md). options_cache/ now covers back to 2022-06
+    # (fetch_stock_options_pre2024.py extended it from the original UDiFF-only, 2024+
+    # coverage), so no separate recent-window pre-filter is needed — trades_v28_fo.csv
+    # is already pre-filtered to fo_universe.csv's F&O-eligible tickers.
+    out = run("runs/trades_v28_fo.csv")
     out.to_csv("runs/option_trades.csv", index=False)
 
     wins = out[out.pnl_pct > 0]
