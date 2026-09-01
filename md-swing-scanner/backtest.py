@@ -12,6 +12,24 @@ CACHE_DIR = Path(__file__).parent / "data_cache"
 TEST_ADX_RISING = False  # tested True (2026-08-30): halved the sample (69->33), win rate and median
                           # pnl both got WORSE for both patterns, concentration blew past 100%
                           # (75.3%->113.1%) — rejected, reverted to the plain threshold (v18 baseline)
+TEST_SMA50_ABOVE = False    # tested True (2026-09-01): REJECTED. Motivated by a real gap (SMA200
+                             # lagged ~2-3 months behind the Oct-Dec 2024 correction that coincides
+                             # with VCP's Oct'24-Feb'26 weak window — see market_regime.py's
+                             # market_trending() docstring) but backwards once actually tested:
+                             # within that exact window, the 98 VCP trades this filter REMOVES
+                             # (Nifty below/falling its 50-SMA) were the BETTER half (55.1% win,
+                             # +1.83% median) and the 100 it KEEPS were worse (38.1% win, -3.99%
+                             # median) — cutting the sample 25% (663->487 VCP trades) while making
+                             # the targeted window's own concentration worse (22.0%->29.3%), not
+                             # better. Nifty's own medium-term trend strength isn't what's driving
+                             # this — third market-level gate idea rejected after ADX_RISING and
+                             # ADX_UPTREND above; the collapse doesn't look like a "gate wasn't
+                             # tight enough" problem at all. Investigation moves to the critique's
+                             # sector-concentration/volatility-regime/market-breadth hypotheses next.
+TEST_SMA50_RISING = False   # tested True (2026-09-01): REJECTED, same investigation as
+                             # TEST_SMA50_ABOVE above and the same result — n cut similarly
+                             # (663->464 VCP trades), targeted-window concentration worse
+                             # (22.0%->26.5%), not a fix.
 TEST_ADX_UPTREND = False  # tested True (2026-08-30): REJECTED. Cut the sample 37% (403->252),
                            # concentration got worse (36.5%->50.3%), median barely moved (2.06%->
                            # 2.11%) — and it specifically failed to fix the thing it was built for:
@@ -156,10 +174,10 @@ def detect_entry(ticker, rows, i, require_regime=True):
         # verified directly that this pattern's edge is real but concentrated outside
         # choppy markets (52% win rate / +0.25% median when Nifty ADX<20, vs 71-73% /
         # ~+2% otherwise).
-        if not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True):
+        if not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True, require_above_sma50=TEST_SMA50_ABOVE, require_sma50_rising=TEST_SMA50_RISING):
             return "breakout_cont", None
         return None
-    if stage2_trend_template(row, ticker, row.Date) and (not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True)):
+    if stage2_trend_template(row, ticker, row.Date) and (not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True, require_above_sma50=TEST_SMA50_ABOVE, require_sma50_rising=TEST_SMA50_RISING)):
         # VCP is explicitly a bull-market pattern in the original methodology, not a
         # regime-agnostic one — same regime gate that rescued Breakout Continuation.
         vcp = vcp_breakout(rows, i)

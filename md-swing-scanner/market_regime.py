@@ -61,7 +61,8 @@ def _regime_frame():
     return df[["Close", "adx14", "plus_di14", "minus_di14", "sma50", "sma200"]]
 
 
-def market_trending(date, require_rising=False, require_uptrend=False, require_above_sma200=False):
+def market_trending(date, require_rising=False, require_uptrend=False, require_above_sma200=False,
+                     require_above_sma50=False, require_sma50_rising=False):
     """Nifty ADX at or after the most recent trading day on/before `date` is >= the
     verified choppy/neutral split. Used to gate BOTH patterns (docstring here was
     stale — VCP got the same gate in v11 once it was checked directly and also showed
@@ -77,7 +78,19 @@ def market_trending(date, require_rising=False, require_uptrend=False, require_a
     Nifty Close > its own 200-day SMA — a slower, structural "is the broad market
     actually in good shape" gauge (same published methodology already used for
     individual stocks in vcp.py's stage2_trend_template), tested as the better-
-    specified version of the same "don't go long against the tape" idea."""
+    specified version of the same "don't go long against the tape" idea.
+
+    Pass require_above_sma50 and/or require_sma50_rising (2026-09-01, REJECTED — kept
+    for reference, same as require_uptrend above): motivated by a real gap in the
+    VCP-collapse investigation (ADX+SMA200 gate stayed open 62-100% of days through
+    Oct-Dec 2024's ~1650-point Nifty correction, since ADX measures trend STRENGTH not
+    direction and SMA200 lags 2-3 months behind), and a Nifty-level check showed
+    SMA50-based filters would have closed the gate 1-2 months faster in that window.
+    Backwards once actually backtested, though: within the exact window this was meant
+    to fix, the VCP trades it REMOVES (Nifty below/falling its 50-SMA) were the BETTER
+    half (55.1% win) and the ones it KEEPS were worse (38.1% win) — see backtest.py's
+    TEST_SMA50_ABOVE/TEST_SMA50_RISING comments for the full numbers. Nifty's own
+    medium-term trend strength isn't what's driving VCP's weak window."""
     df = _regime_frame()
     pos = df.index.searchsorted(date, side="right") - 1
     if pos < 0:
@@ -95,6 +108,16 @@ def market_trending(date, require_rising=False, require_uptrend=False, require_a
         return False
     if require_above_sma200:
         if pd.isna(row.sma200) or not (row.Close > row.sma200):
+            return False
+    if require_above_sma50:
+        if pd.isna(row.sma50) or not (row.Close > row.sma50):
+            return False
+    if require_sma50_rising:
+        prior_pos = pos - NIFTY_ADX_RISING_LOOKBACK
+        if prior_pos < 0:
+            return False
+        prior_sma50 = df.iloc[prior_pos].sma50
+        if pd.isna(row.sma50) or pd.isna(prior_sma50) or not (row.sma50 >= prior_sma50):
             return False
     return True
 

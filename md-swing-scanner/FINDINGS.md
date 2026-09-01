@@ -102,19 +102,26 @@ worse than up-days for VCP in this window (31.25% vs 37.5% win, no real differen
 So "gate stayed open during a down-move" is a confirmed temporal correlation, not
 proof that a naive direction filter fixes it at the trade level.
 
-**Promising untested lead: SMA50, not just SMA200/ADX, for the market-level gate.**
-`market_regime.py` already computes and caches `sma50` for Nifty but `market_trending()`
-never uses it. Quick check (2026-09-01): a `Close > SMA50` filter would have closed
+**SMA50 gate lead — tested and REJECTED (2026-09-01).** `market_regime.py` already
+computed and cached `sma50` for Nifty but `market_trending()` never used it. A
+Nifty-level check first looked promising: a `Close > SMA50` filter would have closed
 the gate in October 2024 itself (100%→14% open that month) instead of December/
-January under the current SMA200-based gate; an `SMA50 rising` (5-day lookback, same
-convention as the existing ADX_RISING test) filter closes it by mid-November
-(→0%). Both are meaningfully faster than the current gate's 62-100%-open readings
-through the same window. **Not yet backtested as an actual filter** — two structurally
-similar-looking ideas already failed on this exact question (`TEST_ADX_RISING` halved
-the sample for no real gain; `TEST_ADX_UPTREND`/+DI-DI cut the sample 37% and didn't
-discriminate the VCP patch at all) — "closes the gate faster during the bad patch" is
-necessary but not sufficient; the real test is a full backtest re-run (n/win/median/
-concentration) with the SMA50 filter added, not just eyeballing the Nifty-level days.
+January under the current SMA200-based gate, meaningfully faster than the gate's
+actual 62-100%-open readings through that window. Added `require_above_sma50` /
+`require_sma50_rising` to `market_trending()` and full-backtest-tested both (plus
+combined) — **backwards result**: isolated exactly which VCP trades each filter
+removes from the Oct'24-Feb'26 weak window, and they're the BETTER half. The 98
+trades `TEST_SMA50_ABOVE` removes (Nifty below/falling its 50-SMA) ran 55.1% win /
++1.83% median; the 100 it keeps (Nifty above/rising) ran 38.1% win / -3.99% median.
+Cut VCP's sample 25-37% while making the targeted window's own concentration worse
+(22.0%→27-29%), not better. **Nifty's own medium-term trend strength is not what's
+driving this weak window** — third market-level gate idea rejected, after
+`TEST_ADX_RISING` and `TEST_ADX_UPTREND`. All three "tighten the shared regime gate"
+ideas have now failed; the remaining investigation moves to the critique's original
+list (sector concentration, volatility regime, market breadth) since this doesn't
+look like a gate problem at all. See `backtest.py`'s `TEST_SMA50_ABOVE`/
+`TEST_SMA50_RISING` comments and `market_regime.py`'s `market_trending()` docstring
+for the full numbers.
 
 **Does a stock qualifying for BOTH patterns on the same day mean higher confidence?
 Checked, and no — not yet, on this sample (2026-09-01).** `detect_entry()` itself
