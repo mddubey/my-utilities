@@ -87,6 +87,15 @@ without relying on any single session's memory.
   list, which already covers the F&O subset too (a strict superset).
 - `fetch_stock_options.py` — NSE F&O bhavcopy cache for the options layer (`options_cache/`, ~2.7GB), UDiFF format, 2024-01 onward.
 - `fetch_stock_options_pre2024.py` — extends `options_cache/` back to 2022-06 by normalizing NSE's discontinued pre-UDiFF bhavcopy format, which never carried a lot-size column; backfills each ticker's lot size from its earliest 2024+ reference value (position-sizing approximation only, doesn't affect the option's own % return — see the file's own comments).
+- `intraday_cache.py` — 5-minute intraday bars (`intraday_cache/`, ~190MB, all 500
+  tickers), built 2026-09-02 specifically to survive past yfinance's own rolling
+  60-day retention window (confirmed: anything older is rejected outright). Once a
+  day ages out of that window it's gone from Yahoo for good unless already saved
+  here — `refresh()` is safe to re-run anytime, new tickers get a full 60-day
+  backfill, already-cached ones just get a 10-day top-up merged in. Run tickers in
+  parallel batches with care: two concurrent `yfinance` fetches triggered rate
+  limiting the first time this was built (224 of 500 tickers failed silently until
+  retried sequentially) — don't background more than one fetch job at once.
 - `market_regime.py` — Nifty ADX/±DI/200-SMA regime data (`data_cache/_NIFTY.csv`).
 - `relative_strength.py` — cross-sectional RS percentile rank. `UNIVERSE_FILE` defaults
   to `nifty500_universe.csv` — set it to `fo_universe.csv` only for the options-specific
