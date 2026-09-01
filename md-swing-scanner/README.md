@@ -23,23 +23,25 @@ resistance target and a gated climax-top exit for both.
 
 ## Current status
 
-As of 2026-09-01, the validated stock-level config (**v27**) backtested over 5 years
-(2021-2026) across the full 500-stock NIFTY 500 universe: **n=924 trades, 62.9% win
-rate, median +2.90%/trade, top-10-of-total concentration 16.1%** (v25 was n=677/58.3%/
-+1.64%/30.7%). v27 = v25 + three changes, each verified individually AND combined:
-`pivots.daily_pivots` replaces `weekly_pivots` as the default everywhere (a weekly
-resistance ladder can get fully used up in a single day and then stay stale for up to
-5 days; daily recompute tracks the stock's actual pace — resistance-exit share rose
-47.9%→59.2%), `vcp.LAST_LEG_TOLERANCE=0.40` (was 0.0 — the base-tightening rule
-required zero slack between the final two contraction legs, rejecting real breakouts
-over sub-percentage-point technicalities), `signals.VOL_ZSCORE_WINDOW=8` (was 20 — a
-20-day window can straddle an old, unrelated volume spike and mute a genuinely strong
-new one). Caveat worth knowing before quoting the headline number: concentration
-partly improves mechanically from a larger n (splitting the 5yr window in half, each
-half's own concentration is 25.8% and 31.6% respectively — still a real improvement
-over v25's per-half 46.3%/51.3%, just less dramatic than the pooled 16.1% figure
-suggests). See `FINDINGS.md` for this and other narrative conclusions that don't map
-to a single code parameter.
+As of 2026-09-01, the validated stock-level config (**v28**) backtested over 5 years
+(2021-2026) across the full 500-stock NIFTY 500 universe: **n=1430 trades, 65.0% win
+rate, median +2.89%/trade, top-10-of-total concentration 10.3%** (v27 was n=924/62.9%/
++2.90%/16.1%; v25 before that was n=677/58.3%/+1.64%/30.7%). v27 = v25 + three changes
+(daily pivots replacing weekly, `vcp.LAST_LEG_TOLERANCE=0.40`, `signals.VOL_ZSCORE_WINDOW=8`
+— see the v27 entry in git history or `backtest.py`'s comments for the individual
+numbers). v28 = v27 + `signals.RSI_MAX=80` (was 68 — Breakout Continuation's own RSI
+ceiling, swept in isolation on v28 data rather than inferred from VCP's separate
+no-ceiling finding, which was a real methodological correction owed from round 5's
+critique; see `signals.py`'s own comment for the full sweep and the same-day-relabel /
+scheduling-cascade verification done before adopting it). Caveat worth knowing before
+quoting either headline number: part of each jump partly reflects a larger n diluting
+a fixed top-10's share (splitting v27's 5yr window in half, each half's own
+concentration was 25.8%/31.6%, not as dramatic as the pooled 16.1% suggested), and
+part of v28's win-rate gain over v27 specifically is a mix-shift artifact — Breakout
+Cont's own win rate (67.9%) and VCP's own (61.7%) barely moved from their
+isolated-test values, but Breakout Cont's much bigger share of the combined pool pulls
+the blended average toward the stronger pattern. See `FINDINGS.md` for this and other
+narrative conclusions that don't map to a single code parameter.
 
 Options layer (`option_backtest.py`/`portfolio.py`, scoped to `fo_universe.csv`):
 contract-selection isolation across ATM/ITM × current/next-month expiry, re-run on
@@ -119,7 +121,7 @@ pip install -r requirements.txt
 ```
 python3 fetch_prices.py       # refresh data_cache/ (incremental — fast after the first run)
 python3 market_regime.py      # refresh the Nifty regime cache
-python3 backtest.py           # writes runs/trades_v27.csv, prints the summary stats
+python3 backtest.py           # writes runs/trades_v28.csv, prints the summary stats
 ```
 
 ## Daily usage

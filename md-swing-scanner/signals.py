@@ -32,8 +32,11 @@ VOL_ZSCORE_WINDOW = 8        # ADOPTED (2026-08-31): a 20-day trailing window ca
 # test is unreliable here: top-10-of-~200 trades run 800-1000% of total summed pnl_pct
 # in every variant tested, so a mean-based comparison mostly measures which rare
 # long-holding outlier trades got let in, not real filter quality. Findings:
-#   - RSI_MIN/RSI_MAX: real, confirmed — removing it flips the median trade from a
-#     winner to a loser (+0.82% -> -0.51%). Keep.
+#   - RSI_MIN/RSI_MAX: real, confirmed (on THIS 210-stock/21mo pre-v27 run) — removing
+#     it flips the median trade from a winner to a loser (+0.82% -> -0.51%). Keep.
+#     Superseded below for RSI_MAX specifically — re-swept in isolation on v27's full
+#     500-stock/5yr data and that finding no longer holds; the two runs aren't directly
+#     comparable (different universe, window, and this session's other v27 changes).
 #   - MOMENTUM_20D_MIN: looked critical under the naive mean-based test (removing it
 #     flipped expectancy negative) but that was the concentration artifact talking —
 #     median is IDENTICAL with or without it (+0.82% both ways). Not proven to add edge.
@@ -49,7 +52,31 @@ VOL_ZSCORE_WINDOW = 8        # ADOPTED (2026-08-31): a 20-day trailing window ca
 # tool even where the backtest edge case for keeping them is weak. Revisit only if the
 # opposite problem shows up (too few signals), not to chase a marginal median gain.
 RSI_MIN = 55
-RSI_MAX = 68
+RSI_MAX = 80  # ADOPTED (2026-09-01, was 68). A round-5 outside-critique correction: VCP's
+              # "no RSI ceiling needed, even RSI>72 is fine" finding does NOT transfer to
+              # Breakout Continuation just because they share the same RSI number — VCP at
+              # RSI 75 usually means weeks of quiet basing (elevated only because today is
+              # breakout day); Breakout Cont at RSI 75 can mean 5-6 days already run. Swept
+              # BC's OWN ceiling in isolation instead of inferring from VCP: 68(current)/72/
+              # 75/80/85/100(no real cap), full v27 backtest each time, Breakout Cont trades
+              # only. Win rate holds ~67-69% throughout; median holds/improves; concentration
+              # drops monotonically 52.2%->26.5%->24.3%->16.4%->15.7%->16.5% and flattens
+              # right at 80 (85/100 statistically indistinguishable from 80 on every metric)
+              # — same real-improvement-then-plateau shape as vcp.LAST_LEG_TOLERANCE and
+              # VOL_ZSCORE_WINDOW. Sample triples (211->767 BC trades) — real, not thin: only
+              # ~90 of those are poached from VCP (VCP's own n drops 713->663, its own
+              # win/median/concentration barely move, 61.6%->61.7%/62.1%, ~2.9% flat,
+              # 19.5%->22.0%), the rest fire under NEITHER pattern today. Checked the poached
+              # trades two ways before trusting this: (1) 31 same-day relabelings — win rate
+              # identical (64.5%->64.5%), only 1 trade flips each direction (PAYTM 2024-11-08:
+              # VCP's structural-low stop hit on a -11.2% dip to 753 five days in; BC's much
+              # wider 3xATR chandelier absorbed the same dip and rode it to a +6.2% resistance
+              # exit two weeks later — both patterns' stop mechanics are correct, sourced,
+              # intentionally different designs, see current_stop_level, not a bug); (2) 26
+              # scheduling-cascade pre-emptions (an earlier BC entry now consumes the ticker's
+              # slot before the later VCP setup could ever form) — these actually skew
+              # favorable, 84.6% win for the earlier BC entry vs a hypothetical 57.7% for the
+              # VCP setup it displaced.
 EMA34_RISING_DAYS_MIN = 9      # out of the trailing 10 — persistent trend, not just "currently above"
 MIN_TRADED_VALUE = 1_000_000_000  # Rs.100cr, 20-day avg Close*Volume — liquidity floor
 MOMENTUM_20D_MIN = 1.05        # close must be >=5% above its level 20 trading days ago

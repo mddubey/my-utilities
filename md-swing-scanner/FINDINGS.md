@@ -32,35 +32,89 @@ candle that builds the move gradually through the session (institutional
 accumulation signature, matches this scanner's existing EMA/RS/volume/breakout
 filters). Not yet tested separately — real, open follow-up.
 
-**Why big-momentum days skew toward Coiled Spring, not Breakout Continuation
-(2026-09-01)** — real case: a watchlist was 5 Coiled Spring vs 1 Breakout Continuation.
-Traced each ticker's exact blocking condition (not one bug, one structural asymmetry):
-**Breakout Continuation has an RSI ceiling (55-68) that Coiled Spring/VCP simply
-doesn't have.** On a day with a genuinely large move, RSI routinely clears 68,
-structurally routing big movers toward VCP even when everything else about the
-Breakout Cont setup (fresh high, volume, trend) is fine.
+**Why big-momentum days USED TO skew toward Coiled Spring, not Breakout Continuation
+(2026-09-01, now resolved)** — real case: a watchlist was 5 Coiled Spring vs 1 Breakout
+Continuation. Traced each ticker's exact blocking condition (not one bug, one
+structural asymmetry): Breakout Continuation had an RSI ceiling (55-68) that Coiled
+Spring/VCP simply doesn't have. On a day with a genuinely large move, RSI routinely
+clears 68, structurally routing big movers toward VCP even when everything else about
+the Breakout Cont setup (fresh high, volume, trend) was fine.
 
-**Correction on the above, from outside review — this was an overgeneralization.**
-The chase-vs-pullback table above showed VCP entries with RSI>72 as the single best
-bucket, which tempted the conclusion "so Breakout Continuation's RSI≤68 ceiling is
-probably cutting off its own best zone too." **That's selection bias — VCP and
-Breakout Cont at the same RSI number mean different things.** A VCP stock at RSI 75
-typically spent WEEKS tightening in a quiet base and is elevated only because today
-is breakout day (RSI is a symptom of the breakout, not pre-existing extension). A
-Breakout Continuation stock at RSI 75 may have already run 5-6 consecutive days
-before today — a genuinely different, more extended situation, even at the same RSI
-number. **Correct fix, if this is worth pursuing: sweep Breakout Continuation's OWN
-RSI ceiling in isolation (55-68 vs 55-72 vs 55-75 vs 55-80) rather than inferring
-anything from VCP's data.** Not yet done.
+**Correction on the above, from outside review — the first fix attempt was an
+overgeneralization.** The chase-vs-pullback table above showed VCP entries with
+RSI>72 as the single best bucket, which tempted the conclusion "so Breakout
+Continuation's RSI≤68 ceiling is probably cutting off its own best zone too." That's
+selection bias — VCP and Breakout Cont at the same RSI number mean different things.
+A VCP stock at RSI 75 typically spent WEEKS tightening in a quiet base and is elevated
+only because today is breakout day (RSI is a symptom of the breakout, not
+pre-existing extension). A Breakout Continuation stock at RSI 75 may have already run
+5-6 consecutive days before today — a genuinely different, more extended situation,
+even at the same RSI number.
 
-**Dec'24-May'25 VCP losing patch** (32 trades, 34.4% win vs ~56-61% everywhere else in
-the project) — confirmed real/non-random. Two obvious hypotheses (Nifty direction,
-weak relative strength during the patch) both refuted directly. Root cause still
-unidentified. Outside review calls this "the biggest unresolved mystery... I wouldn't
-change the strategy until I know why" and suggests testing, in priority order: sector
-concentration (pharma/IT/metals), volatility regime (was ATR unusually high), market
-breadth (weak breadth despite index-level trend), earnings-season clustering, and
-election/macro period effects. Not yet investigated.
+**Done properly (2026-09-01): swept Breakout Continuation's OWN RSI ceiling in
+isolation** (55-68/72/75/80/85/100-no-real-cap) on v28 data, not inferred from VCP's
+data at all. This time it held up: win rate ~67-69% throughout, median flat-to-better,
+concentration drops monotonically 52.2%→16.4% and flattens right at 80 — same
+real-then-plateau shape as the other v27/v28 parameter sweeps. **Adopted `signals.RSI_MAX=80`.**
+Also checked, before trusting it, whether this was just relabeling VCP's own good
+trades as Breakout Cont instead of adding real new ones: only ~90 of VCP's 713→663
+drop are same-day overlaps; the two exact-match subgroups checked out clean (see
+`signals.py`'s own comment for the full numbers, including one real case — PAYTM
+2024-11-08 — where the same entry flipped outcome between patterns for a fully
+legitimate reason: VCP's stop is Minervini's published structural-base-low stop,
+Breakout Cont's is the published Chandelier Exit's 3×ATR trail; two different, real,
+sourced stop philosophies, not an inconsistency).
+
+**"Dec'24-May'25" VCP losing patch is understated — it's really Oct'24 onward, patchy
+through Feb'26, not a closed 6-month window (2026-09-01)**. Year-by-year v27 slice
+found 2025 is a net LOSER on a mean basis (-0.6% mean, though median stays +1.1%) and
+it's entirely a Coiled Spring/VCP problem — Breakout Continuation had a fine 2025
+(72.7% win, +3.3% median, all year). Month-by-month VCP breakdown shows the weak
+patch actually starts **Oct 2024** (32.1% win, -6.7% median), not Dec, and never
+fully resolves through Feb 2026 — just gets punctuated by occasional strong months
+(May'25 73.3%/+4.2%, Jan'26 71.4%/+4.6%) between weak stretches (Jul-Oct'25, Feb'26).
+Two obvious hypotheses (Nifty direction, weak relative strength during the patch)
+both refuted directly. Outside review calls this "the biggest unresolved mystery... I
+wouldn't change the strategy until I know why" and suggests testing, in priority
+order: sector concentration (pharma/IT/metals), volatility regime (was ATR unusually
+high), market breadth (weak breadth despite index-level trend), earnings-season
+clustering, and election/macro period effects.
+
+**New evidence (2026-09-01): the regime gate was OPEN through most of the worst leg
+of the decline.** Checked Nifty ADX/SMA200 directly against `data_cache/_NIFTY.csv`
+for Oct-Dec 2024, the exact window where VCP's win rate first collapsed:
+
+| month | Nifty close (start→end) | ADX range | gate-on % of days |
+|---|---|---|---|
+| 2024-10 | 25797→24205 | 24-32 | 100% |
+| 2024-11 | 24304→24131 | 30-42 | 79% |
+| 2024-12 | 24276→23645 | 20-33 | 62% |
+| 2025-01 | 23743→23508 | 31-37 | 9% |
+| 2025-02 | 23482→22125 | 22-30 | 0% |
+
+This is the same mechanism already flagged in `market_regime.py`'s own comment on
+`_compute_adx()` (ADX measures trend STRENGTH, not direction — a real correction can
+read as "trending" and get waved through) plus SMA200's inherent lag (a 200-day
+average takes ~2-3 months of a correction before it catches up and actually closes
+the gate). Caveat already on record: a `+DI/-DI` directional filter was tried
+specifically to catch this and was REJECTED — per-trade, down-days weren't actually
+worse than up-days for VCP in this window (31.25% vs 37.5% win, no real difference).
+So "gate stayed open during a down-move" is a confirmed temporal correlation, not
+proof that a naive direction filter fixes it at the trade level.
+
+**Promising untested lead: SMA50, not just SMA200/ADX, for the market-level gate.**
+`market_regime.py` already computes and caches `sma50` for Nifty but `market_trending()`
+never uses it. Quick check (2026-09-01): a `Close > SMA50` filter would have closed
+the gate in October 2024 itself (100%→14% open that month) instead of December/
+January under the current SMA200-based gate; an `SMA50 rising` (5-day lookback, same
+convention as the existing ADX_RISING test) filter closes it by mid-November
+(→0%). Both are meaningfully faster than the current gate's 62-100%-open readings
+through the same window. **Not yet backtested as an actual filter** — two structurally
+similar-looking ideas already failed on this exact question (`TEST_ADX_RISING` halved
+the sample for no real gain; `TEST_ADX_UPTREND`/+DI-DI cut the sample 37% and didn't
+discriminate the VCP patch at all) — "closes the gate faster during the bad patch" is
+necessary but not sufficient; the real test is a full backtest re-run (n/win/median/
+concentration) with the SMA50 filter added, not just eyeballing the Nifty-level days.
 
 ## Options side
 

@@ -374,13 +374,18 @@ if __name__ == "__main__":
     # which is hard-constrained to names that actually have options.
     tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
     trades = run(tickers, True, daily_pivots, 0.0)
-    trades.to_csv("runs/trades_v27.csv", index=False)
-    summarize(trades, "v27: v26 (daily pivots) + vcp.LAST_LEG_TOLERANCE=0.40 (base-tightening "
-                       "rule allows the final leg to be up to 40% deeper than the second-to-last, "
-                       "not zero slack) + signals.VOL_ZSCORE_WINDOW=8 (was 20 — a longer window "
-                       "can straddle an old, unrelated volume spike and mute a genuinely strong "
-                       "new one). All three verified individually AND combined (2026-08-31) — they "
-                       "stack constructively: n 677->924, win 58.3%->62.9%, median +1.64%->+2.90%, "
-                       "concentration 30.7%->16.1% (best in project history). Drought-only trades "
-                       "still 0 at every step — all three changes are orthogonal to the regime-gate "
-                       "drought, general detection-quality fixes only, not a backdoor around it.")
+    trades.to_csv("runs/trades_v28.csv", index=False)
+    summarize(trades, "v28: v27 (daily pivots + vcp.LAST_LEG_TOLERANCE=0.40 + "
+                       "signals.VOL_ZSCORE_WINDOW=8, n 677->924, win 58.3%->62.9%, median "
+                       "+1.64%->+2.90%, concentration 30.7%->16.1%) + signals.RSI_MAX=80 (was 68 "
+                       "— Breakout Continuation's own RSI ceiling, swept in isolation this time, "
+                       "not inferred from VCP's data, see signals.py's own comment for the full "
+                       "sweep/verification). Combined: n 924->1430, win 62.9%->65.0%, median "
+                       "+2.90%->+2.89% (flat), concentration 16.1%->10.3%. Caveat: part of the "
+                       "win-rate/concentration gain here is a mix-shift artifact, not new edge — "
+                       "Breakout Cont's own win rate (67.9%) and VCP's own (61.7%) barely moved "
+                       "from their isolated-test values, but Breakout Cont's share of the pool "
+                       "roughly tripled, pulling the blended average toward the stronger pattern; "
+                       "concentration also partly benefits from the same bigger-n dilution effect "
+                       "already flagged for v27's own headline number. Drought-only trades still 0 "
+                       "— orthogonal to the regime-gate drought, a detection-quality fix only.")
