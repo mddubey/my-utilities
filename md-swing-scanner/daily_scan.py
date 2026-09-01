@@ -117,6 +117,21 @@ def fetch_live_bars(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT):
     return bars
 
 
+_FO_TICKERS = None
+
+
+def _fo_tickers():
+    """F&O-eligible tickers (210), lazily loaded once — used to flag whether a swing
+    candidate is actually optionable at all (2026-09-01): the pure-swing universe
+    (nifty500_universe.csv, 500 tickers) is a strict superset, so most scans will
+    include names with NO options market whatsoever. A good swing signal on a
+    non-F&O name is still a real stock trade, just never an options trade."""
+    global _FO_TICKERS
+    if _FO_TICKERS is None:
+        _FO_TICKERS = set(pd.read_csv("fo_universe.csv", header=None)[0])
+    return _FO_TICKERS
+
+
 def _annotate(ticker, pattern, structural_low, row, prev_row, live):
     """Points about TODAY's move specifically, on top of the raw entry (2026-08-31) —
     close/target alone can't distinguish a fresh breakout with real room to run from
@@ -132,6 +147,7 @@ def _annotate(ticker, pattern, structural_low, row, prev_row, live):
         pct_to_target=(target / row.Close - 1) * 100 if target else None,
         target_tested_today=target is not None and row.High >= target,
         vol_zscore=row.vol_zscore,
+        is_fo=ticker in _fo_tickers(),
     )
 
 
@@ -209,7 +225,8 @@ if __name__ == "__main__":
         target_str = f"₹{c['target']:.2f} ({c['pct_to_target']:+.1f}% away)" if c['target'] is not None else "n/a"
         live_tag = " [LIVE]" if c.get("live") else ""
         chg_str = f"{c['pct_chg']:+.1f}% today" if c['pct_chg'] is not None else "n/a"
-        print(f"  {c['ticker']:<14} {c['pattern']:<14} close=₹{c['close']:.2f} ({chg_str})  "
+        fo_tag = "[F&O]" if c["is_fo"] else "[NO OPTIONS]"
+        print(f"  {c['ticker']:<14} {fo_tag:<12} {c['pattern']:<14} close=₹{c['close']:.2f} ({chg_str})  "
               f"target={target_str}  vol_z={c['vol_zscore']:+.1f}{live_tag}")
         if c["target_tested_today"]:
             print(f"    ⚠ already touched/exceeded this target intraday today — thin or no room left")

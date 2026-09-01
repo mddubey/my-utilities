@@ -142,6 +142,12 @@ alternative) that loosening the regime gate does NOT rescue the current drought 
 trades — the watchlist is for keeping an eye on things, not a hint that these are secretly
 tradable.
 
+Each row is tagged `[F&O]` or `[NO OPTIONS]` (2026-09-01) — this scanner's universe
+(`nifty500_universe.csv`, 500 tickers) is a strict superset of the F&O-eligible list
+(`fo_universe.csv`, 210 tickers), so a genuinely good swing signal often shows up on a
+name with no options market at all (real case: 3 of a real 6-ticker watchlist were
+`[NO OPTIONS]`). Still a real stock trade, just never an options trade.
+
 Each row also annotates TODAY's move specifically (2026-08-31), since close/target alone can hide
 how much real room is left: `%chg` (today's move vs prior close), `target=... (X% away)` (room
 left to the resistance exit target — real case: a close of 916 against a 917.97 target is only
