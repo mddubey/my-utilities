@@ -62,7 +62,8 @@ def _regime_frame():
 
 
 def market_trending(date, require_rising=False, require_uptrend=False, require_above_sma200=False,
-                     require_above_sma50=False, require_sma50_rising=False):
+                     require_above_sma50=False, require_sma50_rising=False,
+                     allow_sma50_recovery=False, sma50_recovery_lookback=NIFTY_ADX_RISING_LOOKBACK):
     """Nifty ADX at or after the most recent trading day on/before `date` is >= the
     verified choppy/neutral split. Used to gate BOTH patterns (docstring here was
     stale — VCP got the same gate in v11 once it was checked directly and also showed
@@ -90,7 +91,18 @@ def market_trending(date, require_rising=False, require_uptrend=False, require_a
     to fix, the VCP trades it REMOVES (Nifty below/falling its 50-SMA) were the BETTER
     half (55.1% win) and the ones it KEEPS were worse (38.1% win) — see backtest.py's
     TEST_SMA50_ABOVE/TEST_SMA50_RISING comments for the full numbers. Nifty's own
-    medium-term trend strength isn't what's driving VCP's weak window."""
+    medium-term trend strength isn't what's driving VCP's weak window.
+
+    Pass allow_sma50_recovery=True (2026-09-01, TESTING) for a structurally different
+    idea — an OR, not an AND, on top of require_above_sma200: if Close > SMA200 fails,
+    still pass if SMA50 has been rising over the last sma50_recovery_lookback trading
+    days (default matches NIFTY_ADX_RISING_LOOKBACK, override — a 50-day average is
+    much slower than ADX, 5 days is probably too short to mean anything for it, hence
+    this being a separate testable param). Unlike require_above_sma50/
+    require_sma50_rising above (both AND-tightened, could only ever REMOVE trades),
+    this can only ADD trades the current gate is blocking — most relevant right now
+    during the live regime-gate drought (Nifty below its own 200-SMA since
+    2026-02-26)."""
     df = _regime_frame()
     pos = df.index.searchsorted(date, side="right") - 1
     if pos < 0:
@@ -107,8 +119,17 @@ def market_trending(date, require_rising=False, require_uptrend=False, require_a
     if require_uptrend and not (row.plus_di14 > row.minus_di14):
         return False
     if require_above_sma200:
-        if pd.isna(row.sma200) or not (row.Close > row.sma200):
-            return False
+        sma200_ok = not pd.isna(row.sma200) and row.Close > row.sma200
+        if not sma200_ok:
+            if not allow_sma50_recovery:
+                return False
+            prior_pos = pos - sma50_recovery_lookback
+            if prior_pos < 0:
+                return False
+            prior_sma50 = df.iloc[prior_pos].sma50
+            recovering = not pd.isna(row.sma50) and not pd.isna(prior_sma50) and row.sma50 >= prior_sma50
+            if not recovering:
+                return False
     if require_above_sma50:
         if pd.isna(row.sma50) or not (row.Close > row.sma50):
             return False

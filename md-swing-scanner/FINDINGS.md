@@ -123,6 +123,29 @@ look like a gate problem at all. See `backtest.py`'s `TEST_SMA50_ABOVE`/
 `TEST_SMA50_RISING` comments and `market_regime.py`'s `market_trending()` docstring
 for the full numbers.
 
+**OR-based SMA50 "recovery" gate — tested, INCONCLUSIVE, not adopted (2026-09-01).**
+Structurally different from the rejected idea above: an OR on `require_above_sma200`
+(`allow_sma50_recovery`), not an AND — lets a trade through if SMA200 fails but
+Nifty's SMA50 has risen over the last N trading days, so it can only ADD trades the
+gate currently blocks, never remove any (unlike the AND version, which could only
+remove). Swept N=10/15/20 — pooled effect is tiny either way (n 1430→1433-1457, win
+65.0%→64.7-65.0%, concentration flat ~10.3%), since the recovery window rarely comes
+up across 5 years. Isolated the actual added trades (n=17 at N=15): dominated by one
+real cluster in mid-June 2026 (15 of 17, 60% win, +2.42% median — close to baseline
+quality but two large losers, IFCI -16.4% and ANGELONE -11.3%, pull the mean
+negative) plus 2 older isolated losers (2022, 2025). Too thin (one cluster) to trust
+either way — not backwards like the AND version, just unproven. **Directly live and
+consequential right now**: as of 2026-08-31 (latest cached data), the recovery
+condition is ACTUALLY TRUE — Nifty's still below its SMA200 but its SMA50 has been
+rising for 15 trading days — so adopting this today would immediately reopen the
+regime-gate drought that's been running since 2026-02-26. Given the thin evidence,
+**not adopted** (`TEST_SMA50_RECOVERY=False` stays the default) — kept as a
+documented, disabled option (`market_regime.py`'s `allow_sma50_recovery` param,
+`backtest.py`'s `TEST_SMA50_RECOVERY`/`TEST_SMA50_RECOVERY_LOOKBACK`). Worth
+revisiting as a live natural experiment: if Nifty's SMA50 keeps rising and price
+genuinely recovers over the coming weeks, that's more real evidence accumulating for
+free, without having gated real trades on an unproven signal today.
+
 **Does a stock qualifying for BOTH patterns on the same day mean higher confidence?
 Checked, and no — not yet, on this sample (2026-09-01).** `detect_entry()` itself
 short-circuits (Breakout Cont checked first, first match wins, VCP's own check never
