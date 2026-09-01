@@ -45,6 +45,30 @@ def _last_cached_date(ticker):
     return df.index.max() if len(df) else None
 
 
+def _recover_safe_today(tickers, safe_today):
+    """Narrow single-day re-fetch for tickers whose Close for safe_today came back
+    NULL from the main batch request, even though real data exists. Confirmed
+    reproducible (2026-09-02): the SAME ticker/date's Close is null when that date
+    is the LAST row of a wider multi-day range request, but correct when requested
+    as a single-day range on its own — a yfinance/Yahoo quirk (plausibly related to
+    how the CAS-settled close gets finalized with a lag — see FINDINGS.md), not
+    actually-missing data. Only called for tickers still missing safe_today after
+    the main fetch, so this stays cheap in the common case; harmless no-op if
+    safe_today genuinely has no data for a ticker (weekend/holiday/newly listed)."""
+    if not tickers:
+        return {}
+    yf_tickers = [f"{t}.NS" for t in tickers]
+    data = yf.download(yf_tickers, start=safe_today.strftime("%Y-%m-%d"), interval="1d",
+                        group_by="ticker", threads=True, progress=False, auto_adjust=False)
+    recovered = {}
+    for t, yft in zip(tickers, yf_tickers):
+        df = data[yft].dropna(subset=["Close"])
+        df = df[df.index == safe_today]
+        if not df.empty:
+            recovered[t] = df
+    return recovered
+
+
 def fetch_all(tickers):
     """Returns {'new': [...], 'updated': [...], 'current': [...], 'empty': [...]} —
     kept as 4 distinct buckets (not collapsed into one "ok" list) after a real,
@@ -62,6 +86,8 @@ def fetch_all(tickers):
         yf_tickers = [f"{t}.NS" for t in new_tickers]
         data = yf.download(yf_tickers, period=PERIOD, interval="1d", group_by="ticker",
                             threads=True, progress=False, auto_adjust=False)
+        dfs = {}
+        need_recovery = []
         for t, yft in zip(new_tickers, yf_tickers):
             # dropna(subset=["Close"]), not how="all" — a row fetched while the market's
             # still open (or right at close, before yfinance settles the final print)
@@ -73,6 +99,14 @@ def fetch_all(tickers):
             # check depending on Close for those tickers, with zero visible error.
             df = data[yft].dropna(subset=["Close"])
             df = df[df.index <= safe_today]  # today isn't safe to trust before SAME_DAY_SAFE_HOUR
+            dfs[t] = df
+            if df.empty or df.index.max() < safe_today:
+                need_recovery.append(t)  # see _recover_safe_today — the wide period="5y"
+                                          # request is exactly the shape that triggers this
+        for t, extra in _recover_safe_today(need_recovery, safe_today).items():
+            dfs[t] = pd.concat([dfs[t], extra]) if not dfs[t].empty else extra
+        for t in new_tickers:
+            df = dfs[t]
             if df.empty:
                 result["empty"].append(t)
                 continue
@@ -94,9 +128,23 @@ def fetch_all(tickers):
             yf_tickers = [f"{t}.NS" for t in existing_tickers]
             data = yf.download(yf_tickers, start=start.strftime("%Y-%m-%d"), interval="1d",
                                 group_by="ticker", threads=True, progress=False, auto_adjust=False)
+            dfs = {}
+            need_recovery = []
             for t, yft in zip(existing_tickers, yf_tickers):
                 new_df = data[yft].dropna(subset=["Close"])  # see new_tickers branch above
                 new_df = new_df[(new_df.index > last_dates[t]) & (new_df.index <= safe_today)]
+                dfs[t] = new_df
+                # only chase a recovery if this ticker is actually behind safe_today AND
+                # didn't already get it — a shared batch start date (the minimum across
+                # the whole existing_tickers batch) means even ONE stale ticker widens
+                # the request for everyone, so this can affect tickers that were only
+                # one day behind too, not just the straggler that caused the wide range
+                if last_dates[t] < safe_today and (new_df.empty or new_df.index.max() < safe_today):
+                    need_recovery.append(t)
+            for t, extra in _recover_safe_today(need_recovery, safe_today).items():
+                dfs[t] = pd.concat([dfs[t], extra]) if not dfs[t].empty else extra
+            for t in existing_tickers:
+                new_df = dfs[t]
                 if not new_df.empty:
                     new_df.to_csv(CACHE_DIR / f"{t}.csv", mode="a", header=False)
                     result["updated"].append(t)

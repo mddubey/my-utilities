@@ -5,6 +5,60 @@ parameter, so they had nowhere to live under the "comment next to the code" poli
 (see `README.md`'s Current status section). Anything that DID change a parameter is
 documented as a comment at that parameter instead — this file doesn't duplicate that.
 
+## Market structure: the Closing Auction Session (CAS)
+
+**A real, dated market-structure change (2026-09-02) this project had no visibility
+into until directly investigated.** SEBI's Closing Auction Session (CAS) went live
+2026-08-03, Phase 1 = F&O stocks only (`fo_universe.csv`'s exact scope). Continuous
+trading for F&O names now genuinely ends at **15:15 IST**, not 15:30 — a separate
+20-minute auction (15:15-15:35) sets the real official close, reference price = VWAP
+of 15:00-15:15 trades, ±3% band, market/limit orders only (no stop-loss orders
+allowed in that window). Confirmed directly against real intraday data (see
+`intraday_cache.py`): post-CAS 5-minute bars for F&O tickers simply stop at 15:15,
+nothing after — matches the mechanism exactly.
+
+**Real, confirmed downstream consequences:**
+- The earlier suggestion to push `daily_scan.py --live`'s cutoff to ~15:15-15:20
+  (reasoning: "a few minutes is enough to place an order before the 15:30 close") is
+  WRONG for F&O names post-CAS — 15:15 is the wall itself now, not a target with
+  buffer before it. A live check should stay safely before 15:15 for F&O tickers.
+- Real stop-loss ORDERS (the order type) cannot function during 15:15-15:35 for F&O
+  names — a resting stop won't trigger in the auction window; managing an exit that
+  would hit during that window needs a manual market/limit action instead.
+- **A real, previously-unknown bug in `fetch_prices.py`, found and fixed
+  (2026-09-02): yfinance returns a NULL Close for a date when that date is the LAST
+  row of a wide multi-day range request, but the correct value when the same
+  date/ticker is requested as a narrow single-day range on its own** — confirmed
+  reproducible across 8/8 tickers checked, consistently. `fetch_all()`'s
+  existing-tickers branch computes ONE shared start date (the minimum last-cached
+  date across the whole batch) for every ticker in that call — so even a single
+  stale ticker widens the request for everyone, meaning the existing NaN-close
+  protection (`dropna(subset=["Close"])`, itself a fix from an earlier real incident)
+  could silently drop the latest day's data for tickers that were otherwise fully
+  current, with no visible error. Fixed with `_recover_safe_today()`: after the main
+  fetch, any ticker still missing `safe_today`'s row gets one narrow single-day
+  re-fetch, which reliably returns the correct value. Verified against the real,
+  reproduced bug (not just a synthetic test) before considering it fixed — see
+  `fetch_prices.py`'s own comments for the full mechanism and `tests/test_fetch_prices.py`
+  for the regression test.
+- Whether yfinance's daily Close for F&O tickers *correctly reflects* the
+  CAS-determined official closing price (vs. the last continuous-trade price before
+  15:15) once the above bug is worked around — **not yet checked**, a real open
+  question. `fetch_stock_options.py`/`fetch_stock_options_pre2024.py` already pull
+  NSE bhavcopy directly (the exchange's own authoritative source, not yfinance) for
+  the options layer — worth comparing against that if this needs a definitive answer.
+- 60 days of real 5-minute intraday data (`intraday_cache.py`, all 500 tickers, June
+  10 - Sept 1) captured and cached permanently before it ages out of yfinance's own
+  rolling 60-day retention window — this is what made the above verification
+  possible at all, and is available for further CAS-window analysis later.
+- Checked directly (2026-09-02) whether CAS shows up as a detectable shift in this
+  project's own signals: close-position-within-day's-range (pre/post-CAS median
+  0.462/0.478 — noise) and raw weekly signal-firing rate (no collapse at the Aug 3
+  boundary, wide variance both before and after) — **no detectable pattern in either
+  check**, on ~4 weeks of post-CAS data. Doesn't rule out a real effect specifically
+  inside the 15:00-15:35 window itself, which these two checks don't touch — now
+  possible to investigate with the intraday cache above, not yet done.
+
 ## Swing side
 
 **Chase a big-momentum entry, or wait for a pullback? (2026-09-01)** — checked
