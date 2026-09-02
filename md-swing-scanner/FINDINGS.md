@@ -439,6 +439,50 @@ already trending. Concentration gets meaningfully worse for both patterns (rough
 
 ## Options side
 
+**Options-specific time stop AND premium stop — both tested, both REJECTED at every
+threshold tried (2026-09-02).** A review note suggested a stock stop isn't an option
+risk stop, and floated two candidate options-native exits: a time stop ("exit if the
+stock hasn't moved in favor within 3-5 sessions") and a premium stop (-35% to -50%
+premium loss). Both tested properly against the full ITM+next set (n=562), not just
+reasoned about.
+
+Time stop (checked at N=3/5 sessions, threshold = stock move needed to avoid
+triggering):
+
+| N | threshold | triggered | win% | median pnl |
+|---|---|---|---|---|
+| — | current (no rule) | — | 61.6% | +18.63% |
+| 3 | any non-positive move | 45.4% | 46.8% | -2.97% |
+| 3 | down >3% | 11.4% | 58.4% | +14.40% |
+| 5 | any non-positive move | 41.8% | 48.8% | -1.99% |
+| 5 | down >3% | 14.9% | 57.5% | +13.58% |
+
+Cross-checked across all 4 contract-selection variants (ATM/ITM x current/next), not
+just ITM+next — same shape everywhere, including the theta-sensitive front-month/ATM
+config with the least time to recover, so this isn't an ITM+next-specific artifact.
+
+Premium stop (option's own price dropping X% from entry, checked day-by-day, only on
+real liquid trading days):
+
+| threshold | triggered | win% | median pnl | concentration |
+|---|---|---|---|---|
+| current (no stop) | — | 61.6% | +18.63% | 32.6% |
+| -30% | 42.5% | 50.2% | +0.86% | 41.6% |
+| -35% | 38.8% | 52.0% | +3.73% | 40.7% |
+| -40% | 35.1% | 54.4% | +10.34% | 38.8% |
+| -50% | 28.3% | 58.0% | +15.29% | 33.7% |
+
+Same shape as the time stop: damage shrinks as the threshold loosens but never
+crosses into a real improvement, even at -50% (the loosest end of the review's own
+suggested range). Same underlying mechanism both times — this strategy's real edge
+lives in a small number of huge convex option winners, and those winners routinely
+draw down 30-50%+ before recovering; any early cut based on temporary weakness (stock
+move or option premium) removes exactly the trades that make the whole thing
+profitable. **Conclusion: neither mechanism works at any threshold tested — this
+options layer doesn't currently have (and these two review-suggested ideas don't
+provide) a working independent risk-management overlay separate from the stock's own
+exit.** A real, validated negative result, not an unexplored gap anymore.
+
 **Conclusion evolution (all real, all previously reported, kept here as the timeline
 since the number changed meaning several times)**: original small sample (n=30-36)
 said ATM+next-month; `portfolio.py`'s capital-pooling bug fix flipped this to
