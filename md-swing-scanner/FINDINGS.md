@@ -383,6 +383,16 @@ cutting them all early was net harmful), but as a QUALITY signal, strong immedia
 follow-through genuinely does mean a better trade, matching the "is this a real
 breakout" intuition directly.
 
+**By pattern (2026-09-02): VCP is far more sensitive to a weak immediate start than
+Breakout Continuation.** In the worst bucket (down >2% by day 3): BC still wins
+51.4% of the time (median +0.2%, barely positive but real) — a weak start isn't a
+strong red flag for a stock already mid-trend. VCP crashes to 27.7% win (median
+-6.7%) in the same bucket — for a base-breakout pattern, no immediate follow-through
+more directly suggests the base itself failed. Both patterns converge to a similarly
+strong outcome at the good end (up >5% by day 3: BC 92.1% win, VCP 91.4% win) — the
+asymmetry is specifically in how much a WEAK start should worry you, not in whether a
+strong one is good.
+
 Compared entry-day features between the two extremes (down>2% vs up>5%) to see if
 this could be caught AT ENTRY instead of 3 days later — pattern mix, volume z-score,
 RSI, entry-day move size, close-position-in-range, and ATR% were all statistically
@@ -411,6 +421,21 @@ it reads as "how much weight to put on today's whole list" rather than a per-tic
 ranking field. `market_regime.py`'s `market_trending(min_breadth=...)` param and
 `backtest.py`'s `TEST_MIN_BREADTH` exist and are tested/documented for anyone who
 later wants to revisit this as an actual gate.
+
+**By pattern (2026-09-02): VCP gets the bigger lift from breadth, consistent with it
+being the more breadth-sensitive pattern overall.**
+
+| variant | breakout_cont win/median/conc | coiled_spring win/median/conc |
+|---|---|---|
+| baseline | 67.9% / +2.93% / 16.4% | 61.7% / +2.88% / 22.0% |
+| breadth>=70 | 69.2% / +3.18% / 22.3% | 65.5% / +3.32% / 26.3% |
+| breadth>=80 | 70.7% / +3.61% / 22.1% | 67.4% / +3.45% / 27.0% |
+
+Win rate climbs +5.7pp for VCP (61.7%→67.4%) vs +2.8pp for BC (67.9%→70.7%) going
+from baseline to breadth>=80 — matches the day-3 finding above that VCP is generally
+more dependent on the environment cooperating, while BC is more self-sufficient once
+already trending. Concentration gets meaningfully worse for both patterns (roughly
++6pp each), a real, shared cost of the tighter sample, not specific to either one.
 
 ## Options side
 
