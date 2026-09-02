@@ -86,11 +86,36 @@ def oi_buildup_bullish(ticker, date):
     return last_price > first_price and net_oi_chg > 0
 
 
+MIN_LOTS_TRADED = 0       # testing (2026-09-02): additional floor on TtlTradgVol (already
+                           # in lots/contracts, confirmed directly against real bhavcopy
+                           # rows — values like 13-747 are plausible daily lot counts, not
+                           # raw shares). 0 = disabled (original OI>0/vol>0 bar only).
+MIN_PREMIUM_TURNOVER = 0  # testing (2026-09-02): additional floor on TtlTradgVol *
+                           # NewBrdLotQty * ClsPric (approx rupee value traded that day).
+                           # 0 = disabled.
+EXCLUDE_SINGLE_PRINT = False  # testing (2026-09-02): a contract where Open==High==Low==
+                               # Close is a proxy for "only one real trade happened" — the
+                               # bhavcopy doesn't carry a trade-count column, so this is
+                               # inferred from the price columns rather than a direct count.
+
+
 def liquid(row):
     """Real minimum bar, not a robust liquidity guarantee: some open interest
     AND an actual trade that day. Both zero -> the ClsPric is a stale
-    carried-forward theoretical price, not something you could transact at."""
-    return row.OpnIntrst > 0 and row.TtlTradgVol > 0
+    carried-forward theoretical price, not something you could transact at.
+    MIN_LOTS_TRADED/MIN_PREMIUM_TURNOVER/EXCLUDE_SINGLE_PRINT (2026-09-02, TESTING)
+    layer stricter checks on top, motivated by a review note flagging that OI>0/vol>0
+    alone doesn't prove you could actually get filled at ClsPric — "some contracts
+    print once and then vanish.\""""
+    if not (row.OpnIntrst > 0 and row.TtlTradgVol > 0):
+        return False
+    if MIN_LOTS_TRADED and row.TtlTradgVol < MIN_LOTS_TRADED:
+        return False
+    if MIN_PREMIUM_TURNOVER and row.TtlTradgVol * row.NewBrdLotQty * row.ClsPric < MIN_PREMIUM_TURNOVER:
+        return False
+    if EXCLUDE_SINGLE_PRINT and row.OpnPric == row.HghPric == row.LwPric == row.ClsPric:
+        return False
+    return True
 
 
 ITM_PCT = 0.05  # contract-selection isolation experiment (2026-08-31): how far in-the-money

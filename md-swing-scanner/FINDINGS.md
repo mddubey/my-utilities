@@ -483,6 +483,50 @@ options layer doesn't currently have (and these two review-suggested ideas don't
 provide) a working independent risk-management overlay separate from the stock's own
 exit.** A real, validated negative result, not an unexplored gap anymore.
 
+**Robustness check on the above (2026-09-02): does the premium/time-stop rejection
+hold up on a liquidity-tightened trade set, or was it resting on thin/unreliable
+option prints?** Correctly caught before being left as an open question — the
+original test ran on the CURRENT liquidity bar (`liquid()`: OI>0 and volume>0 only),
+so it was worth checking whether stricter liquidity criteria (tested next) would
+change the underlying trade set enough to flip the conclusion. It doesn't: re-ran
+premium-stop on the liquidity-tightened set (min 25 lots traded, min ₹1L turnover, no
+single-print days, n=444) and the rejection holds up MORE strongly, not less:
+
+| | win% | median pnl | concentration |
+|---|---|---|---|
+| stricter-liquidity baseline | 57.2% | +13.37% | 62.9% |
+| + premium-stop -35% | 46.2% | -19.72% | 88.9% |
+| + premium-stop -40% | 48.2% | -8.03% | 85.6% |
+| + premium-stop -50% | 52.0% | +3.36% | 72.3% |
+
+**Liquidity criteria tightening itself (item 2) — tested, mixed/inconclusive result,
+NOT adopted as designed.** Added `MIN_LOTS_TRADED`/`MIN_PREMIUM_TURNOVER`/
+`EXCLUDE_SINGLE_PRINT` to `option_backtest.py`'s `liquid()`, motivated by the same
+review note ("some contracts print once and then vanish... OI>0/volume>0 doesn't
+prove you could get filled"). Tested on ITM+next:
+
+| preset | n | win% | median pnl | concentration |
+|---|---|---|---|---|
+| baseline (OI>0, vol>0 only) | 562 | 61.6% | +18.63% | 32.6% |
+| moderate (min 10 lots, no single-print) | 497 | 60.6% | +17.35% | 49.3% |
+| stricter (min 25 lots, min ₹1L turnover, no single-print) | 444 | 57.2% | +13.37% | 62.9% |
+
+Traced exactly which 118 trades the stricter preset removes (going baseline→stricter)
+before trusting the worse numbers: they are NOT disproportionately bad trades — win
+61.0%/median +19.09%, actually slightly BETTER than the overall baseline, and include
+some of the biggest winners (ICICIGI +300%, PFC +184%, TRENT +160%) alongside some of
+the biggest losers (PIIND -100%, TRENT -100%, TORNTPHARM -95%) in roughly equal
+measure. So this specific tightening doesn't cleanly separate real/executable trades
+from unreliable prints — it acts more like a blunt "prefer generally bigger/more
+liquid stocks" filter, and the worse headline concentration/median are mostly a
+smaller-sample mechanical effect (same "fewer trades → bigger top-10 share" dynamic
+seen elsewhere in this project), not evidence the original numbers were inflated by
+fake data. **Not adopted as designed** — these specific thresholds aren't well
+targeted; a genuinely useful version would need something that flags stale-looking
+individual prints specifically, not just raw daily volume/turnover size. Left
+documented (`MIN_LOTS_TRADED`/`MIN_PREMIUM_TURNOVER`/`EXCLUDE_SINGLE_PRINT`, all
+default to disabled) for anyone who wants to design a better-targeted version later.
+
 **Conclusion evolution (all real, all previously reported, kept here as the timeline
 since the number changed meaning several times)**: original small sample (n=30-36)
 said ATM+next-month; `portfolio.py`'s capital-pooling bug fix flipped this to
