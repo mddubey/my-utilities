@@ -291,6 +291,79 @@ smaller wins outside the top 10. Shipped as a purely informational tag, explicit
 NOT a ranking signal, until there's a much bigger sample (rare event, ~3% of trades)
 to actually trust the median difference either way.
 
+**Does a next-day (or next-few-day) pullback to daily EMA8/EMA34 mean anything?
+Checked (2026-09-02), and the "wait for the support test" instinct doesn't hold
+up.** Bucketed all 1430 v28 trades by whether/how they interact with daily
+EMA8/EMA34 within 3 days of entry:
+
+| bucket | n | % of total | win% | median pnl | concentration |
+|---|---|---|---|---|---|
+| never touched (ran straight up) | 798 | 55.8% | 74.3% | +3.9% | 8.7% (healthy) |
+| touched EMA8 only, shallow pullback | 501 | 35.0% | 59.1% | +1.8% | 199.6% (thin) |
+| touched EMA34, closed above (held) | 62 | 4.3% | 50.0% | +0.1% | -434.4% (too thin) |
+| touched EMA34, closed below (broke) | 69 | 4.8% | 14.5% | -7.1% | -16.8% |
+
+Trades that never needed a pullback at all are the BEST bucket, not the riskiest —
+independently reconfirms the earlier chase-vs-pullback finding from a completely
+different angle (support-touch behavior instead of entry-day move size). "Touch and
+hold the 34EMA" is close to a coin flip with an unreliable sample (n=62); the only
+clean, trustworthy signal is at the extremes. A same-scope **hourly** cross-check
+(1h EMA8/34, using the new `intraday_cache.py`, n=181, ~2.5 months of real data
+only) did NOT cleanly replicate this — hourly EMAs get touched constantly by
+ordinary intraday noise (bucket shares completely different: "never touched" dropped
+to 8.8% of trades, "broke" jumped to 27.1%), and every bucket there is too thin
+(n<105, wild concentration) to trust. The daily result stands; the hourly one is
+inconclusive on the data actually available (only 60 days retained before
+yfinance's window ages it out).
+
+**Reverse framing: is closing below EMA8/34 (at ANY point during the full holding
+period, not just the first 3 days) basically as good as a stop? Checked — EMA34
+yes, EMA8 no.**
+
+| level | % of trades that ever break it | win% if broken | median pnl if broken | catches real losers | falsely flags real winners |
+|---|---|---|---|---|---|
+| EMA8 | 62.9% | 45.2% | -1.21% | 98.6% | 43.8% |
+| EMA34 | 29.3% | 18.6% | -6.92% | 68.2% | 8.4% |
+
+EMA8 breaks are too common (63% of ALL trades, including 44% of eventual winners) —
+normal noise during a healthy uptrend, not a failure signature. EMA34 breaks are
+much rarer and much more meaningful: 81.4% of trades that break it end up losing,
+with only an 8.4% false-positive rate against real winners. **Timing check: 98.3% of
+EMA34 breaks happen strictly BEFORE the trade's actual stop-out** (median 7 days
+early, mean 11) — a genuine leading indicator, not just a restatement of the
+existing exit.
+
+**Designing "breaking" properly, not just "any close below"**: tested 4 candidate
+definitions (bare close-below, ≥1% below, ≥2% below, 2 consecutive closes below).
+At nearly the same false-positive rate (~4.2-4.3%), the **≥1% margin** rule catches
+far more real losers than the **2-consecutive-closes** rule (57.8% vs 37.0%
+sensitivity) — a real break shows up as closing convincingly under the level, not
+just needing an extra day to "confirm." ≥2% below is even more precise (2.2% false
+positives) but starts missing too many real losers (41.6% sensitivity).
+
+**Simulated actually adopting this as an automatic early-exit rule — net NEGATIVE at
+every threshold tested, don't adopt.** Re-ran the full 1430-trade set with the
+EMA34-break day (if any) replacing the original exit:
+
+| | win% | median pnl | concentration | trades actually exited earlier |
+|---|---|---|---|---|
+| current (existing stop only) | 65.0% | +2.89% | 10.3% | — |
+| + ≥1% EMA34 early-exit | 62.3% | +2.63% | 10.7% | 11.5% |
+| + ≥2% EMA34 early-exit | 63.7% | +2.83% | 10.5% | 5.6% |
+
+Stricter threshold = less damage (fewer trades touched, smaller drop) but NEVER a
+net improvement at either threshold. By pattern, VCP takes the bigger hit both times
+(≥1%: 61.7%→58.2% win, conc 22.0%→24.0%; ≥2%: 61.7%→60.2%, conc 22.0%→22.7%) than
+Breakout Continuation (≥1%: 67.9%→65.8%; ≥2%: 67.9%→66.8%) — VCP's own exit design
+(Minervini's structural stop) is already built to tolerate a temporary EMA dip while
+holding a multi-week base, so a faster generic EMA trigger fights that design more
+than it does Breakout Cont's already-faster ATR-chandelier stop. **Conclusion: this
+is a genuinely good diagnostic (correctly flags most future losers, a week or more
+early) but not a profitable automatic exit rule at any threshold tested** — the real
+recoveries it cuts short always cost more than the early losses it saves. Best use:
+a manual watch/warning signal (e.g., surfaced in `monitor_positions.py`), not
+something to wire into the exit logic.
+
 ## Options side
 
 **Conclusion evolution (all real, all previously reported, kept here as the timeline
