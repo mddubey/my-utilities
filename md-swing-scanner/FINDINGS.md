@@ -41,12 +41,19 @@ nothing after — matches the mechanism exactly.
   reproduced bug (not just a synthetic test) before considering it fixed — see
   `fetch_prices.py`'s own comments for the full mechanism and `tests/test_fetch_prices.py`
   for the regression test.
-- Whether yfinance's daily Close for F&O tickers *correctly reflects* the
-  CAS-determined official closing price (vs. the last continuous-trade price before
-  15:15) once the above bug is worked around — **not yet checked**, a real open
-  question. `fetch_stock_options.py`/`fetch_stock_options_pre2024.py` already pull
-  NSE bhavcopy directly (the exchange's own authoritative source, not yfinance) for
-  the options layer — worth comparing against that if this needs a definitive answer.
+- **RESOLVED (2026-09-02): yfinance's daily Close correctly reflects the CAS-determined
+  official closing price — confirmed, not just assumed.** Fetched NSE's own cash-market
+  bhavcopy directly (`https://nsearchives.nseindia.com/content/cm/BhavCopy_NSE_CM_0_0_0_
+  {ymd}_F_0000.csv.zip`, UDiFF format, same family as the F&O file `fetch_stock_options.py`
+  already uses — its `ClsPric` field is NSE's own authoritative official close, and
+  `SttlmPric` is the actual auction-settled price). Compared against our own cached
+  `data_cache/` Close across 6 tickers x 5 post-CAS dates (29 successful comparisons,
+  one date failed to fetch — likely a holiday): **29/29 exact matches**. Also notable:
+  NSE's own `ClsPric` and `SttlmPric` are themselves almost always within a few paise
+  of each other on ordinary days — the CAS auction typically settles very close to the
+  pre-auction reference, which is also why the raw-bars check above happened to line up.
+  No fix needed — the pipeline is accurate as-is. This was a one-off verification script,
+  not built as permanent infrastructure (no ongoing need once confirmed).
 - 60 days of real 5-minute intraday data (`intraday_cache.py`, all 500 tickers, June
   10 - Sept 1) captured and cached permanently before it ages out of yfinance's own
   rolling 60-day retention window — this is what made the above verification
