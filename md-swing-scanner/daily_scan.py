@@ -59,6 +59,7 @@ from signals import base_filters_pass, entry_signal
 from vcp import base_pivot, vcp_breakout
 from pivots import daily_pivots
 from sector_strength import sector_rs
+import breadth
 
 LIVE_CUTOFF_DEFAULT = "14:45"  # IST
 
@@ -259,6 +260,18 @@ if __name__ == "__main__":
         tickers, require_regime=not args.ignore_regime, live=args.live, cutoff_ist=args.cutoff,
     )
     print(f"scan date: {scan_date.date() if scan_date is not None else 'no data'}")
+    if scan_date is not None:
+        pct = breadth.breadth_pct(scan_date)
+        if pd.notna(pct):
+            # informational only, not a filter (2026-09-02) — real backtest evidence
+            # (see FINDINGS.md) shows a genuine, monotonic relationship between market
+            # breadth and how today's WHOLE candidate list should be weighted: win
+            # 65.0%/median +2.89% at no filter vs 69.3%/+3.58% at breadth>=80 — but per
+            # direct user instruction, this stays a ranking/confidence signal, not a
+            # gate that excludes low-breadth days entirely.
+            print(f"market breadth today: {pct:.0f}% of NIFTY 500 above their own 200-SMA "
+                  f"— historically, higher breadth days produce meaningfully better candidates "
+                  f"(65.0%/+2.89% median at no filter vs 69.3%/+3.58% at breadth>=80)")
     if args.live:
         print(f"⚠ LIVE MODE (intraday as of {args.cutoff} IST, not the final close) — checked "
               f"{len(live_shortlist)} pre-filtered tickers: {live_shortlist}")

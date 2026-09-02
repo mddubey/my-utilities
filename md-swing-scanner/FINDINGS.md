@@ -364,6 +364,54 @@ recoveries it cuts short always cost more than the early losses it saves. Best u
 a manual watch/warning signal (e.g., surfaced in `monitor_positions.py`), not
 something to wire into the exit logic.
 
+**Does immediate (day-3) follow-through strength predict real quality, and can it be
+seen at entry? Checked (2026-09-02) — yes to the first, breadth is the only real
+answer to the second.** Bucketed all v28 trades by actual day-3 stock return, then
+looked at their REAL, patient, full eventual outcome (not cut early) per bucket:
+
+| day-3 performance | n | real eventual win% | real median pnl | median holding days |
+|---|---|---|---|---|
+| down >2% by day 3 | 356 | 39.6% | -5.3% | 13 |
+| down 0-2% | 313 | 58.8% | +1.8% | 16 |
+| up 0-2% | 314 | 76.1% | +3.5% | 15 |
+| up 2-5% | 253 | 74.3% | +3.9% | 11 |
+| up >5% by day 3 | 194 | 91.8% | +8.0% | 5 (fastest) |
+
+Real, monotonic, and doesn't contradict the "don't exit on weak early action" finding
+above — 39.6% of the weakest bucket still wins if held patiently (that's exactly why
+cutting them all early was net harmful), but as a QUALITY signal, strong immediate
+follow-through genuinely does mean a better trade, matching the "is this a real
+breakout" intuition directly.
+
+Compared entry-day features between the two extremes (down>2% vs up>5%) to see if
+this could be caught AT ENTRY instead of 3 days later — pattern mix, volume z-score,
+RSI, entry-day move size, close-position-in-range, and ATR% were all statistically
+indistinguishable between the two groups. **Market breadth was the one real
+discriminator**: median 68.9% (immediate-failure group) vs 85.5% (immediate-strong
+group). Tested properly as an entry-gate threshold sweep (not just the two-group
+comparison) — a real, clean, MONOTONIC result, unlike every other gate idea tried
+this session:
+
+| breadth threshold | n | win% | median pnl | concentration |
+|---|---|---|---|---|
+| none (baseline) | 1430 | 65.0% | +2.89% | 10.3% |
+| >=65% | 990 | 65.6% | +3.03% | 13.6% |
+| >=70% | 835 | 67.5% | +3.21% | 13.3% |
+| >=75% | 748 | 68.9% | +3.42% | 13.0% |
+| >=80% | 670 | 69.3% | +3.58% | 13.6% |
+
+Win rate and median both climb steadily as the threshold tightens, concentration
+only drifts up mildly (still well within a healthy range) — genuinely different from
+the ADX/SMA50 gate ideas (backwards or inconclusive). **Per direct user instruction,
+NOT adopted as a hard filter** — same reasoning as sector-RS: use it as a
+ranking/confidence signal, don't shrink the candidate list. Implemented as a
+top-level annotation in `daily_scan.py` ("market breadth today: X%..."), since
+unlike sector-RS this is one market-wide number per day, not a per-stock value, so
+it reads as "how much weight to put on today's whole list" rather than a per-ticker
+ranking field. `market_regime.py`'s `market_trending(min_breadth=...)` param and
+`backtest.py`'s `TEST_MIN_BREADTH` exist and are tested/documented for anyone who
+later wants to revisit this as an actual gate.
+
 ## Options side
 
 **Conclusion evolution (all real, all previously reported, kept here as the timeline

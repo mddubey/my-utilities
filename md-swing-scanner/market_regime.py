@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 
+import breadth
+
 CACHE_DIR = Path(__file__).parent / "data_cache"
 NIFTY_FILE = CACHE_DIR / "_NIFTY.csv"
 
@@ -63,7 +65,8 @@ def _regime_frame():
 
 def market_trending(date, require_rising=False, require_uptrend=False, require_above_sma200=False,
                      require_above_sma50=False, require_sma50_rising=False,
-                     allow_sma50_recovery=False, sma50_recovery_lookback=NIFTY_ADX_RISING_LOOKBACK):
+                     allow_sma50_recovery=False, sma50_recovery_lookback=NIFTY_ADX_RISING_LOOKBACK,
+                     min_breadth=None):
     """Nifty ADX at or after the most recent trading day on/before `date` is >= the
     verified choppy/neutral split. Used to gate BOTH patterns (docstring here was
     stale — VCP got the same gate in v11 once it was checked directly and also showed
@@ -93,7 +96,8 @@ def market_trending(date, require_rising=False, require_uptrend=False, require_a
     TEST_SMA50_ABOVE/TEST_SMA50_RISING comments for the full numbers. Nifty's own
     medium-term trend strength isn't what's driving VCP's weak window.
 
-    Pass allow_sma50_recovery=True (2026-09-01, TESTING) for a structurally different
+    Pass allow_sma50_recovery=True (2026-09-01, INCONCLUSIVE — kept for reference, not
+    adopted; see FINDINGS.md for the full numbers) for a structurally different
     idea — an OR, not an AND, on top of require_above_sma200: if Close > SMA200 fails,
     still pass if SMA50 has been rising over the last sma50_recovery_lookback trading
     days (default matches NIFTY_ADX_RISING_LOOKBACK, override — a 50-day average is
@@ -102,7 +106,24 @@ def market_trending(date, require_rising=False, require_uptrend=False, require_a
     require_sma50_rising above (both AND-tightened, could only ever REMOVE trades),
     this can only ADD trades the current gate is blocking — most relevant right now
     during the live regime-gate drought (Nifty below its own 200-SMA since
-    2026-02-26)."""
+    2026-02-26).
+
+    Pass min_breadth=X (2026-09-02, TESTING) to additionally require at least X% of
+    NIFTY 500 tickers trading above their own 200-day SMA on this date
+    (`breadth.breadth_pct`) — a finer-grained, per-stock health check on top of the
+    index-level ADX+SMA200 gate. Motivated by a real, per-trade (not macro-period)
+    finding: comparing trades whose day-3 follow-through was immediately strong
+    (up >5% within 3 days) against ones that immediately failed (down >2%), every
+    other entry-day signal checked (pattern, volume z-score, RSI, entry-day move
+    size, close-in-range, sector RS, ATR%) came back statistically identical between
+    the two groups — breadth was the one real gap (85.5% median for the
+    strong-follow-through group vs 68.9% for the immediate-failure group). Different
+    question from the earlier VCP-collapse breadth check above (that one asked "does
+    breadth explain a specific bad historical WINDOW" and came back backwards at the
+    per-trade level within that window); this one asks "does breadth at entry predict
+    per-trade quality across the whole dataset," a different and so-far untested
+    claim — not yet proven as a real backtest improvement, just a promising
+    entry-time-knowable lead."""
     df = _regime_frame()
     pos = df.index.searchsorted(date, side="right") - 1
     if pos < 0:
@@ -139,6 +160,10 @@ def market_trending(date, require_rising=False, require_uptrend=False, require_a
             return False
         prior_sma50 = df.iloc[prior_pos].sma50
         if pd.isna(row.sma50) or pd.isna(prior_sma50) or not (row.sma50 >= prior_sma50):
+            return False
+    if min_breadth is not None:
+        pct = breadth.breadth_pct(date)
+        if pd.isna(pct) or pct < min_breadth:
             return False
     return True
 

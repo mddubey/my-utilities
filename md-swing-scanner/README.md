@@ -199,6 +199,14 @@ sector-RS quartile win 68.1% (vs 55-61% in the bottom three) with much healthier
 Still not a hard gate — nothing gets excluded from the list on this basis, same reasoning as
 `MOMENTUM_20D_MIN`/`MIN_TRADED_VALUE` staying candidate-list controls rather than proven filters.
 
+A top-level line, added 2026-09-02: `market breadth today: X%` (% of NIFTY 500 above their own
+200-SMA) — unlike sector RS, this is one market-wide number for the whole day, not a per-stock
+value, so it's printed once rather than per-candidate. Real backtest evidence (`FINDINGS.md`) found
+a genuine, monotonic relationship between breadth and how good the WHOLE day's candidate list
+tends to be (65.0%/+2.89% median at no filter vs 69.3%/+3.58% at breadth>=80) — read it as "how
+much weight to put on today's list overall," not a per-candidate ranking field. Also explicitly not
+a hard gate, per the same reasoning as sector RS.
+
 Two more observation-only flags, neither backtest-validated: `--ignore-regime` bypasses
 the gate entirely (collapses to a single Tradable Today list, no watchlist split — there's no
 gate left to fail on); `--live [--cutoff HH:MM]` (default 14:45 IST) checks a same-day intraday
