@@ -180,6 +180,40 @@ def reject_theta_trap(row):
     return bool(tiny_body and row.vol_declining5 and atr_shrinking)
 
 
+def near_miss_high_breakout(row):
+    """Informational-only ranking signal (2026-09-03): the SAME Breakout Continuation
+    checklist, except the final breakout check uses today's intraday High instead of
+    Close against the prior 10-day high — i.e. "resistance was cleared intraday but
+    the close didn't confirm it" (real case: MEESHO 2026-09-02, High=213.95 >
+    high10_prior=212.65, but Close=211.60 didn't hold above it, so entry_signal()
+    itself returns False).
+
+    Full-backtest-checked before shipping this, not a guess: swapping Close for High
+    everywhere unlocks 46 new trades project-wide (win 63.0%, median +2.29%) — real
+    and tradeable, but modestly BELOW the standard pool's 65.0%/+2.89%; a further 8
+    otherwise-strong trades (87.5% win, +4.57% median) disappear via a scheduling-
+    cascade side effect. Net roughly a wash, tilted slightly negative — per direct
+    user instruction, NOT adopted as the entry rule itself (don't want a coin-flip-
+    quality trade masquerading as a real signal), kept only as a low-weight "worth a
+    second look tomorrow" flag for quiet days when the real lists are thin. Do not
+    promote this to a gate or to `entry_signal()` without a fresh full-backtest check —
+    see FINDINGS.md's "Exit-strategy comparison" section's neighboring entry for the
+    full numbers."""
+    required = ["ema34", "vol_avg10_prior", "high10_prior", "atr14_60ago",
+                "ema34_rising10", "traded_value_sma20", "close_20ago"]
+    if row[required].isna().any():
+        return False
+    if not base_filters_pass(row):
+        return False
+    if not checklist_pass(row):
+        return False
+    if reject_theta_trap(row):
+        return False
+    if breakout_continuation(row):
+        return False  # already a real signal — don't double-list as a near-miss too
+    return row.High > row.high10_prior and pd.notna(row.vol_zscore) and row.vol_zscore >= VOL_ZSCORE_MIN
+
+
 def entry_signal(row):
     """Breakout Continuation eligibility only. Coiled Spring/VCP is a fully separate
     entry path (vcp.py) with its own trend-template + multi-contraction gate — it does

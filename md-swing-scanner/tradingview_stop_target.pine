@@ -1,0 +1,72 @@
+// MD Swing Scanner - Stop & Target overlay
+// Mirrors backtest.py's current_stop_level()/resistance_target() (v25, 2026-08-30):
+// pattern-specific base stop (chandelier for Breakout Continuation, structural low for
+// VCP) tightening onto the 21-EMA once up TRAIL_ENGAGE_PCT, plus a moving weekly-pivot
+// resistance target that only ratchets up. Renders nothing until you mark an entry.
+//
+// Usage: pick the pattern, click the "Entry date" input to select your entry bar,
+// click the "Entry price" input to mark your actual fill (not just the day's close -
+// this matters most on a high-volatility entry day where close != your fill). For a
+// VCP trade, optionally click "VCP structural low" if you know the base's real low
+// from daily_scan.py's output; leave it at 0 to fall back to the flat 8% cap
+// (MAX_INITIAL_RISK_PCT) the backtest also uses as a ceiling on that stop.
+//
+// Not independently tested against a Pine compiler - paste into Dhan/TV's Pine Editor
+// and report back any errors; the underlying formulas are the validated part, the Pine
+// syntax itself hasn't been run anywhere.
+//@version=5
+indicator("MD Swing Scanner - Stop & Target", overlay=true)
+
+patternType = input.string("Breakout Continuation", "Pattern", options=["Breakout Continuation", "Coiled Spring / VCP"])
+entryTime   = input.time(defval=0, title="1) Entry date - click your entry bar")
+entryPrice  = input.price(defval=0.0, title="2) Entry price - click your actual fill")
+structLowIn = input.price(defval=0.0, title="VCP structural low (optional; 0 = use 8% cap)")
+
+ATR_LEN = 14
+ATR_TRAIL_MULT = 3.0
+TRAIL_ENGAGE_PCT = 1.03
+MAX_INITIAL_RISK_PCT = 0.08
+
+// ta.* functions must be called unconditionally every bar to keep their internal
+// rolling state correct - only their USE is gated behind barstate.isconfirmed below.
+atr14 = ta.atr(ATR_LEN)
+ema21 = ta.ema(close, 21)
+
+hasEntry    = entryTime != 0 and entryPrice != 0.0
+condReached = hasEntry and time >= entryTime
+isEntryBar  = condReached and not condReached[1]   // fires exactly once, no repaint
+
+// prior COMPLETED week's H/L/C -> floor-trader pivots (matches pivots.py's
+// weekly_pivots exactly: PP=(H+L+C)/3, R1=2*PP-L, R2=PP+(H-L)), no lookahead
+[wH, wL, wC] = request.security(syminfo.tickerid, "W", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
+pp = (wH + wL + wC) / 3
+r1 = 2 * pp - wL
+r2 = pp + (wH - wL)
+
+var float peakClose  = na
+var float structLow  = na
+var float target     = na
+var bool  inPosition = false
+var float stopLevel  = na
+
+if barstate.isconfirmed
+    if isEntryBar
+        inPosition := true
+        peakClose  := entryPrice
+        structLow  := patternType == "Coiled Spring / VCP" ? (structLowIn != 0.0 ? structLowIn : entryPrice * (1 - MAX_INITIAL_RISK_PCT)) : float(na)
+        target     := float(na)
+    else if inPosition
+        peakClose := math.max(peakClose, close)
+
+    if inPosition
+        // moving resistance target: first weekly pivot level above entry, ratchets up only
+        freshTarget = pp > entryPrice ? pp : (r1 > entryPrice ? r1 : (r2 > entryPrice ? r2 : float(na)))
+        if not na(freshTarget)
+            target := na(target) ? freshTarget : math.max(target, freshTarget)
+
+        baseStop  = patternType == "Coiled Spring / VCP" ? structLow : peakClose - ATR_TRAIL_MULT * atr14
+        tightened = peakClose >= entryPrice * TRAIL_ENGAGE_PCT
+        stopLevel := tightened ? math.max(baseStop, ema21) : baseStop
+
+plot(inPosition ? stopLevel : na, title="Stop", color=color.red, linewidth=2, style=plot.style_stepline)
+plot(inPosition ? target : na, title="Target", color=color.green, linewidth=2, style=plot.style_stepline)

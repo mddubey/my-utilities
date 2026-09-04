@@ -158,9 +158,13 @@ python3 monitor_positions.py   # current stop/target for your open positions
 ```
 
 `daily_scan.py` scans the full NIFTY 500 universe with the exact same entry logic the backtest
-validated. Output is always two sections: **Tradable Today** (gate-respecting, real signals) and
+validated. Output is always three sections: **Tradable Today** (gate-respecting, real signals),
 **Watchlist — fails only on regime** (pattern fired, only the Nifty ADX/200-SMA gate blocked it —
-computed automatically at no extra cost, for observation only, not a validated trade signal).
+computed automatically at no extra cost, for observation only, not a validated trade signal), and
+**Near-miss — intraday High cleared resistance, Close didn't confirm** (2026-09-03, Breakout
+Continuation only — a LOW-WEIGHT ranking signal for a quiet day, see `signals.near_miss_high_
+breakout`'s docstring for the full backtest numbers: real but modestly below-average trades,
+63.0% win/+2.29% median vs the standard pool's 65.0%/+2.89%).
 Checked directly (2026-08-31, both a four-way gate-isolation test and a market-breadth gate
 alternative) that loosening the regime gate does NOT rescue the current drought with quality
 trades — the watchlist is for keeping an eye on things, not a hint that these are secretly

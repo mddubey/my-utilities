@@ -4,14 +4,18 @@ regime cache (`python3 market_regime.py`) for today. Scans the full NIFTY 500 un
 entry signal as of the latest cached trading day — reuses backtest.py's detect_entry()
 directly, so this can never drift from what the validated backtest actually tested.
 
-Default output is now two sections (2026-08-31): "Tradable Today" (gate-respecting,
-real signals) and "Watchlist — fails only on regime" (pattern fired, only the ADX/
+Default output is now three sections: "Tradable Today" (gate-respecting, real
+signals), "Watchlist — fails only on regime" (2026-08-31, pattern fired, only the ADX/
 200-SMA gate blocked it — computed automatically, no flag needed, cheap since it only
 costs one extra detect_entry(require_regime=False) call per ticker that didn't
-already pass). Checked directly (2026-08-31) that loosening the gate on breadth or an
-isolation basis doesn't rescue the current drought with quality trades (see
-backtest.py comments/memory) — this watchlist is for observation, not a signal that
-these are secretly tradable, same caveat as before.
+already pass), and "Near-miss — intraday High cleared resistance, Close didn't
+confirm" (2026-09-03, a Breakout-Continuation-only, LOW-WEIGHT ranking signal — see
+signals.near_miss_high_breakout's docstring for the full backtest numbers behind it;
+real but modestly below-average trades, meant to come in handy on a quiet day, not a
+standing recommendation). Checked directly (2026-08-31) that loosening the gate on
+breadth or an isolation basis doesn't rescue the current drought with quality trades
+(see backtest.py comments/memory) — the watchlist is for observation, not a signal
+that these are secretly tradable, same caveat as before.
 
 --ignore-regime (2026-08-30): bypasses the Nifty ADX/200-SMA gate for THIS SCAN ONLY
 (collapses to a single "Tradable Today" list with no watchlist split, since there's
@@ -55,7 +59,7 @@ import yfinance as yf
 
 from backtest import (load, load_with_extra_row, detect_entry, resistance_target,
                       stage2_trend_template, current_stop_level, MAX_INITIAL_RISK_PCT)
-from signals import base_filters_pass, entry_signal
+from signals import base_filters_pass, entry_signal, near_miss_high_breakout
 from vcp import base_pivot, vcp_breakout
 from pivots import daily_pivots
 from sector_strength import sector_rs
@@ -197,6 +201,17 @@ def _annotate(ticker, pattern, structural_low, row, prev_row, live, rows, i):
     )
 
 
+def _near_miss_annotate(ticker, row, prev_row):
+    """Lighter than _annotate() — near-miss isn't a validated pattern match (no
+    structural_low, no resolved target), just a raw checklist near-hit, so there's no
+    stop/target to report, only what actually differs from a real signal today."""
+    return dict(
+        ticker=ticker, close=row.Close, high=row.High, high10_prior=row.high10_prior,
+        pct_chg=(row.Close / prev_row.Close - 1) * 100 if prev_row.Close else None,
+        vol_zscore=row.vol_zscore, is_fo=ticker in _fo_tickers(),
+    )
+
+
 def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAULT):
     """candidates: real, gate-respecting signals (empty if require_regime and the
     gate's shut). watchlist: candidates whose PATTERN fired but only the regime gate
@@ -204,7 +219,15 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
     normal run shows both "what's tradable today" and "what to keep an eye on" without
     needing a separate --ignore-regime invocation. Cheap: only costs one extra
     detect_entry(require_regime=False) call, and only for tickers that didn't already
-    pass with the gate on."""
+    pass with the gate on.
+
+    near_miss (2026-09-03): a THIRD, lower-priority bucket, unrelated to the regime
+    gate — Breakout Continuation candidates where today's intraday High cleared the
+    prior 10-day high but the Close didn't confirm it (see signals.near_miss_high_
+    breakout's own docstring for the full backtest numbers: real but modestly
+    below-average trades, kept as a low-weight "worth a second look" flag only, not a
+    validated signal). Checked independently of require_regime — this is about the
+    Close-vs-High distinction, nothing to do with the market regime."""
     live_bars = {}
     live_shortlist = []
     if live:
@@ -213,6 +236,7 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
 
     candidates = []
     watchlist = []
+    near_miss = []
     scan_date = None
     for ticker in tickers:
         try:
@@ -242,7 +266,10 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
                 pattern, structural_low = ungated
                 watchlist.append(_annotate(ticker, pattern, structural_low, row, rows.iloc[i - 1],
                                             live=(ticker in live_bars), rows=rows, i=i))
-    return scan_date, candidates, watchlist, live_shortlist
+                continue
+        if near_miss_high_breakout(row):
+            near_miss.append(_near_miss_annotate(ticker, row, rows.iloc[i - 1]))
+    return scan_date, candidates, watchlist, near_miss, live_shortlist
 
 
 if __name__ == "__main__":
@@ -256,7 +283,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
-    scan_date, candidates, watchlist, live_shortlist = scan(
+    scan_date, candidates, watchlist, near_miss, live_shortlist = scan(
         tickers, require_regime=not args.ignore_regime, live=args.live, cutoff_ist=args.cutoff,
     )
     print(f"scan date: {scan_date.date() if scan_date is not None else 'no data'}")
@@ -310,3 +337,15 @@ if __name__ == "__main__":
             print("  none")
         for c in watchlist:
             print_row(c)
+
+    print(f"\nNear-miss — intraday High cleared resistance, Close didn't confirm ({len(near_miss)}):")
+    print("  LOW WEIGHT / informational only. Full-backtest checked: real, tradeable trades,")
+    print("  but modestly BELOW the standard pool's quality (63.0% win/+2.29% median vs")
+    print("  65.0%/+2.89%) — worth a second look on a quiet day, not a standing recommendation.")
+    if not near_miss:
+        print("  none")
+    for c in near_miss:
+        chg_str = f"{c['pct_chg']:+.1f}% today" if c['pct_chg'] is not None else "n/a"
+        fo_tag = "[F&O]" if c["is_fo"] else "[NO OPTIONS]"
+        print(f"  {c['ticker']:<14} {fo_tag:<12} close=₹{c['close']:.2f}  high=₹{c['high']:.2f}  "
+              f"resistance=₹{c['high10_prior']:.2f}  ({chg_str})  vol_z={c['vol_zscore']:+.1f}")

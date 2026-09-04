@@ -3,6 +3,32 @@ from pathlib import Path
 
 import pandas as pd
 
+import fetch_cash_bhav
+
+# 2026-09-03: real bug found and fixed — data_cache (yfinance) retroactively
+# rescales ALL historical prices for every stock split/bonus after the fact,
+# but option strikes (bhavcopy) and pick_contract()'s own spot-price comparison
+# never get that adjustment. Any ticker that split between its trade date and
+# whenever data_cache was last fetched got compared against the WRONG spot,
+# picking a wildly wrong "5% ITM" strike (real case: BEL 2022-08-23 shows
+# ₹99.48 in data_cache today vs the real, contemporaneous ₹298.45 NSE actually
+# published that day — pick_contract() chose strike 200, deep-deep ITM against
+# the real price, instead of the ~283.5 a genuine 5%-ITM target would have
+# picked). Checked directly: 91 of 562 trades (16.2%) in the current ITM+next
+# set show a strike/spot ratio far outside the sane ~0.90-1.05 band. Fixed by
+# using fetch_cash_bhav's real, never-adjusted cash-market bhavcopy price
+# everywhere a historical stock price needs to be compared against an option
+# strike — both at entry (contract selection) and at expiry (settlement).
+_MISSING_CASH_BHAV = []  # (ticker, date) pairs that fell back to data_cache — tracked, not silent
+
+
+def _real_spot(ticker, date, fallback):
+    real = fetch_cash_bhav.close_on(ticker, date)
+    if real is None:
+        _MISSING_CASH_BHAV.append((ticker, str(date)))
+        return fallback
+    return real
+
 OPT_CACHE_DIR = Path(__file__).parent / "options_cache"
 COLS = ["TradDt", "TckrSymb", "XpryDt", "StrkPric", "OptnTp", "OpnPric", "HghPric",
         "LwPric", "ClsPric", "OpnIntrst", "TtlTradgVol", "NewBrdLotQty"]
@@ -187,7 +213,8 @@ def stock_close(ticker, date):
 
 
 def simulate_option_trade(trade, moneyness="atm", expiry_choice="current"):
-    contract = pick_contract(trade.ticker, trade.entry_date, trade.entry_price, moneyness, expiry_choice)
+    entry_spot = _real_spot(trade.ticker, trade.entry_date, trade.entry_price)
+    contract = pick_contract(trade.ticker, trade.entry_date, entry_spot, moneyness, expiry_choice)
     if contract is None:
         return None
     expiry, strike, lot_size = contract
@@ -211,6 +238,7 @@ def simulate_option_trade(trade, moneyness="atm", expiry_choice="current"):
         spot = stock_close(trade.ticker, expiry)
         if spot is None:
             return None
+        spot = _real_spot(trade.ticker, expiry, spot)
         exit_px = max(0.0, spot - strike)
     else:
         exit_date = trade.exit_date
@@ -236,6 +264,7 @@ def simulate_option_trade(trade, moneyness="atm", expiry_choice="current"):
                 spot = stock_close(trade.ticker, expiry)
                 if spot is None:
                     return None
+                spot = _real_spot(trade.ticker, expiry, spot)
                 exit_px = max(0.0, spot - strike)
             else:
                 exit_px = exit_row.ClsPric
@@ -253,6 +282,7 @@ def simulate_option_trade(trade, moneyness="atm", expiry_choice="current"):
 
 
 def run(trades_csv, moneyness="atm", expiry_choice="current"):
+    _MISSING_CASH_BHAV.clear()
     trades = pd.read_csv(trades_csv, parse_dates=["entry_date", "exit_date"])
     trades = trades[~trades.open_at_end]
 
@@ -265,6 +295,10 @@ def run(trades_csv, moneyness="atm", expiry_choice="current"):
             results.append(r)
 
     print(f"{len(results)} option trades simulated, {skipped} skipped (illiquid contract or no data)")
+    if _MISSING_CASH_BHAV:
+        n_dates = len(set(d for _, d in _MISSING_CASH_BHAV))
+        print(f"  ⚠ {len(_MISSING_CASH_BHAV)} spot-price lookups ({n_dates} unique dates) had no cash "
+              f"bhavcopy cached, fell back to data_cache's (possibly split-corrupted) price")
     return pd.DataFrame(results)
 
 
