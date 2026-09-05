@@ -983,3 +983,53 @@ Reason: theta decay is a per-day *rate* that accelerates near expiry, not just a
 | ITM+next | 74.4% | +9.65% |
 
 Current-month captures the same-day spike roughly 2-2.7x better than next-month on both win rate and median. **Resolution: expiry choice depends on intended holding period, not one universal answer** — current-month for the same-day capture trade (item 2/3 above), next-month for the multi-day stall-managed swing. This is a fresh, concrete confirmation of the response-9 mental model (intraday → ATM/current, multi-day swing → ITM/next), not a new finding in tension with it.
+
+## Response-10 outside critique (2026-09-05) — four items actioned same session
+
+Full critique read in full (28-page chat export). Overall verdict 9.3/10, ship the 0.3-0.6% trigger band and ATM-current/ITM-next split, keep the 3-day stall as a hypothesis (not adopted), reject any capital-level portfolio conclusion at face value. Four of their specific asks tested directly:
+
+**1. Trailing-stop/EMA intraday mirror-bug audit (their "highest-quality result... asks whether this blind spot exists elsewhere").** The Chandelier/21-EMA trailing stop is evaluated on daily Close — a live stop order would trigger on an intraday Low even if price recovers by close, the mirror image of the original intraday-target bug. Checked directly on the 289 real trigger-fire events (June-Sept 2026 intraday window): of 2,947 "held per daily-close backtest" trade-days, **110 (3.7%) had a real intraday Low that breached the stop level** — real, but well under the critic's 5-10% guess. Full-trade impact: **37.4% of trades (108/289) are affected on at least one day**; aggregate win rate 58.5%→56.4%, median +1.21%→+0.86%, mean +1.21%→+1.09% once corrected to a live-stop rule. Important nuance: the 108 affected trades were already net losers on average even under the generous backtest treatment (median −3.72%) — this mostly catches already-bad trades a little earlier and a little worse, not converting winners into losers. Confirmed real, modest impact — nowhere near the scale of the original intraday-stop-loss bug, but a genuine correction worth carrying forward.
+
+**2. DTE × stall heatmap (critic's single highest-priority ask, hypothesis: stall benefit should increase smoothly as DTE shrinks toward expiry).** Tested on ITM+current, n=300 option-matched trades, bucketed by DTE at entry:
+
+| DTE bucket | n | Baseline median | Stall median | Benefit (pp) |
+|---|---|---|---|---|
+| <10 | 46 | +40.76% | +37.15% | −3.61 |
+| 10-15 | 58 | −18.99% | −2.33% | +16.66 |
+| 15-20 | 97 | +30.67% | +29.29% | −1.39 |
+| 20-25 | 75 | +21.21% | +18.62% | −2.59 |
+| 25+ | 24 | +20.86% | +30.40% | +9.54 |
+
+**No monotonic pattern — the hypothesis is NOT supported.** If anything the opposite at the low end (stall *hurts* at <10 DTE, where accelerating theta should have made it help most). The one clearly positive bucket (10-15 DTE) is sandwiched between negative/mixed results either side — no coherent accelerating-toward-expiry shape. Sample sizes per bucket (24-97) are real but modest, so this isn't an airtight rejection, but there's no evidence here to promote stall-for-options from "hypothesis" to "economically-grounded expiry-aware rule."
+
+**3. VCP LAST_LEG_TOLERANCE full sweep re-verification (critic: "why 40%, not 35% or 55% — you stopped because it looked good, that's a danger sign").** Full backtest sweep, 0%-100% in 10% increments, full 500-ticker universe:
+
+| Tolerance | n | Win | Median | Concentration |
+|---|---|---|---|---|
+| 0% | 551 | 61.9% | +2.89% | 36.8% |
+| 10% | 591 | 61.3% | +2.86% | 37.2% |
+| 20% | 615 | 61.8% | +2.88% | 37.1% |
+| 30% | 644 | 61.5% | +2.84% | 37.6% |
+| **40% (adopted)** | 663 | 61.7% | +2.88% | 37.4% |
+| 50% | 674 | 61.9% | +2.90% | 37.1% |
+| 60% | 683 | 61.9% | +2.90% | 37.0% |
+| 70% | 687 | 62.0% | +2.90% | 36.8% |
+| 80% | 692 | 62.3% | +2.93% | 36.9% |
+| 90% | 697 | 62.7% | +3.00% | 36.6% |
+| 100% | 699 | 62.7% | +3.00% | 36.6% |
+
+**No spike at 40% — genuinely flat across the entire range** (win 61.3-62.7%, median +2.84-+3.00%, concentration 36.6-37.6%, all within ~1-1.5pp of each other end to end). Directly answers the critic's concern: this is a real plateau, not an isolated overfit peak. **Honest addendum, same shape as the entry-clearance finding**: the curve drifts mildly, monotonically better toward looser tolerance (90-100%, i.e., no real tightening requirement between the base's contraction legs at all) rather than peaking and declining at 40% — so there's no strong data-driven reason to prefer 40% specifically over something looser either. Worth flagging to the critic rather than claiming 40% is uniquely justified, same honesty standard as the 0.3-0.6% trigger band.
+
+**4. Recall@N curve, extending the Missed Breakout Audit (critic suggested "improve candidate pruning, not ranking score").** Computed Recall@N for N=5/10/15/20/25/30/full-pool on the same 150-day retroactive test:
+
+| N | Recall |
+|---|---|
+| 5 | 9.6% |
+| 10 | 19.9% |
+| 15 | 24.0% |
+| 20 | 30.1% |
+| 25 | 37.0% |
+| 30 | 42.5% |
+| Full pool (median 73) | 68.5% |
+
+**Recall climbs almost linearly with N, tracking roughly N/pool-size the whole way — the signature of a ranking with close to zero real discriminating power for next-day movement**, not merely "imperfect." This sharpens rather than just confirms the critic's own read. It also means "improve candidate pruning instead of ranking" runs into the same wall: pruning only helps if the pruning criteria have real next-day predictive power, which is exactly what the day-before predictive-score investigation (earlier this session) already tested and found weak (~1.4-1.5x lift at best, rejected). No obvious quick fix here — either accept the candidate list for what it demonstrably does well (feasibility/quality ranking among already-qualifying names, e.g. the GLAND-over-NAUKRI call), or this needs a genuinely different signal (news, options flow, sector rotation), not a harder cut of already-tested-weak features.
