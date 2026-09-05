@@ -1094,3 +1094,49 @@ Quality-weighting genuinely improves per-trade quality (win +2.5-2.9pp, median +
 **Follow-up 2 — a very close top-1 pick might fire before there's realistic time to react ("filled at gap-up itself, can't trade it") — quantified rather than assumed.** For each day's top-1 pick specifically (fastest-firing subset, not top-2), minutes elapsed between the 09:20 checkpoint and actual fill (n=41 of 61 days with a top-1 pick that eventually fills): mean 44.4 min, median only 10 min, 25th percentile 5 min (the very next 5-min bar) — **46.3% fill within 5 minutes (effectively zero reaction time), 56.1% within 10 minutes.**
 
 Quantified the real cost of this rather than just flagging it exists: for the n=43 fastest fires, computed slippage from a realistic ~10-minute-late reaction (price 10 min after the fill signal vs. the trigger price itself): **median slippage −0.10%, mean −0.05%** (typically a wash or slightly favorable — the same mean-reversion-after-initial-pop pattern as the rejected first-15-min momentum test), 76.7% of the time within an extra 0.3% of trigger, 88.4% within an extra 0.6% (i.e., still inside the existing band), only **7% of the time >1% slippage** (tail risk, max seen 2.25%). **Conclusion: no new mechanism needed.** A realistic human reaction delay doesn't typically blow through the band — the existing 0.3-0.6% band already absorbs ordinary latency. The one operational discipline this confirms: treat `trigger_high` (the 0.6% ceiling) as a hard skip line — if price is already past trigger_low+~1% total by the time you can act, don't chase; that's exactly the ~7% tail this data flags, and it's what the IOC-with-ceiling design was already built for.
+
+## Response-13 outside critique — three quick tests actioned, one big strategic question (freeze/deploy) still open (2026-09-05)
+
+Full critique read (13 rounds reviewed, 9.2/10 research discipline / 7.5/10 deployability verdict). Confidence table for high-confidence findings acknowledged, no action needed there. Three concrete, bounded asks tested directly on a rebuilt version of the checkpoint walk-forward population (62-day real window, 0.5% clearance, 09:20/09:30 freeze). **Rebuild note**: the original walk-forward script was ephemeral (scratchpad, not committed) and had to be reconstructed — this time using the pool's own night-before pattern classification (`on_vcp_path`/`base_filters_pass` from `build_pool`, matching `live_checkpoint.py`'s actual operational definition of "fired") rather than re-running `detect_entry()` on the fire day itself, which turned out to be a materially stricter, non-operational bar (re-checking full `detect_entry()`, including the Nifty regime gate, on the synthetic fire-day bar collapsed 533 real fires down to 0-2 — first because `require_regime=True` correctly reflects that the regime gate has been shut essentially the whole test window per the standing drought, and second because `detect_entry`'s stricter RSI/volume/trend-template re-check doesn't match what `live_checkpoint.py` itself actually validates before treating a name as "fired"). Numbers below use the corrected, operationally-consistent definition, and differ somewhat in scale from last round's first-pass walk-forward (122 picks) as a result — same direction, cleaner denominator (533 real fires across the same 62 days once the pool isn't artificially gated).
+
+**1. Expected Profit@K / Regret vs. Oracle (the critic's "biggest critique" — Recall@K rewards being in the list, not being the best pick) — confirmed, and sharper than the critique anticipated.** Computed per-day Profit@1 (rank-1 alone), Profit@2 (equal-weight rank-1+2, 0 pnl on no-fire days), and Oracle (best-performing candidate that actually fired that day, perfect hindsight):
+
+| Metric | Mean | Median |
+|---|---|---|
+| Profit@1 | −0.41% | 0.00% |
+| Profit@2 | +0.19% | 0.00% |
+| Oracle | +8.88% | +7.54% |
+| Regret (Oracle − Profit@2) | +8.70% | +7.64% |
+
+Only 3.3% of days did the top-2 picks actually capture that day's best-performing fire. **Broken down by rank specifically — a real, concrete instance of exactly what the critic warned about:**
+
+| Pick | Fill rate | Win (filled) | Median (filled) |
+|---|---|---|---|
+| Rank-1 (closest) | 70.5% | 44.2% | **−0.46%** |
+| Rank-2 | 63.9% | 71.8% | **+2.39%** |
+
+Rank-1 fires most reliably (as validated all along) but performs *worse* once filled than rank-2 — real, if thin (n≈43 vs 39 fired), signal that the single closest candidate is often the most "used up" (least room left before a stall/reversal), consistent with the mean-reversion-after-fast-move pattern already found in the rejected first-15-min-momentum test. **Conclusion: distance-to-trigger genuinely optimizes for "who fires soonest," not "who performs best once filled" — these are different objectives, and the ranking should not be assumed to also be quality-optimal.** Not yet acted on (no ranking change made) — flagging for further work given the thin per-rank sample.
+
+**2. Kaplan-Meier-style conditional-survival fix for the walk-forward's right-censored trades — passed, confirms the walk-forward was understating itself.** Used the full v28 backtest's completed trades (n=1430) as a survival-conditioned reference population: for each censored (still-open at data-cutoff) walk-forward trade, instead of marking it at whatever price the 62-day window happened to end on, looked at same-pattern completed trades that had already survived at least as many holding days and took their eventual median outcome.
+
+| | Win rate | Median |
+|---|---|---|
+| Raw mark-to-market for censored trades (104 of 533, 19.5%) | — | −2.05% |
+| Survival-adjusted expected outcome | — | **+1.77%** |
+| Full population (533), raw-censored included | 56.3% | +1.04% |
+| Full population (533), survival-adjusted | **71.5%** | **+1.77%** |
+| Original approach: exclude censored entirely (429) | 64.6% | +1.75% |
+
+Confirms directly what was flagged as a likely explanation last round: right-censoring was making the walk-forward look artificially worse than reality. The survival-adjusted win rate (71.5%) lands *above* the naive exclude-censored version, closing most of the remaining gap to the main backtest headline (69.4%/+3.97%) — the walk-forward mechanism is healthier than the raw censored-inclusive number suggested.
+
+**3. Trigger Velocity (rate of distance-closing between 09:20→09:30 checkpoints) as a secondary ranking signal — a real, novel improvement, unlike volume.** Tested the same 70/30 blend structure that failed for volume last round:
+
+| Ranking | Recall@1 | Recall@2 | Recall@5 |
+|---|---|---|---|
+| distance-only (baseline, at 09:30 checkpoint) | 55.7% | 80.3% | 95.1% |
+| velocity-only | 16.4% | 39.3% | 62.3% |
+| **combo (70% distance + 30% velocity)** | **65.6%** | **85.2%** | **98.4%** |
+
+Velocity alone is weak (consistent with distance being close to a direct measure of the outcome, same reason volume-alone also failed) but blended with distance genuinely improves the ranking — Recall@1 +9.9pp, Recall@2 +4.9pp, Recall@5 +3.3pp over distance-only. Bucket check confirms it's not noise: among the closest 40% by distance, fire rate climbs from ~23-24% (slowest-closing/moving-away quintiles) to **38.4%** (fastest-closing quintile) — a real gradient among otherwise similarly-close candidates. **Real, promising lead — not yet wired into `live_checkpoint.py`**, needs the two-checkpoint (09:20 + 09:30) data flow built before it can be operational, and should go through the critic's same break-testing standard before being trusted at the same confidence level as the distance-only finding.
+
+**Not actioned this round (informational or awaiting a strategic decision, not a testable claim)**: the confidence/deployment-readiness table (matches this project's own existing green/yellow/red reads — 3-day stall and sector/OI filters already independently flagged not-ready here); options-as-leverage-tiers reframe (a mental-model simplification, not a test); Energy Stall reframed as a resume-vs-distribute classification question (reasonable, same data already available, not yet re-cut); microstructure feature family (gap-fill%, ORB, VWAP distance, relative first-15-min volume — legitimate next direction, bigger lift, not started); the proposed 30-day feature-freeze-and-forward-paper-trade protocol (`Version 30`) — a real strategic call, explicitly left to the user rather than adopted unilaterally.
