@@ -1422,6 +1422,15 @@ Direct follow-up question: if the fixed-N-day rule's per-trade improvement didn'
 
 **Mixed result, not a clean pass or fail**: ATM+current's stall rule genuinely wins, even at the clean uncapped level — this one holds up under proper scrutiny. **ITM+next does not** — baseline wins by a real ~3-3.6pp margin at the reliable capital levels, the same pattern that just killed the fixed-N-day rule. **This means the rule already live in production for ITM+next may not survive the same capital-constrained test that's supposed to justify it** — a real, actionable finding since it questions something already adopted, not just a candidate. Not yet resolved into a code change — flagging for outside review given the significance, same as everything else pending before touching production.
 
+**Direct pushback on the portfolio-scheduler test itself — well-founded, and confirmed independently with a cleaner method.** Trusting a scheduled selection (which trades happen to get "taken" at a given capital level) as the primary evidence is exactly the kind of scheduling-fragility artifact this project has been burned by before — the ₹50k-2L results earlier in this thread looked like an outright bug for precisely this reason. Rather than trace which specific trades the ₹7.5L-10L comparison selects, ran a completely selection-free alternative: for the 181 stock-level trades where the reactive stall rule actually changes the exit, matched pairs (same trade, same entry, only the exit differs) directly, no portfolio scheduler involved at all.
+
+| ITM+next, matched pairs (n=117) | Win rate | Median | Mean | Median hold |
+|---|---|---|---|---|
+| Baseline (natural exit) | 59.8% | +25.18% | +29.53% | 23 days |
+| Stall (cuts early) | 65.0% | +11.73% | +22.09% | 13 days |
+
+**Stall only beats baseline on 50 of 117 trades (under half) — per-trade median difference exactly 0.0.** Essentially a coin flip, with a real, substantial cost: median return roughly halves (+25.18%→+11.73%) for a modest win-rate bump. This reaches the same conclusion as the portfolio test (ITM+next's stall rule doesn't clearly help) but via a method with zero selection/scheduling bias — a same-trade, matched comparison, not a population-selection one. **This matched-pair result should be treated as the primary evidence for ITM+next going forward, not the portfolio CAGR numbers** — it answers the actual question (does cutting early help on the trades it affects) directly, without the scheduler's known fragility in the mix.
+
 ## Two small UX ships, per critic response to Round 15 (2026-09-06)
 
 **Calibration tiers instead of a raw percentage.** Critic's point: a person makes better decisions off a small number of named buckets than off two numbers that only differ by a point or two ("63.2% vs 64.7%"). Added `FIRE_TIERS`/`fire_tier()` to `live_checkpoint.py` — `[HIGH]` ≥70%, `[WATCH]` ≥50%, `[WEAK]` ≥25%, `[IGNORE]` <25%, directly off the Distance Calibration Curve. The raw number is still shown alongside the tier, not hidden, per the "critic's ask, not blind compliance" standard — e.g. `[WEAK] ~33%`.
