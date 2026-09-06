@@ -1399,6 +1399,18 @@ Fixed-3 slightly beats even the existing reactive 3-day-stall's own return/day (
 
 **Conclusion: do not adopt.** The critic's skepticism was correct and is now a decisive result, not just an argument — the per-trade win-rate/return-per-day improvement does not survive a real, sequential, capital-constrained simulation. Natural exits compound better. Matches the critic's final verdict exactly (keep as a research branch, do not replace the current exit).
 
+**Checked the same capital-constrained test on the stock leg too, not just options — fails there as well, though far less dramatically.**
+
+| Capital | Stock baseline CAGR | Stock fixed-3-after-arm CAGR |
+|---|---|---|
+| ₹3L | 36.2% | 38.6% |
+| ₹5L | 32.3% | 31.5% |
+| ₹7.5L | 28.7% | 28.9% |
+| ₹10L | 25.5% | 24.3% |
+| ₹20L (uncapped, both take all 679 trades) | 15.6% | 14.2% |
+
+Much closer to a coin flip than options (max ~2.5pp gap either direction at intermediate capital, vs options' consistent 4-15pp loss) — but at the uncapped level, where capital constraints stop mattering entirely, baseline is still slightly ahead, consistent with the already-disclosed fact that fixed-3's raw median (+3.94%) sits slightly below baseline's (+4.07%). **No capital level or leg shows a real benefit for this rule** — a clean, complete "do not adopt," not just for options.
+
 ## Two small UX ships, per critic response to Round 15 (2026-09-06)
 
 **Calibration tiers instead of a raw percentage.** Critic's point: a person makes better decisions off a small number of named buckets than off two numbers that only differ by a point or two ("63.2% vs 64.7%"). Added `FIRE_TIERS`/`fire_tier()` to `live_checkpoint.py` — `[HIGH]` ≥70%, `[WATCH]` ≥50%, `[WEAK]` ≥25%, `[IGNORE]` <25%, directly off the Distance Calibration Curve. The raw number is still shown alongside the tier, not hidden, per the "critic's ask, not blind compliance" standard — e.g. `[WEAK] ~33%`.
