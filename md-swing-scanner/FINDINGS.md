@@ -1590,3 +1590,70 @@ Tested directly on the same matched-pair pools used for the original sector chec
 | Tech, HIGH persistence | n=3, 33.3% beat-rate | n=5, 20.0% beat-rate |
 
 The critic's exact prediction — high-persistence (trending) names get hurt by cutting — is contradicted by the largest, most trustworthy subgroup here: non-Tech high-persistence trades (n=51/59) show cut helping strongly (baseline flat-to-negative, cut solidly positive), the opposite of the predicted direction. Tech trades lose to cut regardless of their own persistence score (both Tech sub-splits are thin, n=3-9, but point the same direction as the original all-Tech result). **Sector-based Tech exclusion remains the better-supported rule; persistence is not a valid substitute for it.**
+
+## Trigger-breach follow-through: how far does price run past the 0.3-0.6% entry, and a real next-day exit-timing edge for options (2026-09-06)
+
+Triggered by a direct observation ("breakout day itself is a high, then another high, then a red candle — profit booking") and a question about whether the 0.3-0.6% entry-clearance band (adopted 2026-09-05) leaves any real room, or eats the whole known "+1% from pivot" edge. All of this is scoped to **Breakout Continuation only** (the pattern with a `high10_prior`-based trigger; VCP doesn't use this mechanism), using `runs/trades_v28.csv` filtered to `pattern=="breakout_cont"` (n=767).
+
+**Real trigger-fill reconstruction, not Close-based approximation.** The live entry mechanism (`live_checkpoint.py`'s `TRIGGER_CLEARANCE_LOW/HIGH` = 0.3%/0.6% above `high10_prior`, a limit order) was reconstructed from each day's actual Open/High rather than using the backtest's Close-based `entry_price` (which is provably biased — Close on a strong day is often well past the real trigger band, systematically understating true remaining room). Fill logic: `Open > trigger_high` → gapped-through miss, excluded (41/767, 5.3% — these never actually fill under the real limit-order mechanism); `Open` already inside the band → fill at Open (14 trades); `Open` below the band but day's `High` reaches it → fill approximated at `trigger_low` (710 trades, the dominant case — exact intraday fill point isn't recoverable from daily bars, but this is a defensible best-case-within-band approximation, much less biased than Close). 2 trades never reached the band that day at all, excluded. **Final n=724.**
+
+**MFE (Maximum Favorable Excursion) from the real fill price:**
+
+| Horizon | Median MFE | ≥1.0% | ≥2.0% |
+|---|---|---|---|
+| Day0 (breach day itself, same-day) | +2.38% | 82.9% | 58.7% |
+| +1 day | +3.76% | 91.0% | 75.3% |
+| +3 days | +4.87% | 95.0% | 84.8% |
+| +10 days | +7.15% | 97.7% | 92.5% |
+| Ever (to actual exit) | +7.48% | 98.6% | 94.3% |
+
+**Verdict: substantial real room exists beyond the clearance band — the earlier "0.4-0.7% remaining edge" guess badly undersold it.** Day0 alone (same-day continuation after the breach) is methodologically safe to measure this way — unlike the earlier-established Close-based day0 flaw (Close is fixed at day's END, so day-High-vs-Close ordering is ambiguous), fill_price here is anchored at the START of the price path (Open, or the first upward crossing of `trigger_low` from a lower Open), so by simple continuity the day's High can only occur at or after the fill — no lookahead ambiguity.
+
+**Day+1 behavior — the "another high, then red candle" pattern, confirmed directly and precisely (n=724):**
+
+| | % of trades |
+|---|---|
+| Gaps up next day (Open1 > Close0) | 71.3% (median gap +0.58%) |
+| Makes a NEW high beyond day0's own high | 77.5% |
+| Closes RED on day+1 | 56.1% |
+| Closes BELOW day0's close (net given back) | 47.9% |
+| Gaps up AND still fades to close red (single most common outcome) | **41.2%** |
+| Makes a new high intraday, then reverses to close red | 36.0% |
+| Gaps up and stays green (real continuation) | 30.1% |
+
+Median day+1 High is +0.87% above day0's High, but median day+1 Close is only +0.08% above day0's Close — essentially flat. The gap-up and the intraday new high are real and common; keeping them by day+1's own close is not.
+
+**Options-side test: buy ITM/ATM at the trigger-confirmed entry, exit at day+1's option price.** Reused `option_backtest.py`'s `pick_contract`/`option_row` (entry = day0 `ClsPric`, same convention as the rest of this project's options work — options data is daily bhavcopy only, no intraday option ticks exist historically, so this is a known, already-flagged approximation; see caveat below). Contract-availability dropout is real: of 724×2 attempts, 171 (ITM) / 170 (ATM) had no valid liquid contract that day — final n=466 (ITM) / 497 (ATM) for the unconditional test.
+
+| | Next-day OPEN exit | Next-day CLOSE exit | Day+3 CLOSE exit |
+|---|---|---|---|
+| ITM | 52.8% win / +0.57% median / conc 63% | 49.1% / −0.21% / 66% | 48.1% / −2.28% / **185%** (untrustworthy) |
+| ATM | **66.0% win / +2.85% median / conc 33%** | 41.6% / −4.68% / 149% | 42.8% / −7.84% / 208% |
+
+ATM's next-day-open exit is the one genuinely trustworthy cell here (sub-100% concentration; the close-based exits are dominated by a handful of outsized trades). **Gap-conditional split makes it sharper still** — this isn't a blanket rule, it's conditional on the gap:
+
+| | ITM (n≈329) | ATM (n≈356) |
+|---|---|---|
+| Gapped up → exit at day+1 open | 61.5-61.1% win / +2.45-2.46% median | **81.9-82.0% win / +5.03% median** |
+| No gap/gapped down → exit at day+1 open | 33.3% win / −2.33% median | 28.4% win / −2.18% median |
+
+**For the no-gap subset, holding longer only compounds the loss — no recovery pattern at all.** Walked the same no-gap trades forward: ATM median goes from −2.18% (day+1 open) → −9.71% (day+1 close) → −20.24% (day+3) → −31.11% (day+5) → **−37.29% (day+10)**; ITM shows the same monotonic direction, milder. Root cause, diagnosed directly: median DTE at entry is 15 trading days (range 5-28), so by day+10 the median position has only ~5 DTE left — the steepest part of the theta curve — while the underlying **stock's own median move stays small and flat the whole time** (−0.4% to −1.3%, never trending down hard). The option bleeding out while the stock does nothing bad is a theta signature, not a delta one. (The gap between stock mean −9% and median −1% shows a real minority of trades do crash hard — those get hit by theta AND delta together, which is why the option's mean loss is worse than its already-bad median.)
+
+**Tested whether a mid-hold "roll to next month if DTE<5" rule fixes the no-gap decay — it doesn't, it only softens it.** Simulated rolling (sell current contract, buy a fresh same-moneyness contract in the next expiry) the moment DTE drops below 5 during a hold, for the no-gap subset held to day+10: win rate is **completely unchanged** (ITM 42.0%→42.0%, ATM 29.8%→29.8%) — rolling never flips a losing trade into a winner, it only reduces severity for the subset that actually triggers it (of 15 ITM / 22 ATM trades that hit the threshold within 10 days, median loss softens from −61.61%→−46.41% (ITM) and −93.81%→−81.01% (ATM), still deeply negative). Makes sense: rolling resets the theta clock but does nothing about delta — if the stock isn't cooperating, a fresh contract still won't make money. Damage control, not a fix, and doesn't change the standing recommendation below.
+
+**Tested whether "wait through the gap-up with a trailing stop" beats exiting immediately at day+1 open — it doesn't, decisively, for any stop width tried (10/15/20/25/30%).** Every trailing-SL variant collapsed win rate (ATM 82.0%→~30%) and turned the median deeply negative (ATM +5.03%→as low as −30.56%), and even head-to-head, waiting-with-SL only beat the immediate-open-exit 27-32% of the time. **But this is NOT because the extra room doesn't exist** — checked directly: 88.4% (ITM) / 75.6% (ATM) of gap-up trades DO eventually reach a materially higher peak later (median peak gain +45.39% ITM / +78.15% ATM, vs the open-exit's median +1.43%/+4.92%), typically around day 6-7. The room is real and large; a flat % trailing stop on the option's own noisy daily price just isn't the right tool to hold through the (non-monotonic, choppy) path to get there — it gets whipsawed out well before the real peak. A smarter mechanism (this project's own validated stock-side stall/fixed-3-day exit logic, rather than a raw option-price stop) is the natural next candidate here, not yet built.
+
+**Restricting to day+1 only (Open vs intraday High vs Close, gap-up subset) makes the same point most sharply:**
+
+| | Open | High (same day) | Close |
+|---|---|---|---|
+| ITM | 61.1% win / +2.45% median | 84.5% win / **+13.36%** median | 53.8% win / +1.82% median |
+| ATM | 82.0% win / +5.03% median | 97.8% win / **+20.74%** median | 45.5% win / **−2.59%** median |
+
+Enormous room exists *within day+1 itself* — but it's gone by that same day's close (ATM median goes from +5.03% at open to −2.59% at close). The open isn't the ceiling, it's a safe floor; the real opportunity is intraday on day+1, not a multi-day hold.
+
+**Not pursued tonight, deliberately deferred to forward/live experience rather than more backtesting**: a "check price after the first 30 minutes, then set a stop" refinement. Checked feasibility first — real intraday data only exists for a trailing ~90-day window (`intraday_cache.py`, 2026-06-10 to 2026-09-04), and **zero of the 516 gap-up trades in the historical population fall inside that window** (same "backtest population predates the intraday cache" gap already documented for the earlier intraday +1% test). A real test would need a fresh universe rescan inside the live window, PLUS a Black-Scholes option-pricing layer (no intraday option data exists at all, only intraday stock data) — two real builds, not attempted here. Explicit user call: learn this specific piece live rather than backtest it.
+
+**Standing caveat, honestly stated**: every options number above uses day0's option `ClsPric` as entry price (options data is daily bhavcopy only). Given the established day0/day+1 continuation pattern, the option's Close is almost certainly higher than its true price at the actual breach instant — meaning these backtested returns are likely a **conservative underestimate** of what a real trigger-moment entry would achieve, not an overstatement. A Black-Scholes IV-backout could tighten this if pursued later; not necessary for the qualitative conclusion below.
+
+**Practical rule this produces, ready for paper-trading**: buy ITM/ATM at the live 0.3-0.6% trigger breach (real broker quote, not backtested). Next trading day: check the gap. Gapped up (71% of the time) → exit near the open, don't hold for the close (82% win / +5.03% median, ATM) — the real intraday-high opportunity (median +20.74%) is worth watching for live, but the close gives most of it back regardless. Didn't gap up → exit immediately too, don't hold and hope — there's no recovery pattern, only compounding theta bleed with no offsetting stock move. Not yet adopted into any code — paper-trade candidate only, per standing rule.
