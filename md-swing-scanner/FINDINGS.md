@@ -1472,3 +1472,28 @@ Measured directly: for each matched ITM+next trade, the option's price at the st
 **Raw distance shown alongside velocity, not just the blended rank.** Critic's explainability point: showing only the combined score hides *why* something ranked where it did. Every tier-3 row in both `live_checkpoint.py` and `trader_dashboard.py morning` now prints `dist=+X.XX%` next to `vel=+X.XX%/10min`, so the two raw inputs to the ranking are both visible, not just the output.
 
 Verified against real live data in both tools, all 69 tests still pass.
+
+## "Opportunity Cost Exit" (critic's response-14 proposal) — cut AND redeploy, not cut-to-cash — the strongest new idea from this whole thread (2026-09-06)
+
+Critic's idea: instead of a calendar/streak trigger deciding *whether* to exit, use the already-validated Distance Calibration Curve to decide whether a real, currently-available alternative is worth rotating into — "would I rather own today's top checkpoint candidate than this current position?" Tested the core mechanism directly rather than the exact scoring proposal: at the moment a stall condition (either mechanism — reactive 3-day-stall or fixed-3-days-after-arm) would cut a position, check whether a real, independent signal fired on that *same calendar day* elsewhere in the full trade history, and compare three arms for the same trades — hold, cut-to-cash, and cut-then-rotate (crystallize the cut-point P&L, then compound with the real alternative's own full realized outcome, averaged unbiased across all same-day alternatives when more than one existed, never cherry-picked).
+
+**Stock-side, both cut mechanisms — clean, consistent, real:**
+
+| Cut mechanism | n (with a real alt available) | Baseline win/median/conc | Cut-to-cash win/median/conc | Rotate win/median/conc |
+|---|---|---|---|---|
+| Reactive 3-day-stall | 124 of 181 | 71.0% / +4.46% / 33.5% | 94.4% / +4.20% / 21.3% | **89.5% / +8.17% / 20.1%** |
+| Fixed-3-days-after-arm | 155 of 213 | 77.4% / +6.35% / 26.0% | 96.1% / +4.63% / 17.7% | **89.7% / +7.81% / 17.3%** |
+
+Rotate nearly doubles cut-to-cash's median/mean **both times**, with the best (lowest) concentration of all three arms both times — a genuinely robust result, not sensitive to which cut mechanism triggers it. Real alternatives were available most of the time the cut fired (median 3, up to 11 same-day candidates) — not a thin, contrived sample.
+
+**Options-side, all 4 combinations tested (2 cut mechanisms × 2 moneyness variants):**
+
+| | ITM+next, reactive | ITM+next, fixed-3 | ITM+current, reactive | ITM+current, fixed-3 |
+|---|---|---|---|---|
+| Rotate win/median/mean | 70.6% / +41.68% / +46.05% | 73.5% / +38.35% / +47.16% | 63.5% / +23.34% / +37.24% | 66.7% / +33.82% / +51.45% |
+| Rotate concentration | 63.8% | **50.2%** | **99.3% ⚠** | 64.7% |
+| Beats cut-to-cash on win rate too? | Yes | Yes | No | No |
+
+**ITM+next + rotate is the clear, consistent winner** — beats both hold and cut-to-cash on every metric, both cut mechanisms, with the best concentration of any result in this entire session's exit-side work (50.2% with the fixed-3 trigger). **ITM+current + rotate is real but less trustworthy** — good median/mean both times, but win rate lags cut-to-cash both times, and concentration swings from a real red flag (99.3%, reactive-stall cut) to reasonable (64.7%, fixed-3 cut) depending on which trigger is used — needs a larger sample before trusting at the same confidence level as ITM+next.
+
+**Conclusion: this is the strongest validated new idea from the whole stall-exit thread, and it directly confirms the critic's proposal — the value was never in "cut vs. hold," it's in "cut and redeploy into something real," which sitting in cash the whole time was leaving on the table.** Not yet adopted — same standing rule as everything else, needs outside review and a real scoring mechanism (the critic's original proposal used the Distance Calibration Curve to rank alternatives, which this test approximated with an unbiased same-day average rather than the actual scoring rule) before being wired into anything live.
