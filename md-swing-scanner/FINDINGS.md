@@ -1177,3 +1177,13 @@ A fourth state (fired, ran well past the band, still moving) is deliberately NOT
 No single ratio is uniformly best across all three pairs (a real plateau, same honesty standard as the entry-clearance band and VCP tolerance — not a pinned-down optimum), but **80% distance / 20% velocity never lost and usually won** across all three — adopted as the standard blend.
 
 **Wired into `live_checkpoint.py`**: since the live tool only took one snapshot per run, velocity needed a second data point — solved by calling `fetch_live_bars()` twice per run, once at the requested cutoff and once 10 minutes earlier (`_minus_minutes()`), both drawn from the same day's already-cached intraday data, no state persistence between runs needed. Tier 3 (watching, not yet fired) candidates now rank by `0.8×dist_rank + 0.2×vel_rank` (percentile ranks; candidates too early in the day for a prior snapshot fall back to a neutral 0.5 vel-rank rather than being penalized). Verified end-to-end against real live data — reordered the tier-3 list sensibly relative to pure distance (e.g. a candidate closing fast moved up, one drifting slightly away moved down), each row now prints `vel=+X.XX%/10min`.
+
+**Caveat, checked directly and worth being honest about: the 10-minute lookback window itself was never validated, only inherited.** It was simply the gap size in the first checkpoint pairs tested above. Swept the lookback duration (5/10/15/20/25 min) at three separate fixed evaluation checkpoints (09:30, 09:40, 09:45), holding the 80/20 blend ratio fixed:
+
+| Eval checkpoint (baseline R@1) | 5-min | 10-min | 15-min | 20-min | 25-min |
+|---|---|---|---|---|---|
+| 09:30 (55.7%) | 70.5% | 65.6% | — | — | — |
+| 09:40 (62.3%) | 65.6% | 65.6% | 77.0% | 63.9% | — |
+| 09:45 (67.2%) | 54.1% | 63.9% | 63.9% | 67.2% | 60.7% |
+
+Unlike the blend ratio (a genuine, repeatable 70-90% "good zone" across all three checkpoint pairs), **the lookback duration has no consistent optimum** — the best window bounces between 5, 15, and 20 minutes depending on which specific checkpoint is evaluated, and a too-short 5-minute lookback is actively worse than plain distance-only at the 09:45 anchor (54.1% vs 67.2%). With only 62 days of real intraday data, this likely isn't pinnable down more precisely right now. **Conclusion: the direction (blend in some closing-speed signal) is real; the specific 10-minute window is an arbitrary, reasonable middle choice, not a validated optimum** — same honesty standard already applied to the 0.5% entry-clearance pick. Not changed from 10 minutes given the instability offers no confident alternative to switch to.
