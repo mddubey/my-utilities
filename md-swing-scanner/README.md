@@ -122,8 +122,21 @@ without relying on any single session's memory.
   (front-month + 5-trading-day expiry-runway buffer, corrected settlement pricing).
 - `portfolio.py` — capital-constrained simulation (fixed 3-slot, 1-lot options sizing).
 
-**Daily use** (live, not backtesting — see below)
-- `daily_scan.py` — today's new candidate signals.
+**Daily use** (live, not backtesting — see below). `trader_dashboard.py` is the
+recommended entry point for all of these; the individual tools it wraps still run
+standalone if needed.
+- `trader_dashboard.py` — one entry point: `evening` / `morning [HH:MM]` / `night` /
+  `journal`. Wraps the four tools below rather than reimplementing any of their logic.
+- `tomorrow_candidates.py` — tonight's candidate list, ranked by quality + feasibility,
+  with a trigger band and stop for each.
+- `live_checkpoint.py` — the same-day, tiered live check (pulled back / kept going near
+  trigger / still watching / missed) — run anytime during market hours, no fixed
+  checkpoint needed. This is the mechanism actually used to place real trades; see
+  `FINDINGS.md`'s "reverse-engineering entry timing" and Round-13 sections for why.
+- `daily_scan.py` — the original close-based EOD scan (today's already-confirmed
+  signals, gated by the Nifty regime filter). Still the source of the validated v28
+  backtest numbers below, and still useful for a full close-based view, but not the
+  day-to-day mechanism in current use — that's the checkpoint tool above.
 - `monitor_positions.py` — current stop/target for positions you're actually holding.
 - `open_positions.csv` — your real, manually-maintained open positions.
 
@@ -148,17 +161,38 @@ python3 backtest.py           # writes runs/trades_v28.csv, prints the summary s
 
 ## Daily usage
 
-Run once per day, after market close:
+The actual workflow in current use, via `trader_dashboard.py` (2026-09-06 — see
+`FINDINGS.md`'s Round-13 and later sections for the full validation behind each step):
 
 ```
 python3 fetch_prices.py
 python3 market_regime.py
-python3 daily_scan.py          # new candidates today
-python3 monitor_positions.py   # current stop/target for your open positions
+
+python3 trader_dashboard.py evening              # tonight: tomorrow's candidates (ticker, trigger band, stop, quality)
+python3 trader_dashboard.py morning [HH:MM]      # anytime during market hours: tiered live check
+                                                  #   TIER 1/2 (already fired, settled price, no timing race) first,
+                                                  #   TIER 3 (watching, ranked by distance+velocity) if capital remains
+python3 trader_dashboard.py journal add TICKER TIER PRICE notes...   # when you actually place a trade
+# ...then add a row to open_positions.csv by hand — nothing else does this for you
+python3 trader_dashboard.py night                # end of day: stop/target for everything you're holding
 ```
 
-`daily_scan.py` scans the full NIFTY 500 universe with the exact same entry logic the backtest
-validated. Output is always three sections: **Tradable Today** (gate-respecting, real signals),
+The `morning` step is the headline finding of this project's later rounds: ranking the
+still-live candidate pool by same-day distance-to-trigger (not the night-before quality
+score) gets the real mover into the top pick 60-69% of the time, top-2 76-84% — an
+8-9x improvement over the original night-before ranking's Recall@5 of 9.6%. Validated
+against three separate adversarial break-tests (frozen-ranking, gap-vs-momentum
+decomposition, percentile-normalization) before being trusted. `evening` and `morning`
+use the **0.3-0.6% intraday trigger band** (`live_checkpoint.py`'s
+`TRIGGER_CLEARANCE_LOW`/`HIGH`, the single source of truth both tools import from) —
+enter somewhere in that band via a limit IOC order, never chase above the high edge.
+
+`daily_scan.py` is the older, close-based alternative — it scans the full NIFTY 500
+universe with the exact same entry logic the backtest validated, but only confirms a
+signal after today's close (next-day actionable), rather than the same-day intraday
+mechanism above. Still useful for a full close-based view or if you want the original
+validated numbers directly; not the day-to-day mechanism in current use. Output is
+always three sections: **Tradable Today** (gate-respecting, real signals),
 **Watchlist — fails only on regime** (pattern fired, only the Nifty ADX/200-SMA gate blocked it —
 computed automatically at no extra cost, for observation only, not a validated trade signal), and
 **Near-miss — intraday High cleared resistance, Close didn't confirm** (2026-09-03, Breakout
@@ -216,7 +250,8 @@ the gate entirely (collapses to a single Tradable Today list, no watchlist split
 gate left to fail on); `--live [--cutoff HH:MM]` (default 14:45 IST) checks a same-day intraday
 snapshot instead of waiting for tomorrow's close — two-pass, so only a cheap EOD pre-filter
 (`shortlist_primed`, typically ~30/500 tickers) gets an actual intraday fetch, not the full
-universe. `monitor_positions.py` reads `open_positions.csv` (columns: `ticker,
+universe. `monitor_positions.py` (or `trader_dashboard.py night`, which wraps it
+unchanged) reads `open_positions.csv` (columns: `ticker,
 entry_date, entry_price, pattern`) — log each real position you take there — and
 replays the exact same exit logic from your entry date to today, reporting:
 

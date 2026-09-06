@@ -64,7 +64,6 @@ def load_day(ymd):
 
 
 FUT_COLS = ["TradDt", "TckrSymb", "XpryDt", "ClsPric", "PrvsClsgPric", "OpnIntrst", "ChngInOpnIntrst"]
-OI_BUILDUP_WINDOW = 3  # trading days — matches the 3-day cadence used elsewhere in this project
 
 
 @functools.lru_cache(maxsize=None)
@@ -88,28 +87,6 @@ def front_month_future(ticker, date):
         return None
     row = chain[chain.XpryDt == expiries[0]]
     return row.iloc[0] if not row.empty else None
-
-
-def oi_buildup_bullish(ticker, date):
-    """Long buildup (price up AND futures OI up) over a trailing window, as an extra
-    confirmation on top of the stock-price signal: rejects rallies that are just short
-    covering (price up, OI flat/falling — no fresh money committing, weaker/more likely
-    to reverse) even though the price action alone looks identical to a real breakout."""
-    days = [d for d in trading_days() if d <= date]
-    if len(days) < OI_BUILDUP_WINDOW:
-        return False
-    window = days[-OI_BUILDUP_WINDOW:]
-    net_oi_chg = 0
-    first_price = last_price = None
-    for d in window:
-        row = front_month_future(ticker, d)
-        if row is None:
-            return False
-        net_oi_chg += row.ChngInOpnIntrst
-        if first_price is None:
-            first_price = row.PrvsClsgPric
-        last_price = row.ClsPric
-    return last_price > first_price and net_oi_chg > 0
 
 
 MIN_LOTS_TRADED = 0       # testing (2026-09-02): additional floor on TtlTradgVol (already

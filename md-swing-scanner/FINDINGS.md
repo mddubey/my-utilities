@@ -1038,6 +1038,15 @@ Full critique read in full (28-page chat export). Overall verdict 9.3/10, ship t
 
 **Three new-information-source ideas from response-11, tested — two rejected, one modest positive:**
 - **Options flow** (`oi_buildup_bullish()`, already-existing but unused futures-OI-based confirmation): tested on 679 trades — OI buildup present shows *worse* outcomes (62.3% win/+4.20% median, n=61) than absent (70.3%/+4.57%, n=219), the opposite of the function's design intent. Also a real coverage gap: 399/679 trades (58.8%) have no futures data at all. **Rejected.**
+
+**Re-checked directly against options P&L specifically (2026-09-06), not just the stock-level result above — the natural follow-up question ("even if it fails as a stock confirmation, could it still help pick options") answered with real data rather than assumed.** Since options P&L is a leveraged/convex function of the same underlying move, it's a genuinely distinct question, not automatically the same conclusion. Computed `oi_buildup_bullish()` directly against the real options P&L for both standing recipes:
+
+| Variant | Buildup present | Buildup absent |
+|---|---|---|
+| ITM+next-month | win=51.4%, median=+1.30% (n=74) | win=64.1%, median=+21.15% (n=488) |
+| ATM+current-month | win=34.6%, median=−71.45% (n=81) | win=48.7%, median=−7.48% (n=491) |
+
+**Even more decisively backwards than the stock-level result** — a ~20pp median gap on ITM+next vs the stock-level ~4pp gap, and a dramatic −71.45% median for ATM+current specifically. Consistent with leverage amplifying whatever weakness the "buildup" signal was quietly flagging on the stock side. Fully closes the door on this idea in any form — not a case of "wrong context," it gets worse, not better, the more leveraged the instrument. `oi_buildup_bullish()` deleted from `option_backtest.py` (2026-09-06) — zero callers anywhere in the codebase, and this finding plus the original stock-level one are both preserved here, so nothing is lost.
 - **Sector rotation** ("sector breaks out before the stock," not the existing backward-looking sector RS): tested both same-day and 3-day cumulative sector momentum against next-day movers across 146 real historical days — 27.1% and 25.3% of movers respectively come from a "hot" (top-quartile) sector, essentially identical to the ~25% pure-chance baseline. **Rejected**, directly contradicting the critic's own PHARMA/AUROPHARMA anecdote.
 - **Energy Stall** (`Energy = (ATR3/ATR20) × (Volume3/Volume20)`, exit only on low-ATR+high-volume "distribution"): real, modest positive — win 70.0%→71.4%, median +4.07%→+4.17%, return/day +0.416→+0.455%/day, but fires on only 7.2% of trades (much less often than the calendar-based 3-day stall's 28.6%) since the joint condition is stricter. Untuned first pass — thresholds (ATR ratio<1.0, volume ratio>1.2) not swept.
 
