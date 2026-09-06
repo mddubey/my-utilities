@@ -1383,6 +1383,22 @@ Fixed-3 slightly beats even the existing reactive 3-day-stall's own return/day (
 
 **Status: a genuine, promising new candidate — not yet adopted.** Same standing rule as everything else this session: validated backtest finding, pending outside review before being wired into production. Notably stronger evidence base than Energy Stall got (tested directly on options P&L across all 4 variants, not just stock), and arrived at by directly testing a hunch rather than assuming it — the exact "greedy but test it" instinct this whole audit thread has been encouraging.
 
+**Outside critique on this finding — sharp, and confirmed correct by a proper follow-up test.** Reviewed the aggregate per-trade stats above and pushed back hard: (1) the day+3/5/8 trajectory chart mixes a shifting, survivor-biased population at each checkpoint rather than tracking a single fixed cohort — a real methodology gap, not just the sample-size caveat already flagged; (2) return/day is not the same thing as trade expectancy — it only matters if freed-up capital is genuinely redeployed into another edge, and ignores real-world frictions (slippage, missed entries); (3) for ITM+current specifically, total rupee P&L across the trade population was nearly unchanged between baseline and the new rule — meaning any "improvement" is a capital-rotation effect, not a real per-trade edge, which is a portfolio-allocation question, not an exit-rule question. Proposed the correct test: compare CAGR under real capital constraints via a proper sequential portfolio simulation, the same rigor already used to settle the original 3-day-stall's stock-vs-options question.
+
+**Ran exactly that test on ITM+next (reusing `portfolio.py`'s existing cash-only event-driven simulator) — the rule does NOT hold up.**
+
+| Starting capital | Baseline CAGR (taken/440) | Fixed-3-after-arm CAGR (taken/441) |
+|---|---|---|
+| ₹3L | 106.4% (341) | 91.8% (306) |
+| ₹4L | 93.8% (368) | 80.1% (316) |
+| ₹5L | 82.4% (374) | 78.5% (387) |
+| ₹7.5L | 68.4% (412) | 64.8% (432) |
+| ₹10L | 58.8% (433) | 54.5% (440) |
+
+**Baseline (natural exit) beats the fixed-3-day rule at every capital level from ₹3L to ₹10L** — a real, consistent 4-15pp CAGR gap, the opposite direction of what the per-trade aggregate stats suggested. (Below ₹3L — ₹50k/1L/2L — results are noise either way: a tiny number of early trades can lock up nearly the whole pool for weeks at low capital, a real, previously-documented "scheduling fragility" artifact of the fixed-1-lot sequential allocator, not a signal about either exit rule; first attempt at ₹50k-2L showed one rule taking 10x fewer trades than the other, which looked like a bug and was traced directly to this mechanism before being correctly set aside as unreliable rather than reported.)
+
+**Conclusion: do not adopt.** The critic's skepticism was correct and is now a decisive result, not just an argument — the per-trade win-rate/return-per-day improvement does not survive a real, sequential, capital-constrained simulation. Natural exits compound better. Matches the critic's final verdict exactly (keep as a research branch, do not replace the current exit).
+
 ## Two small UX ships, per critic response to Round 15 (2026-09-06)
 
 **Calibration tiers instead of a raw percentage.** Critic's point: a person makes better decisions off a small number of named buckets than off two numbers that only differ by a point or two ("63.2% vs 64.7%"). Added `FIRE_TIERS`/`fire_tier()` to `live_checkpoint.py` — `[HIGH]` ≥70%, `[WATCH]` ≥50%, `[WEAK]` ≥25%, `[IGNORE]` <25%, directly off the Distance Calibration Curve. The raw number is still shown alongside the tier, not hidden, per the "critic's ask, not blind compliance" standard — e.g. `[WEAK] ~33%`.
