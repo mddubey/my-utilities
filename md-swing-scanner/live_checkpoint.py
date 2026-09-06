@@ -75,11 +75,12 @@ Real caveats, not swept under the rug:
   real lead, not forgotten.
 """
 import sys
+from datetime import datetime, timedelta
 
 import pandas as pd
 
 from backtest import load
-from daily_scan import shortlist_primed, fetch_live_bars
+from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT
 from sector_strength import sector_rs
 
 TRIGGER_CLEARANCE_LOW = 0.003   # 0.3% -- earliest honest fire point
@@ -87,6 +88,19 @@ TRIGGER_CLEARANCE_HIGH = 0.006  # 0.6% -- limit-order ceiling, never pay more th
 PULLBACK_MIN_PCT = 0.5          # retrace at least this much off the day's high-so-far to count as "pulled back"
 NEAR_BAND_PCT = 2.0             # clearance-above-trigger cap to still call a fired name "near", not "missed"
 TOP_N = 10
+VELOCITY_LOOKBACK_MIN = 10   # minutes between the two snapshots used to compute closing speed
+VELOCITY_WEIGHT = 0.20      # blend weight on velocity-rank vs distance-rank for tier 3 (2026-09-06:
+                             # swept 0-100% blend across three checkpoint pairs -- no single ratio wins
+                             # every pair (real plateau, not a pinned-down optimum, same honesty
+                             # standard as the entry-clearance band and VCP tolerance), but 80/20 never
+                             # lost and usually won: R@1 55.7%->65.6%, R@2 80.3%->88.5% at 09:20->09:30;
+                             # R@1 62.3%->65.6%, R@2 82.0%->86.9% at 09:30->09:40; R@1 63.9%->73.8% at
+                             # 09:25->09:35. See FINDINGS.md's Round-13 section for the full sweep.
+
+
+def _minus_minutes(cutoff_ist, minutes):
+    t = datetime.strptime(cutoff_ist, "%H:%M")
+    return (t - timedelta(minutes=minutes)).strftime("%H:%M")
 
 
 def _quality_features(t, rows, i):
@@ -112,7 +126,10 @@ def classify_candidates(tickers, cutoff_ist=None):
     order. missed is informational only (fired, ran past the band, not settled) --
     not meant to be acted on, just visible so nothing silently vanishes."""
     pool = shortlist_primed(tickers)
-    live = fetch_live_bars(pool, cutoff_ist=cutoff_ist) if cutoff_ist else fetch_live_bars(pool)
+    effective_cutoff = cutoff_ist or LIVE_CUTOFF_DEFAULT
+    prior_cutoff = _minus_minutes(effective_cutoff, VELOCITY_LOOKBACK_MIN)
+    live = fetch_live_bars(pool, cutoff_ist=effective_cutoff)
+    live_prior = fetch_live_bars(pool, cutoff_ist=prior_cutoff)
 
     feature_rows = {}
     for t in pool:
@@ -164,14 +181,29 @@ def classify_candidates(tickers, cutoff_ist=None):
                 missed.append(rec)
         else:
             dist_pct = (trigger_low / bar["Close"] - 1) * 100
-            watching.append(dict(**common, close=bar["Close"], dist_to_trigger_pct=dist_pct))
+            rec = dict(**common, close=bar["Close"], dist_to_trigger_pct=dist_pct, velocity_pct=None)
+            bar_prior = live_prior.get(t)
+            if bar_prior is not None and bar_prior["High"] < trigger_low:
+                dist_prior_pct = (trigger_low / bar_prior["Close"] - 1) * 100
+                rec["velocity_pct"] = dist_prior_pct - dist_pct  # positive = closing fast
+            watching.append(rec)
 
     def _df(recs, sort_col, ascending):
         return pd.DataFrame(recs).sort_values(sort_col, ascending=ascending) if recs else pd.DataFrame(recs)
 
+    watching_df = _df(watching, "dist_to_trigger_pct", True)
+    if not watching_df.empty and watching_df["velocity_pct"].notna().sum() >= 3:
+        watching_df["dist_rank"] = watching_df["dist_to_trigger_pct"].rank(pct=True, ascending=True)
+        watching_df["vel_rank"] = watching_df["velocity_pct"].rank(pct=True, ascending=False)
+        # candidates with no velocity reading (too early in the day for a prior snapshot)
+        # fall back to a neutral 0.5 vel-rank so they aren't penalized relative to unmeasured peers
+        watching_df["vel_rank"] = watching_df["vel_rank"].fillna(0.5)
+        watching_df["combo_rank"] = (1 - VELOCITY_WEIGHT) * watching_df["dist_rank"] + VELOCITY_WEIGHT * watching_df["vel_rank"]
+        watching_df = watching_df.sort_values("combo_rank", ascending=True)
+
     return (_df(pulled_back, "pullback_pct", False),
             _df(kept_going_near, "clearance_now_pct", True),
-            _df(watching, "dist_to_trigger_pct", True),
+            watching_df,
             _df(missed, "clearance_now_pct", False))
 
 
@@ -183,11 +215,15 @@ def _print_tier(label, df, note, price_col, price_label):
     if df.empty:
         print("  (none)")
         return
+    has_velocity = "velocity_pct" in df.columns
     for _, r in df.iterrows():
         q = f"quality={r.quality_score:.2f}" if pd.notna(r.quality_score) else "quality=n/a"
         sec = f"{r.sector} (sector RS {r.sector_rs:.0f})" if r.sector and pd.notna(r.sector_rs) else (r.sector or "n/a")
+        vel = ""
+        if has_velocity:
+            vel = f"  vel={r.velocity_pct:+.2f}%/{VELOCITY_LOOKBACK_MIN}min" if pd.notna(r.velocity_pct) else "  vel=n/a"
         print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}")
+              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{vel}")
 
 
 if __name__ == "__main__":
@@ -208,7 +244,8 @@ if __name__ == "__main__":
     _print_tier("TIER 2: KEPT GOING, STILL NEAR TRIGGER (settled, no timing race)", kept_going_near,
                 "sorted by clearance -- closest to trigger_low first", "current_price", "price")
     _print_tier(f"TIER 3: WATCHING, not yet fired (top {TOP_N} of {len(watching)})", watching.head(TOP_N),
-                "validated ranking: top-1 catches the real mover 60-69% of the time, top-2 76-84%",
+                "ranked by distance blended 80/20 with closing-speed vs 10 min ago (2026-09-06) -- "
+                "distance-only alone gets top-1 60-69%/top-2 76-84%, the blend does a bit better",
                 "close", "close")
     _print_tier("MISSED (fired, ran well past the band -- not actionable, informational only)", missed,
                 "if it settles back into tier 1/2 on a later run, it'll reappear there", "current_price", "price")

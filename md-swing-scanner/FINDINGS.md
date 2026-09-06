@@ -1166,4 +1166,14 @@ A fourth state (fired, ran well past the band, still moving) is deliberately NOT
 
 **Verified end-to-end against real live data (2026-09-06)**: correctly bucketed IFCI (pulled back, now trading below its own trigger_low after a full round-trip — a real, valid case the win-rate numbers above already account for, not a bug), GLAND (pulled back), RBLBANK (kept-going-near, current price already above `trigger_high` — the band is reference-only for fired tiers, not an executable ceiling the way it is for tier 3), and NIACL (correctly flagged MISSED, +12% past its band). Added an explicit runtime note clarifying that for tiers 1/2/missed, the tradeable price is the `price` column, not bounded by the printed band.
 
-**Not yet done**: Trigger Velocity (validated as a real secondary signal for tier 3, see the Round-13 section above) is still not wired in — needs a two-checkpoint data flow this single-snapshot design doesn't have, and hasn't been through the same break-testing rigor as the distance-only mechanism yet.
+**Trigger Velocity hardened and wired in (2026-09-06).** Round-13's velocity result was a single blend ratio (70/30) at a single checkpoint pair (09:20→09:30) — swept the blend ratio 0-100% at three separate checkpoint pairs before trusting it:
+
+| Pair | Baseline R@1/R@2/R@5 | Best in the 70-90% dist / 10-30% vel zone |
+|---|---|---|
+| 09:20→09:30 | 55.7% / 80.3% / 95.1% | 65.6% / 88.5% / 98.4% (80/20) |
+| 09:30→09:40 | 62.3% / 82.0% / 96.7% | 65.6% / 86.9% / 96.7% (90/10) |
+| 09:25→09:35 | 63.9% / 83.6% / 95.1% | 75.4% / 83.6% / 96.7% (70/30) |
+
+No single ratio is uniformly best across all three pairs (a real plateau, same honesty standard as the entry-clearance band and VCP tolerance — not a pinned-down optimum), but **80% distance / 20% velocity never lost and usually won** across all three — adopted as the standard blend.
+
+**Wired into `live_checkpoint.py`**: since the live tool only took one snapshot per run, velocity needed a second data point — solved by calling `fetch_live_bars()` twice per run, once at the requested cutoff and once 10 minutes earlier (`_minus_minutes()`), both drawn from the same day's already-cached intraday data, no state persistence between runs needed. Tier 3 (watching, not yet fired) candidates now rank by `0.8×dist_rank + 0.2×vel_rank` (percentile ranks; candidates too early in the day for a prior snapshot fall back to a neutral 0.5 vel-rank rather than being penalized). Verified end-to-end against real live data — reordered the tier-3 list sensibly relative to pure distance (e.g. a candidate closing fast moved up, one drifting slightly away moved down), each row now prints `vel=+X.XX%/10min`.
