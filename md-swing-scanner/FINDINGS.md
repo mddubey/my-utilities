@@ -1276,3 +1276,24 @@ Classified each trade's entry date into Bull (Nifty > SMA200) / Recovery (below 
 **Checked before trusting it, per our own standing discipline, and it doesn't survive**: top-10 trade concentration for Bear (n=199) is 67.5%; for Recovery (n=133) it's **167%** — meaning the top 10 trades' P&L exceeds the bucket's entire total, so the other 123 trades net *negative* overall. Real red flag. Worse: 69% of the "Bear" bucket's trades and 89% of the "Recovery" bucket's trades have entry dates in 2026 specifically. **Root cause: Nifty closed above its own 200-SMA continuously from 2022 through Feb 2026 — the entire available history contains essentially ONE non-Bull episode (the current, still-ongoing drought), not multiple independent bull/bear/recovery cycles.** "Bear" and "Recovery" here aren't different market TYPES being compared — they're just two sub-phases (SMA50-falling weeks vs. SMA50-rising weeks) of the same single continuous episode.
 
 **Conclusion: this specific re-audit can't be answered with the data available, not due to a bug or a small sample specifically, but because the real world has only produced one non-Bull episode in the whole window this project has data for.** Answering the critic's actual question (does the pattern generalize across genuinely different regime types) would need either a much longer/older data history containing prior independent bear-market episodes, or waiting for the current drought to resolve and a future one to occur — not something re-slicing the existing data can produce. Logged honestly as "data insufficient to answer," not reported as a real finding despite the first-look number looking dramatic.
+
+## VCP weak-window (Oct'24-Feb'26): detector-quality audit — 10th hypothesis, mostly rejected, one real nuance found (2026-09-06)
+
+Critic's 2nd-highest-priority re-audit: every prior hypothesis for the weak window tested a FILTER (regime, sector, volatility, breadth) — none ever questioned the VCP detector's own output quality (base duration, leg count, volume-decay slope, distance from 52-week high). Extracted these four features directly from `vcp.py`'s own zigzag/leg-detection internals (`_find_swings`/`_legs`) for all 663 real coiled_spring trades in v28.
+
+**Macro-level comparison (weak window vs. outside) — no difference on any of the four features, same shape as every prior rejected hypothesis:**
+
+| Feature | Weak window (n=198) | Outside (n=465) |
+|---|---|---|
+| Base duration | median 51d | median 51d |
+| Number of legs | median 10 | median 11 |
+| Volume decay ratio | median 0.46 | median 0.47 |
+| Distance from 52-week high | median 0.957 | median 0.970 |
+
+Base quality itself is not measurably different during the weak window — the 10th hypothesis tested for this investigation, and the 10th to show no macro-level gap (joining Nifty direction, weak RS, ADX rising, ADX uptrend, SMA50-AND, SMA50-OR-recovery, sector, volatility, breadth).
+
+**But a real, non-outlier-driven split showed up WITHIN the weak window specifically**: splitting at the median base duration (51 days), short bases did meaningfully worse (win 38.9%, median −3.31%, mean −2.25%) than long bases (win 53.4%, median +1.21%, mean −0.06%) — a genuine 14.5pp win-rate gap, mean and median telling the same consistent story (no single-trade distortion; a naive concentration-ratio check broke down here only because the "long bases" group's total P&L nets to near-zero, not because of real outlier concentration). The other three features (leg count, volume decay, 52-week-high distance) showed no comparable split within the weak window.
+
+**Checked whether this generalizes beyond the weak window — it does NOT.** Same median split applied outside the weak window: 69.8% win (short) vs 66.7% win (long) — flat to mildly reversed. Across ALL 663 trades: 60.6% vs 62.7%, a real but much milder tilt. **Conclusion: base duration doesn't explain why the whole period was weak (it isn't different during that period), but it IS a real, useful quality filter specifically when conditions are already unhelpful** — a sensible mechanism: in a strong tape even a hastily-formed base can work because the broader market carries it, but in an indifferent/weak tape, only a base that actually completed genuine institutional accumulation (longer, more thoroughly tested) succeeds. Not adopted as a change (single-window evidence, and the general effect outside the window is much weaker) — logged as a real, mechanistically-explained nuance, not a root cause for the weak window itself.
+
+One measurement caveat, disclosed rather than hidden: `base_duration` as computed here is capped by `BASE_LOOKBACK=60` trading days (the zigzag lookback window itself), so it cannot exceed that — a truly free/uncapped duration measure wasn't attempted here.
