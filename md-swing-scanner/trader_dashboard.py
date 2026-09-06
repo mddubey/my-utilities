@@ -1,5 +1,5 @@
 """trader_dashboard.py -- one entry point for the daily workflow validated this
-session, tying together three already-independently-validated tools rather than
+session, tying together four already-independently-validated tools rather than
 reimplementing any of their logic (same reasoning as detect_entry()'s own docstring:
 two copies of "what counts as a signal" drifting apart over time is a real risk):
 
@@ -15,6 +15,11 @@ two copies of "what counts as a signal" drifting apart over time is a real risk)
                "[ALREADY HOLDING]" instead of silently resurfacing as a fresh
                opportunity (a real gap noticed 2026-09-06 -- GLAND showed up as a
                fresh tier-1 pick on a day it was already a live position).
+  night     -- wraps monitor_positions.py's monitor() unchanged: current stop/target
+               for every row in open_positions.csv, replayed fresh each run. Added
+               2026-09-06 after a direct question ("why isn't this part of the
+               dashboard too") -- no good reason it wasn't, since the dashboard
+               already reads that same file for the morning mode's holding-check.
   journal   -- a lightweight, append-only execution log (trade_journal.csv) -- NOT a
                replacement for open_positions.csv (monitor_positions.py's exit-logic
                replay needs that file's exact schema, untouched here). This is purely
@@ -26,6 +31,7 @@ two copies of "what counts as a signal" drifting apart over time is a real risk)
 Usage:
   python3 trader_dashboard.py evening
   python3 trader_dashboard.py morning [HH:MM]
+  python3 trader_dashboard.py night
   python3 trader_dashboard.py journal add GLAND pulled_back 2932.50 entered half size
   python3 trader_dashboard.py journal show
 """
@@ -40,6 +46,7 @@ from signals import base_filters_pass
 from daily_scan import _initial_stop
 from tomorrow_candidates import build_candidates, TOP_N as EVENING_TOP_N
 from live_checkpoint import classify_candidates, VELOCITY_LOOKBACK_MIN
+from monitor_positions import monitor as monitor_positions
 
 JOURNAL_FILE = "trade_journal.csv"
 OPEN_POSITIONS_FILE = "open_positions.csv"
@@ -125,6 +132,18 @@ def run_morning(tickers, cutoff):
                 "current_price", "price", held)
 
 
+def run_night():
+    try:
+        positions = pd.read_csv(OPEN_POSITIONS_FILE, parse_dates=["entry_date"])
+    except FileNotFoundError:
+        print(f"{OPEN_POSITIONS_FILE} not found -- create it with columns: ticker,entry_date,entry_price,pattern")
+        return
+    if positions.empty:
+        print("no open positions logged")
+        return
+    monitor_positions(positions)
+
+
 def journal_add(args):
     if len(args) < 3:
         print("usage: journal add TICKER TIER PRICE [notes...]")
@@ -165,6 +184,8 @@ if __name__ == "__main__":
         cutoff = sys.argv[2] if len(sys.argv) > 2 else None
         tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
         run_morning(tickers, cutoff)
+    elif mode == "night":
+        run_night()
     elif mode == "journal":
         sub = sys.argv[2] if len(sys.argv) > 2 else None
         if sub == "add":
