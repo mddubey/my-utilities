@@ -45,7 +45,7 @@ from vcp import stage2_trend_template, base_pivot
 from signals import base_filters_pass
 from daily_scan import _initial_stop
 from tomorrow_candidates import build_candidates, TOP_N as EVENING_TOP_N
-from live_checkpoint import classify_candidates, VELOCITY_LOOKBACK_MIN
+from live_checkpoint import classify_candidates, VELOCITY_LOOKBACK_MIN, fire_tier
 from monitor_positions import monitor as monitor_positions
 import breadth
 
@@ -98,15 +98,19 @@ def _print_tier(label, df, note, price_col, price_label, held):
         print("  (none)")
         return
     has_velocity = "velocity_pct" in df.columns
+    has_fire_rate = "fire_rate_pct" in df.columns
+    has_dist = "dist_to_trigger_pct" in df.columns
     for _, r in df.iterrows():
         q = f"quality={r.quality_score:.2f}" if pd.notna(r.quality_score) else "quality=n/a"
         sec = f"{r.sector} (sector RS {r.sector_rs:.0f})" if r.sector and pd.notna(r.sector_rs) else (r.sector or "n/a")
+        dist = f"  dist={r.dist_to_trigger_pct:+.2f}%" if has_dist and pd.notna(r.dist_to_trigger_pct) else ""
         vel = ""
         if has_velocity:
             vel = f"  vel={r.velocity_pct:+.2f}%/{VELOCITY_LOOKBACK_MIN}min" if pd.notna(r.velocity_pct) else "  vel=n/a"
+        fire = f"  [{fire_tier(r.fire_rate_pct)}] ~{r.fire_rate_pct:.0f}%" if has_fire_rate and pd.notna(r.fire_rate_pct) else ""
         held_tag = "  [ALREADY HOLDING]" if r.ticker in held else ""
         print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{vel}{held_tag}")
+              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{held_tag}")
 
 
 def run_morning(tickers, cutoff):

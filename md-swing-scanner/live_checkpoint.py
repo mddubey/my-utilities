@@ -125,6 +125,20 @@ def calibrated_fire_rate(dist_pct):
     return FIRE_RATE_BY_DISTANCE[-1][1]
 
 
+# Tiers on top of the raw calibrated rate (2026-09-06, outside critique): a person
+# makes better decisions off a small number of named buckets than off two numbers that
+# only differ by a percentage point or two (e.g. "63.2% vs 64.7%") -- the raw number is
+# still shown alongside each tier for reference, not hidden.
+FIRE_TIERS = [(70, "HIGH"), (50, "WATCH"), (25, "WEAK"), (0, "IGNORE")]
+
+
+def fire_tier(rate):
+    for lower, label in FIRE_TIERS:
+        if rate >= lower:
+            return label
+    return FIRE_TIERS[-1][1]
+
+
 def _minus_minutes(cutoff_ist, minutes):
     t = datetime.strptime(cutoff_ist, "%H:%M")
     return (t - timedelta(minutes=minutes)).strftime("%H:%M")
@@ -245,15 +259,17 @@ def _print_tier(label, df, note, price_col, price_label):
         return
     has_velocity = "velocity_pct" in df.columns
     has_fire_rate = "fire_rate_pct" in df.columns
+    has_dist = "dist_to_trigger_pct" in df.columns
     for _, r in df.iterrows():
         q = f"quality={r.quality_score:.2f}" if pd.notna(r.quality_score) else "quality=n/a"
         sec = f"{r.sector} (sector RS {r.sector_rs:.0f})" if r.sector and pd.notna(r.sector_rs) else (r.sector or "n/a")
+        dist = f"  dist={r.dist_to_trigger_pct:+.2f}%" if has_dist and pd.notna(r.dist_to_trigger_pct) else ""
         vel = ""
         if has_velocity:
             vel = f"  vel={r.velocity_pct:+.2f}%/{VELOCITY_LOOKBACK_MIN}min" if pd.notna(r.velocity_pct) else "  vel=n/a"
-        fire = f"  fire_pct~{r.fire_rate_pct:.0f}%" if has_fire_rate and pd.notna(r.fire_rate_pct) else ""
+        fire = f"  [{fire_tier(r.fire_rate_pct)}] ~{r.fire_rate_pct:.0f}%" if has_fire_rate and pd.notna(r.fire_rate_pct) else ""
         print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{vel}{fire}")
+              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}")
 
 
 if __name__ == "__main__":
@@ -274,8 +290,8 @@ if __name__ == "__main__":
     _print_tier("TIER 2: KEPT GOING, STILL NEAR TRIGGER (settled, no timing race)", kept_going_near,
                 "sorted by clearance -- closest to trigger_low first", "current_price", "price")
     _print_tier(f"TIER 3: WATCHING, not yet fired (top {TOP_N} of {len(watching)})", watching.head(TOP_N),
-                "ranked by distance blended 80/20 with closing-speed vs 10 min ago (2026-09-06) -- "
-                "distance-only alone gets top-1 60-69%/top-2 76-84%, the blend does a bit better",
+                "ranked by distance blended 80/20 with closing-speed vs 10 min ago -- "
+                "[HIGH]>=70% [WATCH]>=50% [WEAK]>=25% [IGNORE]<25%, per the Distance Calibration Curve",
                 "close", "close")
     _print_tier("MISSED (fired, ran well past the band -- not actionable, informational only)", missed,
                 "if it settles back into tier 1/2 on a later run, it'll reappear there", "current_price", "price")

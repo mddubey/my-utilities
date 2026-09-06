@@ -1328,3 +1328,26 @@ Critic's complaint: the original Energy Stall (`Energy = (ATR3/ATR20) × (Volume
 **Monotonically improves as the threshold loosens — a real, robust shape, not a single lucky point** — and beats the original Energy Stall's own result (fires 7.2%, win 70.0%→71.4%, ret/day →+0.455%/day) at every threshold, even at a comparable fire rate. Checked concentration on the strongest configuration (2.0% threshold, n=151 fired) before trusting it: **top-10 concentration only 14.2%** (healthy, well-distributed — nowhere near the >100% red flag seen elsewhere this session), worst fired trade barely negative (−0.05%), median +5.17%. A genuinely clean, robust result.
 
 **Conclusion: the critic's reframing is a real improvement, not just a different way of describing the same thing** — measuring the actual price-progress shortfall directly (rather than inferring it from an ATR ratio) produces a stronger, more monotonic, better-distributed signal. Not yet adopted into the live exit logic — this is still a validated backtest finding, same standing rule as everything else pending outside review before being wired into production — but a clear, real upgrade candidate over the original Energy Stall concept, best among all four of this round's re-audits in terms of concrete, unambiguous improvement.
+
+## Energy Stall "immortal time bias" audit (critic pushback, response to Round 15) — a real, sharper problem than the concentration/data checks alone would have caught (2026-09-06)
+
+Critic's specific concern, not just "verify this isn't a data artifact" (already done) but something sharper: the efficiency condition only ever gets evaluated on trades that have already survived to arm (reach 0.5R) — comparing "fires" vs "doesn't fire" could be comparing populations conditioned on survival in a way that makes the improvement look more causal/actionable than it is. Requested test: compare cumulative expectancy trajectory, from the point of arming, for trades where the condition eventually fires vs never fires — using each trade's FULL, uncut natural continuation (ignore the stall exit entirely), not the shortened outcome.
+
+Built exactly this (449 of 679 trades arm, 66.1%): split into "fires at some point" (n=158) vs "never fires" (n=291), tracked cumulative pnl at day+3/+5/+8 since arming AND the final natural (uncut) outcome for both groups:
+
+| | Final natural outcome | Day+3 median | Day+5 median | Day+8 median |
+|---|---|---|---|---|
+| Never fires | win 93.5%, median +7.01% | +4.93% | +4.48% | +4.96% |
+| Fires at some point | win 76.6%, median +6.50% | +4.69% | **+4.91%** | **+5.22%** |
+
+**The final-outcome gap is real** (fires trades do end up somewhat behind never-fires trades over the full horizon) — but **at the actual decision point (day+3/5/8, where the real exit rule would trigger), the two groups look nearly identical, and "fires" is even slightly ahead at day+5 and day+8.** The divergence only emerges much later than the point where the stall rule would have already cut the trade.
+
+**This sharpens, with real evidence, exactly the concern the critic raised conceptually**: the signal correlates with modestly weaker trades in aggregate, but doesn't show visible, actionable weakness at the moment it actually fires — it isn't "catching an imminent reversal" the Wyckoff effort-without-result framing implied, it's closer to "this subgroup tends to underperform slightly for reasons invisible at the actual exit point." That's a materially weaker mechanistic claim than originally reported. **Conclusion: matches the critic's "do not ship" verdict, now with concrete supporting evidence rather than just the a priori concern** — the earlier win-rate improvement (70.0%→75.1%) is real as a population-level correlation, but the case for it being a well-timed, causally-understood exit signal is weaker than it looked before this audit. Kept as research, not adopted, not elevated toward shipping.
+
+## Two small UX ships, per critic response to Round 15 (2026-09-06)
+
+**Calibration tiers instead of a raw percentage.** Critic's point: a person makes better decisions off a small number of named buckets than off two numbers that only differ by a point or two ("63.2% vs 64.7%"). Added `FIRE_TIERS`/`fire_tier()` to `live_checkpoint.py` — `[HIGH]` ≥70%, `[WATCH]` ≥50%, `[WEAK]` ≥25%, `[IGNORE]` <25%, directly off the Distance Calibration Curve. The raw number is still shown alongside the tier, not hidden, per the "critic's ask, not blind compliance" standard — e.g. `[WEAK] ~33%`.
+
+**Raw distance shown alongside velocity, not just the blended rank.** Critic's explainability point: showing only the combined score hides *why* something ranked where it did. Every tier-3 row in both `live_checkpoint.py` and `trader_dashboard.py morning` now prints `dist=+X.XX%` next to `vel=+X.XX%/10min`, so the two raw inputs to the ranking are both visible, not just the output.
+
+Verified against real live data in both tools, all 69 tests still pass.
