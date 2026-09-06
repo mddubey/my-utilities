@@ -1297,3 +1297,19 @@ Base quality itself is not measurably different during the weak window — the 1
 **Checked whether this generalizes beyond the weak window — it does NOT.** Same median split applied outside the weak window: 69.8% win (short) vs 66.7% win (long) — flat to mildly reversed. Across ALL 663 trades: 60.6% vs 62.7%, a real but much milder tilt. **Conclusion: base duration doesn't explain why the whole period was weak (it isn't different during that period), but it IS a real, useful quality filter specifically when conditions are already unhelpful** — a sensible mechanism: in a strong tape even a hastily-formed base can work because the broader market carries it, but in an indifferent/weak tape, only a base that actually completed genuine institutional accumulation (longer, more thoroughly tested) succeeds. Not adopted as a change (single-window evidence, and the general effect outside the window is much weaker) — logged as a real, mechanistically-explained nuance, not a root cause for the weak window itself.
 
 One measurement caveat, disclosed rather than hidden: `base_duration` as computed here is capped by `BASE_LOOKBACK=60` trading days (the zigzag lookback window itself), so it cannot exceed that — a truly free/uncapped duration measure wasn't attempted here.
+
+## DTE × moneyness × expiry heatmap (critic re-audit #3, 8/10) — the moneyness split reveals a real pattern the ITM-only test hid (2026-09-06)
+
+Critic's methodological complaint: the earlier DTE×stall heatmap (`ITM+current` only, "no monotonic pattern, hypothesis not supported") never checked whether the shape differs across moneyness/expiry combos — theta acceleration genuinely depends on moneyness too, not DTE alone. Reused already-computed stall-vs-baseline options results from earlier this session (`stall_options_results.pkl`, all 4 combos) and bucketed each by DTE-at-entry:
+
+| DTE bucket | ATM+current Δ (stall − baseline median) | ITM+current Δ |
+|---|---|---|
+| <10 | +5.42pp | −4.74pp |
+| 10-15 | +16.33pp | −7.88pp |
+| 15-20 | +29.55pp | +10.01pp |
+| 20-25 | +16.95pp | +5.89pp |
+| 25+ | −3.96pp | −6.56pp |
+
+**ATM+current shows a real, sensible shape the ITM-only test completely hid**: stall helps at every bucket except the longest, fading from a large benefit at short/medium DTE down to slightly negative at 25+ — broadly matching the critic's theta-acceleration hypothesis (not strictly monotonic — 15-20 shows the single biggest benefit, not <10 — but the overall "helps when DTE is tight, doesn't when it isn't" direction is real and coherent, unlike ITM+current's incoherent up-down-up-down pattern). **ATM+next and ITM+next have only one DTE bucket at all** (25+, since next-month expiry is always 25+ days by construction) — no gradient exists to test for either, and both show stall mildly hurting (−0.93pp, −2.18pp), consistent with the already-established "stall doesn't help next-month" finding.
+
+**Conclusion: the critic's methodological point was correct — checking DTE decay without controlling for moneyness averaged away a real signal.** For ATM+current specifically (the "same-day spike capture" recipe this project already recommends), stall's benefit is genuinely DTE-dependent in a sensible way; for ITM+current it isn't. Not yet turned into a code change (would mean making the stall exit's use conditional on moneyness+DTE rather than a flat rule) — logged as a real refinement worth adopting if/when the options-side stall logic gets revisited, not acted on unilaterally given it touches the options exit mechanism directly.
