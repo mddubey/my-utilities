@@ -47,6 +47,7 @@ from daily_scan import _initial_stop
 from tomorrow_candidates import build_candidates, TOP_N as EVENING_TOP_N
 from live_checkpoint import classify_candidates, VELOCITY_LOOKBACK_MIN
 from monitor_positions import monitor as monitor_positions
+import breadth
 
 JOURNAL_FILE = "trade_journal.csv"
 OPEN_POSITIONS_FILE = "open_positions.csv"
@@ -112,6 +113,15 @@ def run_morning(tickers, cutoff):
     print(f"Checking as of {'now' if cutoff is None else cutoff} IST...")
     pulled_back, kept_going_near, watching, missed = classify_candidates(tickers, cutoff_ist=cutoff)
     held = _held_tickers()
+
+    try:
+        latest_date = breadth._breadth_frame().index.max()
+        pct = breadth.breadth_pct(latest_date)
+        if pd.notna(pct):
+            print(f"market breadth today: {pct:.0f}% of NIFTY 500 above their own 200-SMA "
+                  f"-- how much weight to put on today's whole list, not a per-candidate filter")
+    except FileNotFoundError:
+        pass
 
     print()
     print("NOTE: for tiers 1/2/missed, 'band' is reference only (where it fired earlier today) --")

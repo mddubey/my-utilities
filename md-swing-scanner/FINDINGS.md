@@ -1229,3 +1229,38 @@ Per the critic's Round-13 suggestion ("stop writing more scripts, build one dash
 - `open_positions.csv` was empty (header row only) despite two real, live positions (IFCI, GLAND) — so the dashboard's "already holding" cross-check had nothing to check against. **Fixed**: verified each ticker's actual pattern classification directly rather than assuming (IFCI qualifies for both breakout_cont and VCP on its entry day, 2026-09-02 — same-day-dual-qualified case, breakout_cont wins per `detect_entry`'s first-match-wins order, matching the real memory note "IFCI breakout_cont"; GLAND's entry (2026-09-04) was driven by the intraday trigger off the prior night's `base_filters_pass` classification, not a same-day `detect_entry` fire, so checked the night-before date 2026-09-03 instead — breakout_cont, not VCP). Both logged: `IFCI,2026-09-02,96.90,breakout_cont` and `GLAND,2026-09-04,2925,breakout_cont`. Verified via `monitor_positions.py` — resolves cleanly, reports current stop (₹86.83 / ₹2657.39) and target (₹104.52 / ₹2954.73) for both. Re-ran `trader_dashboard.py morning` — GLAND now correctly shows `[ALREADY HOLDING]`.
 
 **Added a fourth mode, `night`, per a direct follow-up question ("why isn't this part of the dashboard too") — there was no good reason it wasn't.** Wraps `monitor_positions.py`'s existing `monitor()` function unchanged (same reasoning as the other three modes — no new logic, just wiring). Verified output is identical to running `monitor_positions.py` directly for both IFCI and GLAND. All 69 tests still pass. The dashboard is now a complete daily loop: `evening` → `morning [HH:MM]` (place trades, then `journal add` + a manual `open_positions.csv` row) → `night`.
+
+## Distance Calibration Curve — turns Recall@K into a real, usable probability (2026-09-06)
+
+Prompted by outside critique (response-14): instead of "is the real mover in my top-K," directly compute P(fires later today | distance-to-trigger at a checkpoint) — a smooth calibration curve, not a ranking comparison. Pooled every (checkpoint, distance, fires-after) triple across all six tested checkpoints (09:20-09:45, n=21,273 candidate-checkpoint pairs, 62-day real intraday window):
+
+| Distance bucket | n | Fire rate |
+|---|---|---|
+| 0.1-0.2% | 25 | 88.0% |
+| 0.2-0.3% | 48 | 81.3% |
+| 0.3-0.4% | 81 | 77.8% |
+| 0.4-0.5% | 122 | 68.0% |
+| 0.5-0.6% | 146 | 71.9% |
+| 0.6-0.8% | 487 | 56.7% |
+| 0.8-1.0% | 577 | 48.0% |
+| 1.0-1.5% | 1764 | 32.9% |
+| 1.5-2.0% | 2032 | 22.3% |
+| 2.0-3.0% | 3796 | 11.7% |
+| 3.0-5.0% | 5962 | 3.8% |
+| 5.0%+ | 6233 | 0.5% |
+
+Genuinely, smoothly monotonic (a small 0.4-0.5%/0.5-0.6% wobble is sampling noise at n~120-150, not a break in the trend). **Checked robustness — the curve looks the same whether measured at 09:20 or 09:40 specifically** (both checkpoints independently show the same monotonic decline at comparable magnitudes), confirming this is a real distance-to-probability relationship, not a time-of-day artifact. **Wired directly into `live_checkpoint.py`**: each tier-3 (watching) candidate's row now shows a `fire_pct≈X%` field alongside its raw distance, using this exact lookup table — turns an abstract rank into a concrete, historically-grounded probability read at the moment of deciding whether to commit capital. Verified end-to-end against real live data; all 69 tests still pass.
+
+## Two more response-14 items checked before market open — one rejected, one shipped (2026-09-06)
+
+**Rank-aggregation instead of a weighted blend for Trigger Velocity — tested directly, does NOT hold up.** Critic's proposal: `Score = DistanceRank + VelocityRank`, no weights, on the reasoning that weights imply false precision. Tested against the same three checkpoint pairs as the original blend-ratio sweep:
+
+| Pair | Distance-only R@1/R@2 | 80/20 weighted R@1/R@2 | Rank-aggregation R@1/R@2 |
+|---|---|---|---|
+| 09:20→30 | 55.7% / 80.3% | 65.6% / 88.5% | 62.3% / 77.0% |
+| 09:30→40 | 62.3% / 82.0% | 65.6% / 83.6% | 67.2% / 77.0% |
+| 09:25→35 | 63.9% / 83.6% | 73.8% / 82.0% | 67.2% / 78.7% |
+
+Consistently worse at R@2 (5-11pp) across all three pairs — not the "<1% change" the critic guessed. **Precise reason**: summing two ranks already on the same 1..n scale is not weight-free — it's mathematically the 50/50 point on the exact same weighting spectrum already swept in the original blend-ratio test, where 50/50 was already known to underperform 80/20 at every pair. The "no weights, more honest" framing was a specific (and worse) weight choice in disguise, not an escape from the weighting question. **Not adopted** — kept the existing 80/20 weighted blend.
+
+**Breadth line added to `trader_dashboard.py morning`** — trivial, reuses `breadth.breadth_pct()` unchanged (the same real, adopted signal `daily_scan.py` already surfaces), just wasn't wired into the newer tool. Verified working against live data (`market breadth today: 56%...`). All 69 tests still pass.

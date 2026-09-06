@@ -67,12 +67,17 @@ Real caveats, not swept under the rug:
   that the tier-3 (distance) ranking is robust across the whole 0.3-1.0% range.
 - Volume was tested as a secondary tier-3 ranking signal and made it WORSE, not
   better (Recall@1 60.7%->44.3%) -- deliberately not used.
-- Trigger Velocity (rate of distance-closing between two checkpoints) tested
-  2026-09-05 as a real, promising secondary tier-3 signal (Recall@1 55.7%->65.6%
-  blended) but NOT wired in here yet -- needs a two-checkpoint data flow this
-  single-snapshot design doesn't have, and hasn't been through the same
-  break-testing rigor as the distance-only mechanism. Logged in FINDINGS.md as a
-  real lead, not forgotten.
+- Trigger Velocity (rate of distance-closing between two checkpoints, 2026-09-06):
+  wired in -- see VELOCITY_WEIGHT below. Swept across three checkpoint pairs before
+  trusting it (real plateau in the 70-90% distance / 10-30% velocity zone, no single
+  ratio wins every pair); the 10-minute lookback itself, however, was NOT validated
+  the same way -- swept separately and found no consistent optimum (best window
+  bounces 5/15/20 min depending on the anchor checkpoint), kept as an arbitrary
+  reasonable choice, not a data-backed one. Both fully detailed in FINDINGS.md.
+- Distance Calibration Curve (2026-09-06, see FIRE_RATE_BY_DISTANCE below): each
+  tier-3 row shows a historically-grounded fire probability alongside its raw
+  distance, not just a rank -- checked robust across checkpoints (same curve shape
+  at 09:20 and 09:40 independently), not a time-of-day artifact.
 """
 import sys
 from datetime import datetime, timedelta
@@ -96,6 +101,28 @@ VELOCITY_WEIGHT = 0.20      # blend weight on velocity-rank vs distance-rank for
                              # lost and usually won: R@1 55.7%->65.6%, R@2 80.3%->88.5% at 09:20->09:30;
                              # R@1 62.3%->65.6%, R@2 82.0%->86.9% at 09:30->09:40; R@1 63.9%->73.8% at
                              # 09:25->09:35. See FINDINGS.md's Round-13 section for the full sweep.
+
+# Distance Calibration Curve (2026-09-06): P(fires later today | distance-to-trigger
+# right now), pooled across checkpoints 09:20-09:45 (n=21,273 candidate-checkpoint
+# pairs, 62 real days) -- checked robust at 09:20 and 09:40 independently before
+# trusting it. (upper_bound_pct, fire_rate_pct) pairs, ascending -- see FINDINGS.md's
+# "Distance Calibration Curve" section for the full table including sample sizes.
+FIRE_RATE_BY_DISTANCE = [
+    (0.2, 88.0), (0.3, 81.3), (0.4, 77.8), (0.5, 68.0), (0.6, 71.9),
+    (0.8, 56.7), (1.0, 48.0), (1.5, 32.9), (2.0, 22.3), (3.0, 11.7),
+    (5.0, 3.8), (float("inf"), 0.5),
+]
+
+
+def calibrated_fire_rate(dist_pct):
+    """Historical P(fires later today) for a candidate currently this far from its
+    trigger -- a lookup, not a model fit, deliberately: the underlying curve is
+    monotonic enough that a simple bucket table is more honest than pretending to
+    interpolate precision the data doesn't support."""
+    for upper, rate in FIRE_RATE_BY_DISTANCE:
+        if dist_pct <= upper:
+            return rate
+    return FIRE_RATE_BY_DISTANCE[-1][1]
 
 
 def _minus_minutes(cutoff_ist, minutes):
@@ -181,7 +208,8 @@ def classify_candidates(tickers, cutoff_ist=None):
                 missed.append(rec)
         else:
             dist_pct = (trigger_low / bar["Close"] - 1) * 100
-            rec = dict(**common, close=bar["Close"], dist_to_trigger_pct=dist_pct, velocity_pct=None)
+            rec = dict(**common, close=bar["Close"], dist_to_trigger_pct=dist_pct, velocity_pct=None,
+                       fire_rate_pct=calibrated_fire_rate(dist_pct))
             bar_prior = live_prior.get(t)
             if bar_prior is not None and bar_prior["High"] < trigger_low:
                 dist_prior_pct = (trigger_low / bar_prior["Close"] - 1) * 100
@@ -216,14 +244,16 @@ def _print_tier(label, df, note, price_col, price_label):
         print("  (none)")
         return
     has_velocity = "velocity_pct" in df.columns
+    has_fire_rate = "fire_rate_pct" in df.columns
     for _, r in df.iterrows():
         q = f"quality={r.quality_score:.2f}" if pd.notna(r.quality_score) else "quality=n/a"
         sec = f"{r.sector} (sector RS {r.sector_rs:.0f})" if r.sector and pd.notna(r.sector_rs) else (r.sector or "n/a")
         vel = ""
         if has_velocity:
             vel = f"  vel={r.velocity_pct:+.2f}%/{VELOCITY_LOOKBACK_MIN}min" if pd.notna(r.velocity_pct) else "  vel=n/a"
+        fire = f"  fire_pct~{r.fire_rate_pct:.0f}%" if has_fire_rate and pd.notna(r.fire_rate_pct) else ""
         print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{vel}")
+              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{vel}{fire}")
 
 
 if __name__ == "__main__":
