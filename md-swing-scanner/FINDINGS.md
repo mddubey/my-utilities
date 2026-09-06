@@ -1542,3 +1542,51 @@ Critic flagged ITM+current+fast-exit as "not yet real" (5.5/10) pending a year-s
 **3. Sector-neutrality** — used `sectors.py`'s ticker→sector map. No single sector dominates the sample (top sector, Financial Services, is 26-30%; removing it entirely, cut still wins on median both mechanisms: +3.98%→+7.31% and +11.75%→+15.63%). Cut wins in 4 of 6 sectors with enough data (n≥8) both mechanisms (Basic Materials, Consumer Cyclical, Energy, Financial Services). **Technology is a real, consistent exception, not a fluke — cut LOSES in Technology both mechanisms** (reactive: win 60.0%→30.0%, median +8.03%→−14.43%, n=10; fixed-3: win 64.3%→35.7%, median +14.51%→−8.88%, n=14). Industrials is a mild wash on the fixed-3 variant only (+17.45% vs +15.75%). Not swept under the rug: this is genuinely useful evidence that the discipline isn't perfectly sector-neutral — plausible mechanism (tech options in this universe may see thinner liquidity or more explosive/sustained continuation moves that a fast cut kills prematurely) but unconfirmed at this sample size, and worth a specific tech-sector exclusion if this candidate is ever adopted.
 
 **Overall: 2 of 3 checks pass clean (volatility, sector-concentration-robustness); the year-split and the Technology sector both surface real, explainable exceptions rather than random noise.** This is stronger, more honest evidence than a blanket "it works everywhere" result would have been — ITM+current+fast-exit looks like a real effect with two known boundary conditions (strong bull years, tech sector specifically), not a universal rule. Still not adopted — same standing rule as everything else, pending outside review.
+
+## CORRECTION to update-16: the "current wins head-to-head 72%" claim was a methodology bug, reversed on the clean sample (2026-09-06)
+
+Update-16 (already sent to the critic) reported: "current-month wins the same trade head-to-head 72% of the time" on n=189 same-strike-matched ITM current-vs-next pairs. **This number is wrong and reverses on correct methodology.** Two stacked problems, both verified directly against the real trade file (`runs/trades_v28_fo.csv`):
+
+1. `pick_contract(expiry_choice="current")` auto-rolls to the next-month expiry when front-month has <5 trading days of runway at entry (`option_backtest.py:150-151`, by-design behavior, not itself a bug). When that rollover fires, "current" and "next" resolve to the **literal same contract** — same expiry, same strike, identical P&L. Of 236 same-strike-matched pairs, **116 (49%) were these collisions**, not genuine current-vs-next comparisons.
+2. The original head-to-head comparison used `>=` instead of `>`. Since collision pairs are exact ties, `>=` silently counted every one of those 116 ties as a "current win" — reproduced exactly: re-running with `>=` and collisions included gives 171/236 = **72.5%**, matching the reported figure precisely.
+
+**Corrected methodology** (strict `>`, rollover collisions excluded, n=120 genuine distinct-expiry pairs):
+
+| Metric | ITM Current | ITM Next |
+|---|---|---|
+| Head-to-head win | 45.8% (55/120) | **54.2% (65/120)** |
+| Win rate (own trades) | 50.8% | **58.3%** |
+| Avg win / avg loss | 58.4% / −59.9% | 55.3% / −56.4% |
+| Expectancy (≈ expected return per ₹10k premium) | 0.21% (₹21) | **8.76% (₹876)** |
+| Expected max drawdown (mean/median) | −44.0% / −38.5% | **−32.7% / −25.6%** |
+| Median holding days | 7 | 11 |
+
+Next wins on every metric — head-to-head, win rate, expectancy, and drawdown — not just the aggregate median/mean the original (correct part of the) writeup already noted. **Retracting the "reopens the case for current-month" conclusion from update-16 section 3.** This directly answers the critic's own Q2 pushback (their response-16: "head-to-head win rate is the wrong metric without an expectancy table") — with the bug fixed, the expectancy table doesn't just refine the picture, it reverses it in the same direction their skepticism pointed.
+
+Annualized CAGR was also computed (584.5% for next, 7.9% for current) but is flagged as illustrative only — mechanically annualizing an expectancy computed over a 7-11 day median hold isn't a real compounding number and shouldn't be quoted to the critic as if it were.
+
+## MAE (Maximum Adverse Excursion) curve, ITM+current baseline vs fast-exit (2026-09-06)
+
+Critic's ask (response-16): does the fast-exit rule reduce max drawdown-before-exit, not just improve final P&L — "psychologically more attractive," their words. Measured directly: for every matched trade (`stall_pool.csv`/`fixed3_pool.csv`, `changed==True` only — where the fast-exit rule actually fired earlier than the natural exit), walked the ITM+current option's daily closing price from entry to (a) the natural/full-hold exit date and (b) the earlier fast-exit trigger date, and recorded the worst drawdown from entry price reached along each path.
+
+| Percentile | Baseline MAE (10/25/50/75/90) | Fast-exit MAE (10/25/50/75/90) |
+|---|---|---|
+| Reactive 3-day-stall (n=122) | −66.9 / −50.4 / −23.4 / −4.7 / 0.0 | **−46.4 / −25.9 / −10.4 / 0.0 / 0.0** |
+| Fixed-3-after-arm (n=146) | −66.1 / −47.7 / −19.6 / −0.1 / 0.0 | **−46.1 / −23.1 / −7.5 / 0.0 / 0.0** |
+
+Fast-exit roughly halves median MAE in both mechanisms and cuts mean MAE by ~40%, consistent across both trigger mechanisms — not an artifact of one. Confirms the critic's framing directly: cutting early doesn't just help the final number, it genuinely spares the position from the worst of the drawdown path most of the time.
+
+## Trend-persistence test on the Technology exception — critic's hypothesis tested and REJECTED (2026-09-06)
+
+Critic's response-16 proposed that the Technology-sector exception found in the sector-neutrality check (cut loses in Technology, both mechanisms) isn't really about sector — it's about trend persistence (`DaysAboveEMA21 / Last30Days`), which happens to cluster in Tech names in this sample. Proposed this as a better, more general exclusion rule than a sector-specific one.
+
+Tested directly on the same matched-pair pools used for the original sector check. **Result: rejected, not confirmed.** Persistence buckets alone show cut helping in every tercile (low/mid/high), both mechanisms — no threshold separates cut-wins from cut-loses. The decisive crosstab:
+
+| | Reactive | Fixed-3 |
+|---|---|---|
+| Non-Tech, LOW persistence | n=50, 42.0% beat-rate | n=62, 35.5% beat-rate |
+| **Non-Tech, HIGH persistence** | n=51, 52.9% beat-rate, baseline −3.15%→cut +8.50% | n=59, 57.6% beat-rate, baseline −0.58%→cut +16.86% |
+| Tech, LOW persistence | n=7, 42.9% beat-rate, both negative | n=9, 44.4% beat-rate, both negative |
+| Tech, HIGH persistence | n=3, 33.3% beat-rate | n=5, 20.0% beat-rate |
+
+The critic's exact prediction — high-persistence (trending) names get hurt by cutting — is contradicted by the largest, most trustworthy subgroup here: non-Tech high-persistence trades (n=51/59) show cut helping strongly (baseline flat-to-negative, cut solidly positive), the opposite of the predicted direction. Tech trades lose to cut regardless of their own persistence score (both Tech sub-splits are thin, n=3-9, but point the same direction as the original all-Tech result). **Sector-based Tech exclusion remains the better-supported rule; persistence is not a valid substitute for it.**
