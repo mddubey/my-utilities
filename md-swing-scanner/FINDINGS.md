@@ -1411,6 +1411,17 @@ Fixed-3 slightly beats even the existing reactive 3-day-stall's own return/day (
 
 Much closer to a coin flip than options (max ~2.5pp gap either direction at intermediate capital, vs options' consistent 4-15pp loss) — but at the uncapped level, where capital constraints stop mattering entirely, baseline is still slightly ahead, consistent with the already-disclosed fact that fixed-3's raw median (+3.94%) sits slightly below baseline's (+4.07%). **No capital level or leg shows a real benefit for this rule** — a clean, complete "do not adopt," not just for options.
 
+## Same capital-constrained test run on the ORIGINAL, already-live reactive 3-day-stall — mixed, and worth flagging since it questions something already in production (2026-09-06)
+
+Direct follow-up question: if the fixed-N-day rule's per-trade improvement didn't survive a real capital-constrained test, does the rule *actually currently live* for options survive it? This had never been checked — the original stall was only ever validated on per-trade aggregate stats (win/median/ret-per-day), never run through a real sequential portfolio simulation. Reused the existing `stall_pool.csv` (baseline vs reactive-stall stock exits, 679 trades, 181 changed), re-simulated both ATM+current and ITM+next option prices, ran through `portfolio.py`'s simulator at the same capital levels — using only ₹7.5L-10L as trustworthy (lower levels showed the same scheduling-fragility noise as before, with meaningfully different trade counts taken between the two rules):
+
+| Variant | ₹7.5L Baseline / Stall | ₹10L Baseline / Stall |
+|---|---|---|
+| ATM+current | 24.2% / 25.6% | 22.5% / 23.2% |
+| ITM+next | 68.4% / 65.4% | 58.8% / 55.2% |
+
+**Mixed result, not a clean pass or fail**: ATM+current's stall rule genuinely wins, even at the clean uncapped level — this one holds up under proper scrutiny. **ITM+next does not** — baseline wins by a real ~3-3.6pp margin at the reliable capital levels, the same pattern that just killed the fixed-N-day rule. **This means the rule already live in production for ITM+next may not survive the same capital-constrained test that's supposed to justify it** — a real, actionable finding since it questions something already adopted, not just a candidate. Not yet resolved into a code change — flagging for outside review given the significance, same as everything else pending before touching production.
+
 ## Two small UX ships, per critic response to Round 15 (2026-09-06)
 
 **Calibration tiers instead of a raw percentage.** Critic's point: a person makes better decisions off a small number of named buckets than off two numbers that only differ by a point or two ("63.2% vs 64.7%"). Added `FIRE_TIERS`/`fire_tier()` to `live_checkpoint.py` — `[HIGH]` ≥70%, `[WATCH]` ≥50%, `[WEAK]` ≥25%, `[IGNORE]` <25%, directly off the Distance Calibration Curve. The raw number is still shown alongside the tier, not hidden, per the "critic's ask, not blind compliance" standard — e.g. `[WEAK] ~33%`.
