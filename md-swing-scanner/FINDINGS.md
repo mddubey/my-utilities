@@ -1431,6 +1431,40 @@ Direct follow-up question: if the fixed-N-day rule's per-trade improvement didn'
 
 **Stall only beats baseline on 50 of 117 trades (under half) — per-trade median difference exactly 0.0.** Essentially a coin flip, with a real, substantial cost: median return roughly halves (+25.18%→+11.73%) for a modest win-rate bump. This reaches the same conclusion as the portfolio test (ITM+next's stall rule doesn't clearly help) but via a method with zero selection/scheduling bias — a same-trade, matched comparison, not a population-selection one. **This matched-pair result should be treated as the primary evidence for ITM+next going forward, not the portfolio CAGR numbers** — it answers the actual question (does cutting early help on the trades it affects) directly, without the scheduler's known fragility in the mix.
 
+## What "final outcome" hides: the option's path during the hold, not just entry-vs-exit (2026-09-06)
+
+Direct challenge: the matched-pair comparison above only looks at entry-vs-exit P&L for each rule — it says nothing about what the option's value actually does *between* the stall-trigger point and the eventual natural exit if you don't cut. That's the real, felt cost of "sitting in a stalled option" (theta bleed + adverse moves along the way), independent of whether freed capital gets redeployed anywhere.
+
+Measured directly: for each matched ITM+next trade, the option's price at the stall-trigger point vs. the minimum price it reaches at any point between there and the eventual natural exit (same contract, real intraday-cache-independent option data, day-by-day via `option_row()`):
+
+| ITM+next (n=114) | |
+|---|---|
+| Median further drawdown from the stall-trigger price | **−16.4%** |
+| Trades with a real (>10%) further dip before any recovery | 61 of 114 (53.5%) |
+| Trades with a severe (>30%) further dip | 38 of 114 (33.3%) |
+| Trades that never dip below the stall-trigger price at all | 38 of 114 (33.3%) |
+
+**This directly confirms the "stalled option = real pain" worry the stall rule was designed to avoid** — holding through means sitting through a real, often severe, further loss in option value a majority of the time, even though the position frequently (not always) recovers to a good final number. The final-P&L comparison completely hides this. **Reframes the tradeoff**: it's not "the stall rule doesn't help, hold through it" — it's a genuine risk/reward tradeoff where cutting early avoids real pain most of the time, at the cost of giving up upside in the minority of cases that do recover. Neither side is free.
+
+**Follow-up hypothesis, tested directly: if ITM+current suffers WORSE interim pain than ITM+next (faster theta, less runway to recover), does a fast-exit discipline actually pay off there — unlike ITM+next?** Ran the identical matched-pair and drawdown-path methodology on ITM+current (same 181 changed trades, contracts resolved to current-month instead):
+
+| | ITM+current baseline | ITM+current stall | ITM+next baseline | ITM+next stall |
+|---|---|---|---|---|
+| Win rate | 55.9% | **64.0%** | 59.8% | 65.0% |
+| Median | +5.66% | **+10.47%** | +25.18% | +11.73% |
+| Mean | +16.46% | **+19.41%** | +29.53% | +22.09% |
+| Median hold | 18 days | **10 days** | 23 days | 13 days |
+
+| Drawdown-if-you-don't-cut | ITM+current (n=94) | ITM+next (n=114) |
+|---|---|---|
+| Median further drawdown | **−19.2%** (worse) | −16.4% |
+| % with real (>10%) further pain | **62.8%** (more often) | 53.5% |
+| % with severe (>30%) further pain | **40.4%** (more often) | 33.3% |
+
+**Confirmed — and it reframes the whole finding.** ITM+current punishes holding through a stall harder (worse, more frequent drawdowns, consistent with faster theta decay and less time for the underlying to recover before expiry pressure), and precisely because of that, cutting early on ITM+current genuinely improves win rate, median, AND mean — the opposite of ITM+next, where the position usually has enough runway that holding through wins on net despite the real interim pain. Concentration checked before trusting this: 66.3% top-10 (elevated but not disqualifying — consistent with current-month options generally being more fat-tailed than next-month, not something specific to the stall rule).
+
+**Practical implication: the fast-exit discipline's real home may be ITM+current, not ITM+next where it's currently applied.** ITM+current alone (natural exit) was previously seen as a weak, unreliable variant — but paired with an early-exit rule, it looks like a real, capital-efficient alternative (shorter 10-day median hold, better aggregate stats across the board). Not yet adopted — needs the same outside review as everything else before touching production, and this specific combination (ITM+current + fast exit) hasn't been through the capital-constrained portfolio test the other variants got. Real, promising, and a genuinely new angle rather than just a rejection.
+
 ## Two small UX ships, per critic response to Round 15 (2026-09-06)
 
 **Calibration tiers instead of a raw percentage.** Critic's point: a person makes better decisions off a small number of named buckets than off two numbers that only differ by a point or two ("63.2% vs 64.7%"). Added `FIRE_TIERS`/`fire_tier()` to `live_checkpoint.py` — `[HIGH]` ≥70%, `[WATCH]` ≥50%, `[WEAK]` ≥25%, `[IGNORE]` <25%, directly off the Distance Calibration Curve. The raw number is still shown alongside the tier, not hidden, per the "critic's ask, not blind compliance" standard — e.g. `[WEAK] ~33%`.
