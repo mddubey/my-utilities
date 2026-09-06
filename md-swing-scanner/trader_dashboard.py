@@ -74,10 +74,10 @@ def run_evening(tickers, fo_tickers):
         stop = _initial_stop(pattern, structural_low, row) if structural_low is not None or pattern == "breakout_cont" else None
         fo_tag = "[F&O]" if r.is_fo else "[NO OPTIONS]"
         held_tag = "  [ALREADY HOLDING]" if r.ticker in held else ""
-        to_trigger_pct = (r.trigger_price / r.close - 1) * 100
+        to_trigger_pct = (r.trigger_low / r.close - 1) * 100
         stop_str = f"{stop:9.2f}" if stop is not None else "     n/a"
         print(f"  {r.ticker:12s} {fo_tag:13s} close={r.close:9.2f}  "
-              f"TRIGGER={r.trigger_price:9.2f} ({to_trigger_pct:+.2f}% away)  STOP={stop_str}  "
+              f"TRIGGER=[{r.trigger_low:.2f},{r.trigger_high:.2f}] ({to_trigger_pct:+.2f}% away)  STOP={stop_str}  "
               f"score={r.score:.3f} (quality={r.quality_score:.3f}){held_tag}")
 
 

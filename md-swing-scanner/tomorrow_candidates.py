@@ -1,11 +1,16 @@
-"""Tomorrow Candidates — the +1% intraday trigger watchlist (2026-09-04).
+"""Tomorrow Candidates — the intraday trigger watchlist (2026-09-04, trigger band
+updated 2026-09-06).
 
 Ranks the "primed" universe (same VCP-base-pivot / base_filters_pass logic as
 shortlist_primed() in daily_scan.py) by a 5-feature score, and outputs a trigger
-price for each: `high10_prior * 1.01` — the level validated this session (full
-trade re-simulation: 69.4% win / +3.97% median / 11.6% concentration vs. the
-close-based baseline's 65.0%/+2.89%, see FINDINGS.md's "Same-day intraday
-confirmation trigger" section for the full validation).
+band for each: `high10_prior * [1+TRIGGER_CLEARANCE_LOW, 1+TRIGGER_CLEARANCE_HIGH]`
+(imported from live_checkpoint.py so the two tools never quietly drift onto two
+different trigger definitions) -- the 0.3-0.6% band re-optimized 2026-09-05 from
+the original flat 1% used here through 2026-09-04, itself validated via full trade
+re-simulation: 69.4% win / +3.97% median / 11.6% concentration vs. the close-based
+baseline's 65.0%/+2.89% (see FINDINGS.md's "Same-day intraday confirmation trigger"
+and "Entry-clearance re-optimization" sections for the full validation of both the
+original level and the later band).
 
 Score = average of 5 equally-weighted percentile ranks:
   - range_compression (10d range / ATR14, lower = tighter = better)
@@ -17,11 +22,14 @@ Score = average of 5 equally-weighted percentile ranks:
   - dist_to_resistance (Close / high10_prior, higher = closer to actually
     triggering today = better) -- added 2026-09-04 after NAUKRI/NEULANDLAB both
     ranked top-5 on quality while sitting 4.3-4.5% below resistance, unreachable
-    that day. This is a FEASIBILITY fix, not a predictive-power fix.
+    that day. This is a FEASIBILITY fix, not a predictive-power fix. Deliberately
+    still measured against the plain resistance level (high10_prior), not the
+    trigger band itself -- this is about "is the base level even reachable", the
+    band is a separate, later concern about exactly where within reach to fill.
 
 Known open item, not yet applied (critic feedback, response-9.pdf, logged in
 FINDINGS.md): a volatility-scaled trigger (`resistance + max(0.6%, 0.35*ATR%)`)
-instead of the flat 1% used here -- untested, deliberately deferred.
+instead of the flat band used here -- untested, deliberately deferred.
 """
 import sys
 
@@ -31,6 +39,7 @@ from backtest import load
 from vcp import stage2_trend_template
 from signals import base_filters_pass
 from daily_scan import base_pivot
+from live_checkpoint import TRIGGER_CLEARANCE_LOW, TRIGGER_CLEARANCE_HIGH
 
 TOP_N = 5
 
@@ -66,7 +75,8 @@ def build_candidates(tickers, fo_tickers):
             continue
         dist_to_resistance = row.Close / row.high10_prior
         recs.append(dict(ticker=t, close=row.Close, high10_prior=row.high10_prior,
-                          trigger_price=row.high10_prior * 1.01,
+                          trigger_low=row.high10_prior * (1 + TRIGGER_CLEARANCE_LOW),
+                          trigger_high=row.high10_prior * (1 + TRIGGER_CLEARANCE_HIGH),
                           on_vcp_path=on_vcp_path, range_compression=range_compression,
                           ema8_dist_pct=ema8_dist_pct, atr_trend_15d=atr_trend_15d,
                           narrowing_range=narrowing_range, dist_to_resistance=dist_to_resistance,
@@ -97,7 +107,7 @@ if __name__ == "__main__":
     print(f"TOP {TOP_N} Tomorrow Candidates (quality + feasibility):")
     for _, r in top.iterrows():
         fo_tag = "[F&O]" if r.is_fo else "[NO OPTIONS]"
-        to_trigger_pct = (r.trigger_price / r.close - 1) * 100
+        to_trigger_pct = (r.trigger_low / r.close - 1) * 100
         print(f"  {r.ticker:12s} {fo_tag:13s} close={r.close:9.2f}  "
-              f"TRIGGER={r.trigger_price:9.2f} ({to_trigger_pct:+.2f}% away)  "
+              f"TRIGGER=[{r.trigger_low:.2f},{r.trigger_high:.2f}] ({to_trigger_pct:+.2f}% away)  "
               f"score={r.score:.3f} (quality={r.quality_score:.3f})")
