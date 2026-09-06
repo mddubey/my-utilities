@@ -160,6 +160,17 @@ def pick_contract(ticker, entry_date, spot_price, moneyness="atm", expiry_choice
     if strikes.empty:
         return None
     target = spot_price if moneyness == "atm" else spot_price * (1 - ITM_PCT)
+    if moneyness == "itm":
+        # Hard constraint: an "itm" pick must actually be in the money (strike < spot
+        # for a call). Without this, a liquid strike near the target can be missing
+        # for a given expiry (esp. next-month, thinner liquidity) and the nearest-
+        # liquid-strike search silently snaps to a strike ABOVE spot -- a real,
+        # differently-behaved OTM bet mislabeled as "itm" (found 2026-09-06: 6.6%
+        # of itm+next picks were flipped OTM this way, two of them among that
+        # variant's own top-10 winning trades).
+        strikes = strikes[strikes.StrkPric < spot_price]
+        if strikes.empty:
+            return None
     idx = (strikes.StrkPric - target).abs().idxmin()
     row = strikes.loc[idx]
     return expiry, row.StrkPric, row.NewBrdLotQty
