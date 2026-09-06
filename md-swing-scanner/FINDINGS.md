@@ -1353,6 +1353,36 @@ Built exactly this (449 of 679 trades arm, 66.1%): split into "fires at some poi
 
 **Materially different result from Energy Stall — the divergence is already large and visible at Day+3** (+7.85% vs +4.40%, a real ~3.5pp gap on reasonable sample sizes, 44 vs 189), not something that only emerges much later. (One caveat: "never stalls" trades tend to hit their resistance target and exit quickly, so that bucket's sample collapses fast — 44→16→4 — making the Day+8 comparison specifically too thin to trust; the Day+3 comparison, where both groups still have real sample sizes, is the one to rely on.) **Conclusion: the original, simpler, already-live 3-day-stall rule does not show the same immortal-time-bias problem Energy Stall did** — the weakness in trades that eventually stall is visible close to real-time, near the point the rule would actually act, not just in hindsight long after. Reassuring, not just "no gap left by not shipping Energy Stall" but genuine evidence the rule already doing this job for options is on more solid footing than the newer, more sophisticated attempt to replace it.
 
+## Fixed-N-days-after-arming exit — a genuinely strong new candidate, found by directly testing a "why not just cut it there" hunch (2026-09-06)
+
+Prompted by a direct observation on the Day+3-since-arming numbers above ("both groups already look decent at Day+3 — why not just exit everyone there?"). Tested rather than assumed: an **unconditional** rule — once armed (0.5-0.6R), exit exactly N trading days later no matter what (unlike the reactive "wait for 3 consecutive no-fresh-high days" rule, this needs no streak-tracking at all).
+
+**Stock-side sweep** (679 breakout_cont trades): N=3 is the best of three tested, and decays sensibly as N grows (a real shape, not a lucky single point):
+
+| Rule | Win | Median | Return/day |
+|---|---|---|---|
+| Baseline (no early exit at all) | 70.0% | +4.07% | +0.416%/day |
+| Fixed exit 3 days after arming | 75.7% | +3.94% | **+0.582%/day** |
+| Fixed exit 5 days after arming | 74.4% | +4.16% | +0.495%/day |
+| Fixed exit 8 days after arming | 72.9% | +4.24% | +0.469%/day |
+
+Fixed-3 slightly beats even the existing reactive 3-day-stall's own return/day (+0.582%/day vs the existing rule's +0.544-0.548%/day) — genuinely competitive, and simpler to implement. Real, honest tradeoff disclosed: for the 213 trades where this rule actually changes the exit, the natural (uncut) median for those same trades is +6.61%, vs +4.64% under the forced exit — real upside given up in exchange for the win-rate/turnover-speed gain. Stock-side concentration on the changed subset: healthy, 13.8%.
+
+**Options-side test, all 4 variants — this is where it gets genuinely strong.** Re-simulated real option prices for both the baseline (natural) and fixed-3-day exit dates, using the existing `simulate_option_trade()`:
+
+| Variant | Baseline win/median/ret-day (days) | Fixed-3-after-arm win/median/ret-day (days) |
+|---|---|---|
+| ATM+current | 46.3% / −17.17% / −1.154%/day (13d) | 49.0% / −5.38% / −0.340%/day (9d) |
+| ITM+current | 54.4% / +10.52% / +0.633%/day (13d) | 56.7% / +14.89% / +1.250%/day (9d) |
+| ATM+next | 57.3% / +14.84% / +1.131%/day (15d) | 60.3% / +14.71% / +1.245%/day (11d) |
+| ITM+next | 61.6% / +20.86% / +1.412%/day (16d) | 64.6% / +20.31% / +1.472%/day (13d) |
+
+**Improves win rate and return/day in every single variant**, with the largest gain in ATM+current (the most theta-sensitive, most convex contract — exactly where a faster-turnover rule should help most) and, notably, a real (if smaller) improvement even for **ATM+next/ITM+next** — variants where the *existing* reactive 3-day-stall rule showed no benefit ("a wash for next-month variants," per the earlier options re-check). This fixed rule reaches further than what's currently adopted.
+
+**Concentration checked before trusting the dramatic ATM+current number — real caveat, but not a new one.** ATM+current's concentration under the new rule is 230.8% (extremely skewed — a handful of huge winners rescue an otherwise-negative population), but checking the SAME variant's baseline concentration shows 169.7% — this skew is inherent to ATM+current itself (already this project's roughest, most fat-tailed variant), not something the new rule introduced; the rule still improves the underlying number a lot, but neither the before nor after number for ATM+current should be over-trusted given the inherent skew. **ITM+next — the standing, most-trusted recipe — shows a healthy 32.2% concentration**, and its improvement (61.6%→64.6% win, +1.412→+1.472%/day) is real and well-distributed, not concentration-driven.
+
+**Status: a genuine, promising new candidate — not yet adopted.** Same standing rule as everything else this session: validated backtest finding, pending outside review before being wired into production. Notably stronger evidence base than Energy Stall got (tested directly on options P&L across all 4 variants, not just stock), and arrived at by directly testing a hunch rather than assuming it — the exact "greedy but test it" instinct this whole audit thread has been encouraging.
+
 ## Two small UX ships, per critic response to Round 15 (2026-09-06)
 
 **Calibration tiers instead of a raw percentage.** Critic's point: a person makes better decisions off a small number of named buckets than off two numbers that only differ by a point or two ("63.2% vs 64.7%"). Added `FIRE_TIERS`/`fire_tier()` to `live_checkpoint.py` — `[HIGH]` ≥70%, `[WATCH]` ≥50%, `[WEAK]` ≥25%, `[IGNORE]` <25%, directly off the Distance Calibration Curve. The raw number is still shown alongside the tier, not hidden, per the "critic's ask, not blind compliance" standard — e.g. `[WEAK] ~33%`.
