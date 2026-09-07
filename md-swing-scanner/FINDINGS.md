@@ -1652,6 +1652,46 @@ ATM's next-day-open exit is the one genuinely trustworthy cell here (sub-100% co
 
 Enormous room exists *within day+1 itself* — but it's gone by that same day's close (ATM median goes from +5.03% at open to −2.59% at close). The open isn't the ceiling, it's a safe floor; the real opportunity is intraday on day+1, not a multi-day hold.
 
+## Equity-side exit shape: winner convexity refuted, a real partial-exit improvement found, and a deterministic Risk-of-Ruin table (2026-09-07)
+
+Triggered by a critic question about the win:loss R-shape (production system is ~0.92:1, not the "1:3" ideal) and their response — three pieces, all on the equity swing side (both patterns combined, full v28 production population).
+
+**Winner R-histogram — refutes the critic's "hidden convexity" hypothesis.** They guessed 40% of winners below 1R, 15% above 2R, 5% "monsters." Actual (n=930 winners): 70.5% below 1R, only 4.8% above 2R, only 1.1% monsters (3R+). Top-10 winners are just 4.4% of total winner R — no meaningful convexity exists to protect. Root cause found directly: 93.4% of all wins exit via the resistance target, and `resistance_target()` has zero minimum-distance floor — it fires the instant Close reaches the nearest daily pivot above price, however close. The system is mechanically incapable of producing convexity; it caps almost every winner at the first pivot touch. Median payoff ratio (0.670R/1.018R = 0.659) is worse than the mean-based one (0.921) — the typical trade's shape is worse than the average implies, not rescued by a hidden tail.
+
+**Minimum-R gate on the resistance exit — 0.5R is a real, clean improvement; 1R+ is the same "chase the tail" trap as everything else this session.** Required price to clear a minimum R before the resistance exit is allowed to fire (skip the touch otherwise, keep trailing):
+
+| Gate | Win rate | Median | Mean | Winners→losers |
+|---|---|---|---|---|
+| Baseline (0R) | 65.5%* | +2.93%* | +1.86%* | — |
+| **0.5R** | 59.5% | **+3.85%** | +2.03% | 9.1% (85/930), gave up +2.40% median for −3.82% |
+| 1.0R | 53.4% | +0.71% | +2.50% | 18.5% |
+| 2.0R | 51.3% | +0.17% | +3.08% | 21.8% |
+| 3.0R | 51.2% | +0.15% | +3.64% | 21.9% (plateaus — most trades reaching 1R don't reach 3R) |
+
+*(re-simulated for this test, minor variance from the checked-in 65.0%/+2.89% baseline — re-simulation noise, not a discrepancy.)* 0.5R genuinely improves median AND mean together at a bounded, real cost. 1R+ collapses median toward zero while mean keeps climbing — propped up by a shrinking number of bigger winners, the same shape already rejected this session for Energy Stall, trailing stops, and the fixed-3-day exit.
+
+**"Close back below entry pivot = failed breakout" early-exit — tested, REJECTED.** Fires on 35-49% of ALL trades (not rare), and even requiring 2 consecutive closes below pivot (not just 1) still catches 30-48% of what would have been real winners, converting them to guaranteed small losses (mechanically: falling back to the pivot means price is at/near entry, so this rule can never itself produce a win). Root cause: retesting the exact breakout level before continuing is completely normal behavior in genuine winners, not a failure signal — this rule can't distinguish the two. **However**, isolated specifically to trades that were ALREADY going to lose under baseline: the rule roughly halves the loss 87-96% of the time (Breakout Cont: median −7.82%→−3.85%, worst −21.54%→−13.27%; VCP: −7.17%→−3.75%, worst −13.66%→−7.75%) — a real, useful loss-containment property on its own terms, just not a net-positive rule once winners-cut-short are included. Net aggregate pnl_pct sum across all trades: worse both patterns (BC: 1604→1024; VCP: 1051→987).
+
+**Dynamic partial exit (critic's Part-8 ask) — the strongest result of this thread.** Sell 50% at first resistance touch (their literal spec, unconditional), trail the remaining 50% with the same stop:
+
+| | Win rate | Median | Mean | Concentration |
+|---|---|---|---|---|
+| Baseline (100% at resistance) | 65.0% | +2.89% | +1.86% | ~8-10% |
+| Partial exit, critic's literal spec (50/50, any touch) | 60.5% | +1.97% | +3.27% | 6.8% |
+| **Partial exit + 0.5R gate on the trigger (own extension, beyond the "one backtest" instruction)** | 58.7% | **+2.20%** | **+3.36%** | **6.5%** |
+
+Nearly doubles the mean vs baseline, concentration stays excellent (broadly distributed, not lumpy) — real convexity created where none existed before, at a modest bounded cost (7.6-10.3% of baseline winners become small losses). The 0.5R-gated version beats the critic's own literal spec on every metric simultaneously — best combined result found this session.
+
+**Deterministic Risk-of-Ruin table (critic's Part-7 ask) — real methodology snags found and fixed before trusting it.** A naive `entry_date`-sorted sequential streak (matching the critic's own L-L-W-W-W illustration) is invalid here: **95.3% of all trades share their entry date with at least one other trade** (up to 23/day) — this is a multi-ticker scanner, not one-position-at-a-time, so chronological sort order doesn't represent a real sequential experience. A first "worst streak" number was contaminated by this; a second attempt had a genuine bug (`pandas.idxmax()` on a grouped streak-length column returns the group's FIRST row, not its last, silently producing a window straddling two different streaks) — caught before reporting, fixed, and the final version verified with an explicit assertion (every value in the reported window is genuinely ≤0).
+
+**Resolved with an explicit max-5-concurrent-positions cap** (deterministic, capital-agnostic — no rupee/position-sizing model needed, avoids reopening the already-distrusted portfolio-simulation question): admit a new signal only if fewer than 5 positions are open, skip otherwise.
+- 244 of 1430 signals admitted (1186 skipped) — this scanner generates ~6x more candidates than a 5-position book can act on.
+- Final cumulative result: +64.56R (~₹64,560 at ₹1,000/R) over ~4 years.
+- Max drawdown: −6.96R (~₹6,963), near the end of the dataset (Oct 2025), not yet recovered but only 15 trades of runway remained after it — inconclusive, not a red flag.
+- **Worst genuine consecutive losing streak: 6 trades** (2024-12-13 to 2025-01-02), R-multiples [−1.07, −1.13, −1.36, −1.15, −0.43, −1.06], totaling −6.20R (~₹6,198) — nearly the entire max drawdown by itself. Real, bounded answer to the original "capital wipeout from an unlucky start" concern: worst historical case was ~₹6,200, not a wipeout.
+
+Nothing here adopted yet — same standing rule as everything else, pending outside review. Full submission compiled and sent as update-19.
+
 **Not pursued tonight, deliberately deferred to forward/live experience rather than more backtesting**: a "check price after the first 30 minutes, then set a stop" refinement. Checked feasibility first — real intraday data only exists for a trailing ~90-day window (`intraday_cache.py`, 2026-06-10 to 2026-09-04), and **zero of the 516 gap-up trades in the historical population fall inside that window** (same "backtest population predates the intraday cache" gap already documented for the earlier intraday +1% test). A real test would need a fresh universe rescan inside the live window, PLUS a Black-Scholes option-pricing layer (no intraday option data exists at all, only intraday stock data) — two real builds, not attempted here. Explicit user call: learn this specific piece live rather than backtest it.
 
 **Standing caveat, honestly stated**: every options number above uses day0's option `ClsPric` as entry price (options data is daily bhavcopy only). Given the established day0/day+1 continuation pattern, the option's Close is almost certainly higher than its true price at the actual breach instant — meaning these backtested returns are likely a **conservative underestimate** of what a real trigger-moment entry would achieve, not an overstatement. A Black-Scholes IV-backout could tighten this if pursued later; not necessary for the qualitative conclusion below.
