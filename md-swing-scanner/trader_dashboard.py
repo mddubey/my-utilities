@@ -43,7 +43,7 @@ import pandas as pd
 from backtest import load, current_stop_level
 from vcp import stage2_trend_template, base_pivot
 from signals import base_filters_pass
-from daily_scan import _initial_stop
+from daily_scan import _initial_stop, _fo_tickers
 from tomorrow_candidates import build_candidates, TOP_N as EVENING_TOP_N
 from live_checkpoint import classify_candidates, VELOCITY_LOOKBACK_MIN, fire_tier
 from monitor_positions import monitor as monitor_positions
@@ -111,7 +111,8 @@ def _print_tier(label, df, note, price_col, price_label, held):
         held_tag = "  [ALREADY HOLDING]" if r.ticker in held else ""
         # informational only, not a filter -- see live_checkpoint.py's extension_days comment
         ext = f"  ext={r.extension_days}d" if "extension_days" in r and r.extension_days >= 2 else ""
-        print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
+        fo_tag = "[F&O]" if r.ticker in _fo_tickers() else "[NO OPTIONS]"
+        print(f"  {r.ticker:12s} {fo_tag:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
               f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
 
 
