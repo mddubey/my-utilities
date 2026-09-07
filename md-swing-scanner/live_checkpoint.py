@@ -201,6 +201,19 @@ def fire_tier(rate):
     return FIRE_TIERS[-1][1]
 
 
+# UX (2026-09-07): raw vol_vs_normal_pct/vol_vs_breakout_pct numbers are hard to
+# scan at a glance mid-market -- same categorical-tag treatment as FIRE_TIERS,
+# thresholds picked against today's real observed range (16-455%).
+VOL_TIERS = [(250, "STRONG"), (120, "GOOD"), (60, "NORMAL"), (0, "WEAK")]
+
+
+def vol_tier(pct):
+    for lower, label in VOL_TIERS:
+        if pct >= lower:
+            return label
+    return VOL_TIERS[-1][1]
+
+
 def _minus_minutes(cutoff_ist, minutes):
     t = datetime.strptime(cutoff_ist, "%H:%M")
     return (t - timedelta(minutes=minutes)).strftime("%H:%M")

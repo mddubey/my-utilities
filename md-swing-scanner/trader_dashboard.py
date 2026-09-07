@@ -45,7 +45,7 @@ from vcp import stage2_trend_template, base_pivot
 from signals import base_filters_pass
 from daily_scan import _initial_stop, _fo_tickers
 from tomorrow_candidates import build_candidates, TOP_N as EVENING_TOP_N
-from live_checkpoint import classify_candidates, VELOCITY_LOOKBACK_MIN, fire_tier
+from live_checkpoint import classify_candidates, VELOCITY_LOOKBACK_MIN, fire_tier, vol_tier
 from monitor_positions import monitor as monitor_positions
 import breadth
 
@@ -121,9 +121,9 @@ def _print_tier(label, df, note, price_col, price_label, held):
         # NIACL case that prompted these. vol_vs_breakout only exists for extension_days>=1.
         vol = ""
         if "vol_vs_breakout_pct" in r and pd.notna(r.vol_vs_breakout_pct):
-            vol = f"  vol_vs_breakout={r.vol_vs_breakout_pct:.0f}%"
+            vol = f"  vol=[{vol_tier(r.vol_vs_breakout_pct)}]vs-breakout ({r.vol_vs_breakout_pct:.0f}%)"
         elif "vol_vs_normal_pct" in r and pd.notna(r.vol_vs_normal_pct):
-            vol = f"  vol_vs_normal={r.vol_vs_normal_pct:.0f}%"
+            vol = f"  vol=[{vol_tier(r.vol_vs_normal_pct)}] ({r.vol_vs_normal_pct:.0f}%)"
         fo_tag = "[F&O]" if r.ticker in _fo_tickers() else "[NO OPTIONS]"
         res = ""
         if "resistance" in r and pd.notna(r.resistance):
