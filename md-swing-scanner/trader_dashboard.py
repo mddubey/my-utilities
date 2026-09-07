@@ -112,8 +112,12 @@ def _print_tier(label, df, note, price_col, price_label, held):
         # informational only, not a filter -- see live_checkpoint.py's extension_days comment
         ext = f"  ext={r.extension_days}d" if "extension_days" in r and r.extension_days >= 2 else ""
         fo_tag = "[F&O]" if r.ticker in _fo_tickers() else "[NO OPTIONS]"
+        res = ""
+        if "resistance" in r and pd.notna(r.resistance):
+            res_dist = (r.resistance / r[price_col] - 1) * 100
+            res = f"  resistance={r.resistance:.2f} ({res_dist:+.2f}%)"
         print(f"  {r.ticker:12s} {fo_tag:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
+              f"{price_label}={r[price_col]:9.2f}{res}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
 
 
 def run_morning(tickers, cutoff):

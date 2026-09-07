@@ -84,7 +84,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from backtest import load
+from backtest import load, resistance_target
 from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT
 from sector_strength import sector_rs
 
@@ -245,9 +245,10 @@ def classify_candidates(tickers, cutoff_ist=None):
             pullback_pct = (bar["High"] - bar["Close"]) / bar["High"] * 100
             clearance_now_pct = (bar["Close"] / trigger_low - 1) * 100
             entry_vs_trigger_pct = (bar["Close"] / trigger_low - 1) * 100
+            resistance = resistance_target(bar["Close"], row)
             rec = dict(**common, day_high=bar["High"], current_price=bar["Close"],
                       pullback_pct=pullback_pct, clearance_now_pct=clearance_now_pct,
-                      entry_vs_trigger_pct=entry_vs_trigger_pct)
+                      entry_vs_trigger_pct=entry_vs_trigger_pct, resistance=resistance)
             if pullback_pct >= PULLBACK_MIN_PCT and clearance_now_pct <= NEAR_BAND_PCT:
                 pulled_back.append(rec)
             elif clearance_now_pct <= NEAR_BAND_PCT:
@@ -256,8 +257,9 @@ def classify_candidates(tickers, cutoff_ist=None):
                 missed.append(rec)
         else:
             dist_pct = (trigger_low / bar["Close"] - 1) * 100
+            resistance = resistance_target(bar["Close"], row)
             rec = dict(**common, close=bar["Close"], dist_to_trigger_pct=dist_pct, velocity_pct=None,
-                       fire_rate_pct=calibrated_fire_rate(dist_pct))
+                       fire_rate_pct=calibrated_fire_rate(dist_pct), resistance=resistance)
             bar_prior = live_prior.get(t)
             if bar_prior is not None and bar_prior["High"] < trigger_low:
                 dist_prior_pct = (trigger_low / bar_prior["Close"] - 1) * 100
