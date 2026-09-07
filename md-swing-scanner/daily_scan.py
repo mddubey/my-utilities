@@ -50,7 +50,20 @@ a handful can plausibly fire on any given day):
   can't fire today per Pass 1, so there's nothing live to check). yfinance intraday is
   itself delayed, not a real broker feed — treat --live the same as --ignore-regime,
   observation to inform same-day action, not a validated backtest-tested signal path
-  (the backtest never runs on partial-day bars)."""
+  (the backtest never runs on partial-day bars).
+
+--live-full (2026-09-07): same live intraday check, but skips shortlist_primed()
+  entirely and runs fetch_live_bars() against the WHOLE 500-ticker universe. Exists
+  because shortlist_primed() only depends on YESTERDAY's cached data — re-running it
+  mid-day returns the identical ~53 names every time, so it structurally cannot catch
+  a same-day surprise mover that wasn't already primed as of yesterday's close (real
+  case: SYRMA +12.2%, ZYDUSWELL +4.4% same-day movers, both absent from the primed
+  shortlist, both invisible to plain --live). Real cost measured post-close
+  (2026-09-07): 108s cold-start, then 17-24s on repeat calls — cheap enough to run
+  every couple of hours during market hours, unverified yet whether that holds up
+  during actual live trading hours (all measurements so far were taken after 16:00
+  close). Meant to be run periodically (e.g. every 2 hours 9:15-15:30) alongside the
+  cheap --live runs, not as a replacement for them."""
 import argparse
 from datetime import time as dtime
 
@@ -212,7 +225,7 @@ def _near_miss_annotate(ticker, row, prev_row):
     )
 
 
-def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAULT):
+def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAULT, live_full=False):
     """candidates: real, gate-respecting signals (empty if require_regime and the
     gate's shut). watchlist: candidates whose PATTERN fired but only the regime gate
     blocked them (2026-08-31) — always computed, regardless of require_regime, so a
@@ -230,7 +243,10 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
     Close-vs-High distinction, nothing to do with the market regime."""
     live_bars = {}
     live_shortlist = []
-    if live:
+    if live_full:
+        live_shortlist = list(tickers)
+        live_bars = fetch_live_bars(live_shortlist, cutoff_ist)
+    elif live:
         live_shortlist = shortlist_primed(tickers)
         live_bars = fetch_live_bars(live_shortlist, cutoff_ist)
 
@@ -278,13 +294,16 @@ if __name__ == "__main__":
                          help="skip the Nifty ADX/200-SMA gate — observation only, NOT validated trade signals")
     parser.add_argument("--live", action="store_true",
                          help="check a shortlist of primed tickers against today's intraday data instead of waiting for tomorrow's close")
+    parser.add_argument("--live-full", action="store_true",
+                         help="like --live but fetches intraday bars for the WHOLE 500-ticker universe, not just yesterday's primed shortlist -- catches same-day surprise movers shortlist_primed() can't see (slower: ~20-110s vs the shortlist's few seconds)")
     parser.add_argument("--cutoff", default=LIVE_CUTOFF_DEFAULT,
-                         help=f"IST cutoff time for --live's intraday snapshot (default {LIVE_CUTOFF_DEFAULT})")
+                         help=f"IST cutoff time for --live/--live-full's intraday snapshot (default {LIVE_CUTOFF_DEFAULT})")
     args = parser.parse_args()
 
     tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
     scan_date, candidates, watchlist, near_miss, live_shortlist = scan(
-        tickers, require_regime=not args.ignore_regime, live=args.live, cutoff_ist=args.cutoff,
+        tickers, require_regime=not args.ignore_regime, live=args.live or args.live_full,
+        cutoff_ist=args.cutoff, live_full=args.live_full,
     )
     print(f"scan date: {scan_date.date() if scan_date is not None else 'no data'}")
     if scan_date is not None:
