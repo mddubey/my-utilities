@@ -125,12 +125,13 @@ def _print_tier(label, df, note, price_col, price_label, held):
         elif "vol_vs_normal_pct" in r and pd.notna(r.vol_vs_normal_pct):
             vol = f"  vol=[{vol_tier(r.vol_vs_normal_pct)}] ({r.vol_vs_normal_pct:.0f}%)"
         ticker_label = f"{r.ticker}(F/O)" if r.ticker in _fo_tickers() else r.ticker
-        res = ""
-        if "resistance" in r and pd.notna(r.resistance):
-            res_dist = (r.resistance / r[price_col] - 1) * 100
-            res = f"  resistance={r.resistance:.2f} ({res_dist:+.2f}%)"
+        # the raw pivot itself (2026-09-07, user correction): the level that had to be
+        # broken to become eligible, BEFORE the 0.3-0.6% buffer -- always has a value,
+        # unlike the old pp/r1/r2 resistance_target() this replaced (which goes blank
+        # once price runs past all three classic pivot levels).
+        pivot = f"  pivot={r.high10_effective:.2f}" if "high10_effective" in r and pd.notna(r.high10_effective) else ""
         print(f"  {ticker_label:18s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}{clr}{res}{vol}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
+              f"{price_label}={r[price_col]:9.2f}{clr}{pivot}{vol}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
 
 
 def run_morning(tickers, cutoff):

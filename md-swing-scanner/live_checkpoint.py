@@ -84,7 +84,7 @@ from datetime import datetime, timedelta, time as dtime
 
 import pandas as pd
 
-from backtest import load, resistance_target
+from backtest import load
 from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT
 from sector_strength import sector_rs
 
@@ -349,11 +349,10 @@ def classify_candidates(tickers, cutoff_ist=None):
             # just staying inside it.
             clearance_vs_raw_pivot_pct = (bar["Close"] / high10_effective - 1) * 100
             entry_vs_trigger_pct = (bar["Close"] / trigger_low - 1) * 100
-            resistance = resistance_target(bar["Close"], row)
             rec = dict(**common, day_high=bar["High"], current_price=bar["Close"],
                       pullback_pct=pullback_pct, clearance_now_pct=clearance_now_pct,
                       clearance_vs_raw_pivot_pct=clearance_vs_raw_pivot_pct,
-                      entry_vs_trigger_pct=entry_vs_trigger_pct, resistance=resistance)
+                      entry_vs_trigger_pct=entry_vs_trigger_pct)
             band_ceiling_pct = TRIGGER_CLEARANCE_HIGH * 100  # 0.6%, the official band's own top edge
             # Downside deliberately uncapped (2026-09-07, explicit user instruction):
             # further below the raw pivot is only ever a BETTER price, never "missed" --
@@ -366,9 +365,8 @@ def classify_candidates(tickers, cutoff_ist=None):
                 missed.append(rec)
         else:
             dist_pct = (trigger_low / bar["Close"] - 1) * 100
-            resistance = resistance_target(bar["Close"], row)
             rec = dict(**common, close=bar["Close"], dist_to_trigger_pct=dist_pct, velocity_pct=None,
-                       fire_rate_pct=calibrated_fire_rate(dist_pct), resistance=resistance)
+                       fire_rate_pct=calibrated_fire_rate(dist_pct))
             bar_prior = live_prior.get(t)
             if bar_prior is not None and bar_prior["High"] < trigger_low:
                 dist_prior_pct = (trigger_low / bar_prior["Close"] - 1) * 100
