@@ -267,7 +267,10 @@ def classify_candidates(tickers, cutoff_ist=None):
                       clearance_vs_raw_pivot_pct=clearance_vs_raw_pivot_pct,
                       entry_vs_trigger_pct=entry_vs_trigger_pct, resistance=resistance)
             band_ceiling_pct = TRIGGER_CLEARANCE_HIGH * 100  # 0.6%, the official band's own top edge
-            if -PULLED_BACK_TOLERANCE_PCT <= clearance_vs_raw_pivot_pct <= PULLED_BACK_TOLERANCE_PCT:
+            # Downside deliberately uncapped (2026-09-07, explicit user instruction):
+            # further below the raw pivot is only ever a BETTER price, never "missed" --
+            # only chasing above the tolerance gets penalized. Only the upside is bounded.
+            if clearance_vs_raw_pivot_pct <= PULLED_BACK_TOLERANCE_PCT:
                 pulled_back.append(rec)
             elif PULLED_BACK_TOLERANCE_PCT < clearance_vs_raw_pivot_pct <= band_ceiling_pct:
                 kept_going_near.append(rec)
