@@ -154,12 +154,13 @@ def run_morning(tickers, cutoff):
         print(f"      Already holding: {', '.join(sorted(held))} -- flagged inline, not dropped.")
 
     _print_tier("TIER 1: PULLED BACK (best price, settled, no timing race)", pulled_back,
-                "sorted by how much it's pulled back -- more pullback = cheaper entry",
+                "sorted by closeness to the raw pivot, either side -- closest = best price",
                 "current_price", "price", held)
     _print_tier("TIER 2: KEPT GOING, STILL NEAR TRIGGER (settled, no timing race)", kept_going_near,
-                "sorted by clearance -- closest to trigger_low first", "current_price", "price", held)
+                "sorted by closeness to the raw pivot, either side", "current_price", "price", held)
     _print_tier(f"TIER 3: WATCHING, not yet fired (top 10 of {len(watching)})", watching.head(10),
-                "ranked by distance blended 80/20 with closing-speed vs 10 min ago",
+                "ranked by distance blended 80/20 with closing-speed vs 10 min ago, "
+                "volume breaks near-ties",
                 "close", "close", held)
     _print_tier("MISSED (fired, ran well past the band -- not actionable)", missed,
                 "if it settles back into tier 1/2 on a later run, it'll reappear there",

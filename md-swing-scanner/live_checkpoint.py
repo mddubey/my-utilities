@@ -378,6 +378,16 @@ def classify_candidates(tickers, cutoff_ist=None):
     def _df(recs, sort_col, ascending):
         return pd.DataFrame(recs).sort_values(sort_col, ascending=ascending) if recs else pd.DataFrame(recs)
 
+    def _by_abs_clearance_vs_pivot(recs):
+        # Fixed (2026-09-07): was sorting by the OLD pullback_pct/clearance_now_pct
+        # metrics, stale since the tier classification itself was redefined to use
+        # clearance_vs_raw_pivot_pct -- sort now matches what actually defines "better
+        # price" (closest to the raw pivot, either side, per the user's own definition).
+        df = pd.DataFrame(recs)
+        if df.empty:
+            return df
+        return df.reindex(df["clearance_vs_raw_pivot_pct"].abs().sort_values(ascending=True).index)
+
     watching_df = _df(watching, "dist_to_trigger_pct", True)
     if not watching_df.empty and watching_df["velocity_pct"].notna().sum() >= 3:
         watching_df["dist_rank"] = watching_df["dist_to_trigger_pct"].rank(pct=True, ascending=True)
@@ -386,10 +396,18 @@ def classify_candidates(tickers, cutoff_ist=None):
         # fall back to a neutral 0.5 vel-rank so they aren't penalized relative to unmeasured peers
         watching_df["vel_rank"] = watching_df["vel_rank"].fillna(0.5)
         watching_df["combo_rank"] = (1 - VELOCITY_WEIGHT) * watching_df["dist_rank"] + VELOCITY_WEIGHT * watching_df["vel_rank"]
-        watching_df = watching_df.sort_values("combo_rank", ascending=True)
+        # Volume as a TIEBREAKER only (2026-09-07, validated bucket check: within the
+        # closest 20% by distance, fire rate climbs 18.7%->41.9% by volume quartile) --
+        # NOT blended into combo_rank itself, since a global rank-blend was tested and
+        # found to hurt Recall@1/@2 even with this same, properly-constructed volume
+        # metric. Round combo_rank so genuinely near-tied candidates get reordered by
+        # volume, without disturbing the validated primary ordering otherwise.
+        watching_df["combo_rank_rounded"] = watching_df["combo_rank"].round(2)
+        watching_df = watching_df.sort_values(
+            ["combo_rank_rounded", "vol_vs_normal_pct"], ascending=[True, False])
 
-    return (_df(pulled_back, "pullback_pct", False),
-            _df(kept_going_near, "clearance_now_pct", True),
+    return (_by_abs_clearance_vs_pivot(pulled_back),
+            _by_abs_clearance_vs_pivot(kept_going_near),
             watching_df,
             _df(missed, "clearance_now_pct", False))
 
