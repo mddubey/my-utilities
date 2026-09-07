@@ -181,7 +181,39 @@ def classify_candidates(tickers, cutoff_ist=None):
         i = len(df) - 1
         if i < 15 or pd.isna(df.iloc[i].atr14) or df.iloc[i].atr14 == 0 or pd.isna(df.iloc[i].ema8):
             continue
-        feature_rows[t] = dict(row=df.iloc[i], features=_quality_features(t, df, i), date=df.iloc[i].Date)
+        # Real bug found live (2026-09-07): the cached row's own `high10_prior` column
+        # is `High.shift(1).rolling(10).max()` -- the 10-day high as of the day BEFORE
+        # that row, not as of that row itself. When the cache is one session behind
+        # "today" (the normal case intraday, before today's own bar exists yet), using
+        # that stored value as today's reference misses the last cached day's own high
+        # entirely -- if that day itself set a fresh high (e.g. a breakout day), the
+        # trigger band silently uses last week's level instead. Real case: RBLBANK's
+        # cached row showed high10_prior=410.70 (window ending the day before), but the
+        # correct 10-day high through the last cached day was 417.05 (that day's own
+        # high) -- the stored band [411.93,413.16] was ~1.5% too low, wrongly flagging
+        # a stock that hadn't actually broken out yet as "pulled back, good entry".
+        # Fixed: recompute the effective high10 fresh as the max High over the actual
+        # last 10 cached rows, which correctly includes the most recent cached day.
+        high10_effective = df.High.tail(10).max()
+
+        # Informational only (2026-09-07, user-flagged live on RBLBANK): how many
+        # consecutive cached days has this ticker ALREADY been closing above its own
+        # day's high10_prior. The historical backtest only ever contains DAY-1 entries
+        # for a given move (simulate_ticker's in_position state prevents re-entering a
+        # ticker it's already holding) -- there is NO validated evidence either way on
+        # entering day 2/3/4+ of an already-running move, so this is NOT a filter, just
+        # a visible flag so a re-triggering old move isn't mistaken for a fresh one.
+        already_extended = df.Close > df.high10_prior
+        extension_days = 0
+        for v in already_extended.iloc[::-1]:
+            if v:
+                extension_days += 1
+            else:
+                break
+
+        feature_rows[t] = dict(row=df.iloc[i], features=_quality_features(t, df, i),
+                                date=df.iloc[i].Date, high10_effective=high10_effective,
+                                extension_days=extension_days)
 
     quality_pool = pd.DataFrame({t: v["features"] for t, v in feature_rows.items()}).T
     if not quality_pool.empty:
@@ -198,14 +230,16 @@ def classify_candidates(tickers, cutoff_ist=None):
         if bar is None or t not in feature_rows:
             continue
         row = feature_rows[t]["row"]
-        if pd.isna(row.high10_prior):
+        high10_effective = feature_rows[t]["high10_effective"]
+        if pd.isna(high10_effective):
             continue
-        trigger_low = row.high10_prior * (1 + TRIGGER_CLEARANCE_LOW)
-        trigger_high = row.high10_prior * (1 + TRIGGER_CLEARANCE_HIGH)
+        trigger_low = high10_effective * (1 + TRIGGER_CLEARANCE_LOW)
+        trigger_high = high10_effective * (1 + TRIGGER_CLEARANCE_HIGH)
         quality_score = quality_pool.loc[t, "quality_score"] if t in quality_pool.index else None
         sector, sector_rs_pct = sector_rs(t, feature_rows[t]["date"])
         common = dict(ticker=t, trigger_low=trigger_low, trigger_high=trigger_high,
-                     quality_score=quality_score, sector=sector, sector_rs=sector_rs_pct)
+                     quality_score=quality_score, sector=sector, sector_rs=sector_rs_pct,
+                     extension_days=feature_rows[t]["extension_days"])
 
         if bar["High"] >= trigger_low:
             pullback_pct = (bar["High"] - bar["Close"]) / bar["High"] * 100
