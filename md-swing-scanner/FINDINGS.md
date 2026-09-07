@@ -1697,3 +1697,24 @@ Nothing here adopted yet — same standing rule as everything else, pending outs
 **Standing caveat, honestly stated**: every options number above uses day0's option `ClsPric` as entry price (options data is daily bhavcopy only). Given the established day0/day+1 continuation pattern, the option's Close is almost certainly higher than its true price at the actual breach instant — meaning these backtested returns are likely a **conservative underestimate** of what a real trigger-moment entry would achieve, not an overstatement. A Black-Scholes IV-backout could tighten this if pursued later; not necessary for the qualitative conclusion below.
 
 **Practical rule this produces, ready for paper-trading**: buy ITM/ATM at the live 0.3-0.6% trigger breach (real broker quote, not backtested). Next trading day: check the gap. Gapped up (71% of the time) → exit near the open, don't hold for the close (82% win / +5.03% median, ATM) — the real intraday-high opportunity (median +20.74%) is worth watching for live, but the close gives most of it back regardless. Didn't gap up → exit immediately too, don't hold and hope — there's no recovery pattern, only compounding theta bleed with no offsetting stock move. Not yet adopted into any code — paper-trade candidate only, per standing rule.
+
+## Live volume checks built and a re-test of the volume-as-ranking-signal rejection (2026-09-07, live trading day)
+
+Triggered by a real live mistake: claimed NIACL's volume was "183% elevated" (vs a 20-day trailing average) when a candidate first fired — wrong. The 20-day average was itself contaminated by including NIACL's own 66.9M-share breakout day (2026-09-04), making a merely-average follow-through day look artificially elevated. Compared directly against the user's own chart: today's volume was actually only ~20-25% of the breakout day's — a weak continuation, the opposite conclusion.
+
+**Fixed with two new live checks, built and wired into `live_checkpoint.py`/`trader_dashboard.py`**: `vol_vs_normal_pct` (live volume-so-far vs the median of the last 25 cached days, EXCLUDING any day already inside an extension run, scaled by elapsed session-time fraction — always computable) and `vol_vs_breakout_pct` (for `extension_days>=1` tickers only: live volume-so-far vs the actual breakout day's own volume, same elapsed-time scaling — the check that actually caught NIACL's real, weak continuation: 47% of the breakout day's pace).
+
+**Re-tested whether this properly-constructed volume metric changes an earlier rejection** (`FINDINGS.md`'s "Round-12" section: blending a raw volume-rank into the validated same-day distance-to-trigger ranking dropped Recall@1 60.7%→44.3%, "distance is already close to a direct measure of the outcome, blending in noise only hurts"). Reconstructed the same Recall@K methodology (62 real trading days, full `intraday_cache.py` window, 10:00 checkpoint, 0.5% clearance) with `vol_vs_normal_pct` blended in instead of the old crude volume-rank:
+
+| Weight (distance/volume) | Recall@1 | Recall@2 | Recall@5 |
+|---|---|---|---|
+| distance_only (baseline) | 67.7% | 83.9% | 91.9% |
+| 90/10 | 56.5% | 80.6% | 93.5% |
+| 80/20 | 56.5% | 79.0% | 93.5% |
+| 70/30 | 62.9% | 75.8% | 90.3% |
+
+**The original rejection mostly holds — Recall@1/@2 still degrade at every weight** — confirming distance really is close to a direct measure of the outcome, not just an artifact of the old, cruder volume metric. Milder degradation than before (worst case 56.5% vs the original 44.3%), and Recall@5 improves slightly (91.9%→93.5%) at the lighter weights.
+
+**But a bucket check reveals a real, narrower use volume DOES have**: within just the closest 20% by distance (n=772, candidates already similarly close to firing), fire rate by `vol_vs_normal_pct` quartile — Q1 (low volume) 18.7% → Q4 (high volume) **41.9%**, more than double, a real monotonic-ish gradient. Volume carries genuine independent information; a global rank-blend just doesn't exploit it correctly, because it reshuffles which single candidate lands at rank 1 rather than using volume as a **tiebreaker among already-similar-distance candidates**. That's a distinct, narrower mechanism from both the original rejected test and this re-test — not yet built or tested as its own thing. Directly validated against a real live case the same day: MOTILALOFS and IDEA were both close-distance AND high-`vol_vs_normal` simultaneously, matching exactly the combination this bucket check says should matter.
+
+Not adopted into the ranking yet — real, promising lead for a future "volume as tiebreaker within a tight distance band" test, distinct from what's been tried so far.
