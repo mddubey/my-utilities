@@ -109,6 +109,9 @@ def _print_tier(label, df, note, price_col, price_label, held):
             vel = f"  vel={r.velocity_pct:+.2f}%/{VELOCITY_LOOKBACK_MIN}min" if pd.notna(r.velocity_pct) else "  vel=n/a"
         fire = f"  [{fire_tier(r.fire_rate_pct)}] ~{r.fire_rate_pct:.0f}%" if has_fire_rate and pd.notna(r.fire_rate_pct) else ""
         held_tag = "  [ALREADY HOLDING]" if r.ticker in held else ""
+        # the real "how close to the level it crossed to become valid" number -- drives
+        # tier 1/2 classification already, was silently computed but never shown
+        clr = f"  clr_vs_pivot={r.clearance_now_pct:+.2f}%" if "clearance_now_pct" in r and pd.notna(r.clearance_now_pct) else ""
         # informational only, not a filter -- see live_checkpoint.py's extension_days comment
         ext = f"  ext={r.extension_days}d" if "extension_days" in r and r.extension_days >= 2 else ""
         fo_tag = "[F&O]" if r.ticker in _fo_tickers() else "[NO OPTIONS]"
@@ -117,7 +120,7 @@ def _print_tier(label, df, note, price_col, price_label, held):
             res_dist = (r.resistance / r[price_col] - 1) * 100
             res = f"  resistance={r.resistance:.2f} ({res_dist:+.2f}%)"
         print(f"  {r.ticker:12s} {fo_tag:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}{res}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
+              f"{price_label}={r[price_col]:9.2f}{clr}{res}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
 
 
 def run_morning(tickers, cutoff):
