@@ -124,12 +124,12 @@ def _print_tier(label, df, note, price_col, price_label, held):
             vol = f"  vol=[{vol_tier(r.vol_vs_breakout_pct)}]vs-breakout ({r.vol_vs_breakout_pct:.0f}%)"
         elif "vol_vs_normal_pct" in r and pd.notna(r.vol_vs_normal_pct):
             vol = f"  vol=[{vol_tier(r.vol_vs_normal_pct)}] ({r.vol_vs_normal_pct:.0f}%)"
-        fo_tag = "[F&O]" if r.ticker in _fo_tickers() else "[NO OPTIONS]"
+        ticker_label = f"{r.ticker}(F/O)" if r.ticker in _fo_tickers() else r.ticker
         res = ""
         if "resistance" in r and pd.notna(r.resistance):
             res_dist = (r.resistance / r[price_col] - 1) * 100
             res = f"  resistance={r.resistance:.2f} ({res_dist:+.2f}%)"
-        print(f"  {r.ticker:12s} {fo_tag:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
+        print(f"  {ticker_label:18s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
               f"{price_label}={r[price_col]:9.2f}{clr}{res}{vol}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
 
 
