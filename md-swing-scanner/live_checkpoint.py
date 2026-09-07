@@ -239,15 +239,24 @@ def classify_candidates(tickers, cutoff_ist=None):
         sector, sector_rs_pct = sector_rs(t, feature_rows[t]["date"])
         common = dict(ticker=t, trigger_low=trigger_low, trigger_high=trigger_high,
                      quality_score=quality_score, sector=sector, sector_rs=sector_rs_pct,
-                     extension_days=feature_rows[t]["extension_days"])
+                     extension_days=feature_rows[t]["extension_days"],
+                     high10_effective=high10_effective)
 
         if bar["High"] >= trigger_low:
             pullback_pct = (bar["High"] - bar["Close"]) / bar["High"] * 100
             clearance_now_pct = (bar["Close"] / trigger_low - 1) * 100
+            # user-defined "real bargain" metric (2026-09-07): distance from the RAW
+            # pivot (high10_effective, the 0% base level the 0.3-0.6% band is measured
+            # FROM), not from trigger_low (the 0.3% mark itself). The 0.3-0.6% band is
+            # the expected/standard entry price, not a discount -- a genuine better
+            # price means coming back down toward the raw pivot, below the band, not
+            # just staying inside it.
+            clearance_vs_raw_pivot_pct = (bar["Close"] / high10_effective - 1) * 100
             entry_vs_trigger_pct = (bar["Close"] / trigger_low - 1) * 100
             resistance = resistance_target(bar["Close"], row)
             rec = dict(**common, day_high=bar["High"], current_price=bar["Close"],
                       pullback_pct=pullback_pct, clearance_now_pct=clearance_now_pct,
+                      clearance_vs_raw_pivot_pct=clearance_vs_raw_pivot_pct,
                       entry_vs_trigger_pct=entry_vs_trigger_pct, resistance=resistance)
             if pullback_pct >= PULLBACK_MIN_PCT and clearance_now_pct <= NEAR_BAND_PCT:
                 pulled_back.append(rec)
