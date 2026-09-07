@@ -91,7 +91,15 @@ from sector_strength import sector_rs
 TRIGGER_CLEARANCE_LOW = 0.003   # 0.3% -- earliest honest fire point
 TRIGGER_CLEARANCE_HIGH = 0.006  # 0.6% -- limit-order ceiling, never pay more than this
 PULLBACK_MIN_PCT = 0.5          # retrace at least this much off the day's high-so-far to count as "pulled back"
-NEAR_BAND_PCT = 2.0             # clearance-above-trigger cap to still call a fired name "near", not "missed"
+NEAR_BAND_PCT = 2.0             # unused by classification since 2026-09-07's redefinition below, kept for reference
+PULLED_BACK_TOLERANCE_PCT = 0.5  # user-defined (2026-09-07): the 0.3-0.6% clearance band IS the expected/
+                                  # standard entry price, not a discount -- a genuine "pulled back, better
+                                  # price" entry means sitting within this tolerance EITHER SIDE of the RAW
+                                  # pivot (high10_effective) itself, not just "not too far above trigger_low".
+                                  # Real case that prompted this: GLAND/IDEA/SOLARINDS were showing "Tier 1:
+                                  # pulled back" at +1.0-1.6% above the raw pivot (already past the official
+                                  # 0.3-0.6% band) under the old NEAR_BAND_PCT=2.0%-from-trigger_low rule --
+                                  # nowhere near a real discount, just tolerated by too loose a threshold.
 TOP_N = 10
 VELOCITY_LOOKBACK_MIN = 10   # minutes between the two snapshots used to compute closing speed
 VELOCITY_WEIGHT = 0.20      # blend weight on velocity-rank vs distance-rank for tier 3 (2026-09-06:
@@ -258,9 +266,10 @@ def classify_candidates(tickers, cutoff_ist=None):
                       pullback_pct=pullback_pct, clearance_now_pct=clearance_now_pct,
                       clearance_vs_raw_pivot_pct=clearance_vs_raw_pivot_pct,
                       entry_vs_trigger_pct=entry_vs_trigger_pct, resistance=resistance)
-            if pullback_pct >= PULLBACK_MIN_PCT and clearance_now_pct <= NEAR_BAND_PCT:
+            band_ceiling_pct = TRIGGER_CLEARANCE_HIGH * 100  # 0.6%, the official band's own top edge
+            if -PULLED_BACK_TOLERANCE_PCT <= clearance_vs_raw_pivot_pct <= PULLED_BACK_TOLERANCE_PCT:
                 pulled_back.append(rec)
-            elif clearance_now_pct <= NEAR_BAND_PCT:
+            elif PULLED_BACK_TOLERANCE_PCT < clearance_vs_raw_pivot_pct <= band_ceiling_pct:
                 kept_going_near.append(rec)
             else:
                 missed.append(rec)
