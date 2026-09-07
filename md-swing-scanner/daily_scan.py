@@ -241,7 +241,7 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
     for ticker in tickers:
         try:
             if ticker in live_bars:
-                df = load_with_extra_row(ticker, live_bars[ticker], daily_pivots)
+                df = load_with_extra_row(ticker, live_bars[ticker], daily_pivots, cutoff_ist=cutoff_ist)
             else:
                 df = load(ticker, daily_pivots)
         except FileNotFoundError:

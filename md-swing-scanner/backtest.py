@@ -1,3 +1,4 @@
+from datetime import datetime, time as dtime
 from pathlib import Path
 
 import numpy as np
@@ -127,22 +128,62 @@ def load(ticker, pivot_fn=daily_pivots):
     return _finish_load(df, pivot_fn)
 
 
-def load_with_extra_row(ticker, extra_row, pivot_fn=daily_pivots):
+_SESSION_START = dtime(9, 15)
+_SESSION_END = dtime(15, 30)
+_SESSION_MINUTES = (datetime.combine(datetime.today(), _SESSION_END)
+                    - datetime.combine(datetime.today(), _SESSION_START)).seconds / 60.0
+MIN_FRACTION_FOR_VOLUME_SCALING = 0.15  # floor on elapsed-session fraction used to scale
+                                          # volume -- avoids wildly over-extrapolating from
+                                          # just a few minutes of data early in the session
+
+
+def _elapsed_session_fraction(cutoff_ist):
+    """Fraction of the 09:15-15:30 IST session elapsed as of cutoff_ist ('HH:MM')."""
+    h, m = map(int, cutoff_ist.split(":"))
+    t = dtime(h, m)
+    if t <= _SESSION_START:
+        return 0.0
+    if t >= _SESSION_END:
+        return 1.0
+    elapsed = (datetime.combine(datetime.today(), t)
+               - datetime.combine(datetime.today(), _SESSION_START)).seconds / 60.0
+    return elapsed / _SESSION_MINUTES
+
+
+def load_with_extra_row(ticker, extra_row, pivot_fn=daily_pivots, cutoff_ist=None):
     """Like load(), but appends one synthetic OHLCV row in-memory before computing
     indicators — for daily_scan.py's --live mode (2026-08-30): a partial-day intraday
     bar (extra_row: dict with Date/Open/High/Low/Close/Volume) run through the EXACT
     same build_indicators()/pivot_fn() as any real cached day, so vol_zscore/ema/rsi/etc
     are computed identically, not a special partial-day formula. If extra_row's date is
     already <= the last cached date (today's real close already landed), this is a
-    no-op — falls back to the real cached data, nothing synthetic to add."""
+    no-op — falls back to the real cached data, nothing synthetic to add.
+
+    Real bug found live (2026-09-07): `vol_zscore` (and anything else downstream that
+    reads today's Volume) compared today's RAW, partial-day-so-far volume directly
+    against a rolling mean/std of the last 8 FULL days -- comparing a half-finished day
+    against complete ones. Early in the session this systematically understates today's
+    real pace (a stock on track for a genuinely strong day looks weak purely because the
+    day isn't over yet), which can wrongly fail the `vol_zscore >= VOL_ZSCORE_MIN` entry
+    condition on a real, strong breakout. Fixed by scaling the extra row's Volume up to a
+    full-day-equivalent (divide by the elapsed-session fraction, floored at
+    MIN_FRACTION_FOR_VOLUME_SCALING so the first ~55 minutes of the session don't get
+    wildly over-extrapolated from too little data) BEFORE it enters the indicator
+    pipeline -- same fix pattern already applied to live_checkpoint.py's vol_vs_normal_pct,
+    applied here at the actual source instead. cutoff_ist=None preserves the exact prior
+    (unscaled) behavior for any caller not passing it."""
     raw = pd.read_csv(CACHE_DIR / f"{ticker}.csv", index_col="Date", parse_dates=True)
     date = pd.Timestamp(extra_row["Date"])
     if len(raw) and date <= raw.index.max():
         df = raw
     else:
+        volume = extra_row["Volume"]
+        if cutoff_ist is not None:
+            frac = max(_elapsed_session_fraction(cutoff_ist), MIN_FRACTION_FOR_VOLUME_SCALING)
+            volume = volume / frac
         new_row = pd.DataFrame([{
             "Open": extra_row["Open"], "High": extra_row["High"], "Low": extra_row["Low"],
-            "Close": extra_row["Close"], "Adj Close": extra_row["Close"], "Volume": extra_row["Volume"],
+            "Close": extra_row["Close"], "Adj Close": extra_row["Close"], "Volume": volume,
         }], index=pd.Index([date], name="Date"))
         df = pd.concat([raw, new_row])
     return _finish_load(df, pivot_fn)
