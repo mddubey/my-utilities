@@ -117,13 +117,20 @@ def _print_tier(label, df, note, price_col, price_label, held):
                if "clearance_vs_raw_pivot_pct" in r and pd.notna(r.clearance_vs_raw_pivot_pct) else "")
         # informational only, not a filter -- see live_checkpoint.py's extension_days comment
         ext = f"  ext={r.extension_days}d" if "extension_days" in r and r.extension_days >= 2 else ""
+        # live volume checks (2026-09-07) -- see live_checkpoint.py's comment for the
+        # NIACL case that prompted these. vol_vs_breakout only exists for extension_days>=1.
+        vol = ""
+        if "vol_vs_breakout_pct" in r and pd.notna(r.vol_vs_breakout_pct):
+            vol = f"  vol_vs_breakout={r.vol_vs_breakout_pct:.0f}%"
+        elif "vol_vs_normal_pct" in r and pd.notna(r.vol_vs_normal_pct):
+            vol = f"  vol_vs_normal={r.vol_vs_normal_pct:.0f}%"
         fo_tag = "[F&O]" if r.ticker in _fo_tickers() else "[NO OPTIONS]"
         res = ""
         if "resistance" in r and pd.notna(r.resistance):
             res_dist = (r.resistance / r[price_col] - 1) * 100
             res = f"  resistance={r.resistance:.2f} ({res_dist:+.2f}%)"
         print(f"  {r.ticker:12s} {fo_tag:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}{clr}{res}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
+              f"{price_label}={r[price_col]:9.2f}{clr}{res}{vol}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
 
 
 def run_morning(tickers, cutoff):

@@ -80,13 +80,67 @@ Real caveats, not swept under the rug:
   at 09:20 and 09:40 independently), not a time-of-day artifact.
 """
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dtime
 
 import pandas as pd
 
 from backtest import load, resistance_target
 from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT
 from sector_strength import sector_rs
+
+# Live volume checks (2026-09-07) -- see FINDINGS.md. Two checks, built and
+# validated against real data before wiring in: (1) fresh-breach volume vs a
+# "normal day" baseline that EXCLUDES any recent extension/spike days (a plain
+# trailing average gets contaminated by the breakout's own volume spike --
+# real case: NIACL's 20-day average included its own 66.9M-share breakout day,
+# making a merely-average follow-through day look "183% elevated"); (2) for an
+# already-extended ticker, continuation-strength vs the ACTUAL breakout day's
+# own volume (the comparison that actually caught NIACL's real story: today's
+# volume was only ~48% of the breakout day's, scaled for elapsed session time
+# -- a genuinely weak continuation, confirmed against the user's own chart).
+# Elapsed-time scaling assumes linear volume distribution through the session
+# -- an approximation (real intraday volume is front/back-loaded), fine for an
+# informational column, not exact enough to be a hard gate.
+_SESSION_START = dtime(9, 15)
+_SESSION_END = dtime(15, 30)
+_SESSION_MINUTES = (datetime.combine(datetime.today(), _SESSION_END)
+                    - datetime.combine(datetime.today(), _SESSION_START)).seconds / 60.0
+
+
+def _elapsed_session_fraction(now=None):
+    now = now or datetime.now()
+    t = now.time()
+    if t < _SESSION_START:
+        return 0.0
+    if t > _SESSION_END:
+        return 1.0
+    elapsed = (datetime.combine(datetime.today(), t)
+               - datetime.combine(datetime.today(), _SESSION_START)).seconds / 60.0
+    return elapsed / _SESSION_MINUTES
+
+
+def _normal_day_volume_baseline(df, already_extended, lookback=25):
+    """Median daily Volume over the last `lookback` cached rows, excluding any
+    day that was itself already inside a breakout run -- avoids a recent spike
+    inflating what counts as "typical". Returns (median, n_days_used)."""
+    tail_vol = df.Volume.tail(lookback)
+    tail_ext = already_extended.tail(lookback)
+    normal = tail_vol[~tail_ext]
+    if normal.empty:
+        return None, 0
+    return normal.median(), len(normal)
+
+
+def _breakout_day_volume(df, already_extended):
+    """Volume on the day the CURRENT extension streak started (most recent
+    False->True flip), or None if not currently extended / can't be found."""
+    if not already_extended.iloc[-1]:
+        return None
+    i = len(already_extended) - 1
+    while i > 0 and already_extended.iloc[i - 1]:
+        i -= 1
+    return df.Volume.iloc[i]
+
 
 TRIGGER_CLEARANCE_LOW = 0.003   # 0.3% -- earliest honest fire point
 TRIGGER_CLEARANCE_HIGH = 0.006  # 0.6% -- limit-order ceiling, never pay more than this
@@ -219,9 +273,14 @@ def classify_candidates(tickers, cutoff_ist=None):
             else:
                 break
 
+        normal_vol_baseline, normal_vol_n = _normal_day_volume_baseline(df, already_extended)
+        breakout_day_vol = _breakout_day_volume(df, already_extended) if extension_days >= 1 else None
+
         feature_rows[t] = dict(row=df.iloc[i], features=_quality_features(t, df, i),
                                 date=df.iloc[i].Date, high10_effective=high10_effective,
-                                extension_days=extension_days)
+                                extension_days=extension_days,
+                                normal_vol_baseline=normal_vol_baseline, normal_vol_n=normal_vol_n,
+                                breakout_day_vol=breakout_day_vol)
 
     quality_pool = pd.DataFrame({t: v["features"] for t, v in feature_rows.items()}).T
     if not quality_pool.empty:
@@ -245,10 +304,26 @@ def classify_candidates(tickers, cutoff_ist=None):
         trigger_high = high10_effective * (1 + TRIGGER_CLEARANCE_HIGH)
         quality_score = quality_pool.loc[t, "quality_score"] if t in quality_pool.index else None
         sector, sector_rs_pct = sector_rs(t, feature_rows[t]["date"])
+        frac = _elapsed_session_fraction()
+        vol_so_far = bar.get("Volume")
+        vol_vs_normal_pct = vol_vs_breakout_pct = None
+        if vol_so_far is not None and frac > 0:
+            normal_baseline = feature_rows[t]["normal_vol_baseline"]
+            if normal_baseline:
+                expected_normal = normal_baseline * frac
+                if expected_normal:
+                    vol_vs_normal_pct = vol_so_far / expected_normal * 100
+            breakout_vol = feature_rows[t]["breakout_day_vol"]
+            if breakout_vol:
+                expected_breakout = breakout_vol * frac
+                if expected_breakout:
+                    vol_vs_breakout_pct = vol_so_far / expected_breakout * 100
+
         common = dict(ticker=t, trigger_low=trigger_low, trigger_high=trigger_high,
                      quality_score=quality_score, sector=sector, sector_rs=sector_rs_pct,
                      extension_days=feature_rows[t]["extension_days"],
-                     high10_effective=high10_effective)
+                     high10_effective=high10_effective,
+                     vol_vs_normal_pct=vol_vs_normal_pct, vol_vs_breakout_pct=vol_vs_breakout_pct)
 
         if bar["High"] >= trigger_low:
             pullback_pct = (bar["High"] - bar["Close"]) / bar["High"] * 100
