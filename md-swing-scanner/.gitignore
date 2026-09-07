@@ -8,3 +8,4 @@ __pycache__/
 *.pyc
 *.log
 open_positions.csv
+primed_cache.json

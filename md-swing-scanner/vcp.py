@@ -7,10 +7,13 @@ LOW_52W_MIN_MULT = 1.25   # price must be at least 25% above its 52-week low
 HIGH_52W_MAX_MULT = 0.75  # price must be within 25% of its 52-week high (i.e. >= 75% of it)
 
 
-def stage2_trend_template(row, ticker, date):
+def stage2_trend_template(row, ticker, date, live_closes=None):
     """Long-term uptrend confirmation, checked BEFORE looking at any short-term pattern
     at all — this is the actual gate that separates a real base-building leader from a
-    random quiet patch inside an unremarkable or declining stock."""
+    random quiet patch inside an unremarkable or declining stock.
+
+    live_closes (optional): passed straight through to rs_rating() for a live `date`
+    not yet cached to disk anywhere — see its docstring. Never set by backtests."""
     required = ["sma50", "sma150", "sma200", "sma200_20ago", "high_252", "low_252"]
     if row[required].isna().any():
         return False
@@ -19,7 +22,7 @@ def stage2_trend_template(row, ticker, date):
     sma200_rising = row.sma200 > row.sma200_20ago
     off_52w_low = row.Close >= LOW_52W_MIN_MULT * row.low_252
     near_52w_high = row.Close >= HIGH_52W_MAX_MULT * row.high_252
-    rs = rs_rating(ticker, date)
+    rs = rs_rating(ticker, date, live_closes=live_closes)
     strong_rs = rs is not None and rs >= RS_RATING_MIN
     return above_all_smas and ma_stack and sma200_rising and off_52w_low and near_52w_high and strong_rs
 

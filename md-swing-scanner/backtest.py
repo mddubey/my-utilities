@@ -203,13 +203,20 @@ def support_level(entry_price, row):
     return None
 
 
-def detect_entry(ticker, rows, i, require_regime=True):
+def detect_entry(ticker, rows, i, require_regime=True, live_closes=None):
     """Two fully independent entry gates, checked in this order only because
     entry_signal() is cheap and VCP's trend-template + zigzag scan is not; first match
     wins (a ticker can't be both on the same day). Returns (pattern, structural_low) if
     a candidate fires at rows.iloc[i], else None — structural_low is raw/uncapped, only
     meaningful for coiled_spring (caller applies the MAX_INITIAL_RISK_PCT cap at actual
     entry time, since it needs the real entry_price to do that).
+
+    live_closes (optional): passed straight through to stage2_trend_template()'s
+    rs_rating() call, for a live `rows.iloc[i].Date` not yet cached to disk anywhere
+    (see relative_strength.py's _universe_returns_live() docstring) — without this,
+    the coiled_spring path silently can never fire during real live/intraday scans,
+    since rs_rating() would return None for every ticker (not backtest-affecting:
+    the backtest itself never passes this).
 
     Pulled out of simulate_ticker's loop (2026-08-30) so a live daily scanner can call
     the EXACT same entry logic against today's data instead of duplicating it — two
@@ -232,7 +239,7 @@ def detect_entry(ticker, rows, i, require_regime=True):
         if not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True, require_above_sma50=TEST_SMA50_ABOVE, require_sma50_rising=TEST_SMA50_RISING, allow_sma50_recovery=TEST_SMA50_RECOVERY, sma50_recovery_lookback=TEST_SMA50_RECOVERY_LOOKBACK, min_breadth=TEST_MIN_BREADTH):
             return "breakout_cont", None
         return None
-    if stage2_trend_template(row, ticker, row.Date) and (not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True, require_above_sma50=TEST_SMA50_ABOVE, require_sma50_rising=TEST_SMA50_RISING, allow_sma50_recovery=TEST_SMA50_RECOVERY, sma50_recovery_lookback=TEST_SMA50_RECOVERY_LOOKBACK, min_breadth=TEST_MIN_BREADTH)):
+    if stage2_trend_template(row, ticker, row.Date, live_closes=live_closes) and (not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True, require_above_sma50=TEST_SMA50_ABOVE, require_sma50_rising=TEST_SMA50_RISING, allow_sma50_recovery=TEST_SMA50_RECOVERY, sma50_recovery_lookback=TEST_SMA50_RECOVERY_LOOKBACK, min_breadth=TEST_MIN_BREADTH)):
         # VCP is explicitly a bull-market pattern in the original methodology, not a
         # regime-agnostic one — same regime gate that rescued Breakout Continuation.
         vcp = vcp_breakout(rows, i)

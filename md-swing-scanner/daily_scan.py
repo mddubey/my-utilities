@@ -52,20 +52,27 @@ a handful can plausibly fire on any given day):
   observation to inform same-day action, not a validated backtest-tested signal path
   (the backtest never runs on partial-day bars).
 
---live-full (2026-09-07): same live intraday check, but skips shortlist_primed()
-  entirely and runs fetch_live_bars() against the WHOLE 500-ticker universe. Exists
-  because shortlist_primed() only depends on YESTERDAY's cached data — re-running it
-  mid-day returns the identical ~53 names every time, so it structurally cannot catch
-  a same-day surprise mover that wasn't already primed as of yesterday's close (real
-  case: SYRMA +12.2%, ZYDUSWELL +4.4% same-day movers, both absent from the primed
-  shortlist, both invisible to plain --live). Real cost measured post-close
-  (2026-09-07): 108s cold-start, then 17-24s on repeat calls — cheap enough to run
-  every couple of hours during market hours, unverified yet whether that holds up
-  during actual live trading hours (all measurements so far were taken after 16:00
-  close). Meant to be run periodically (e.g. every 2 hours 9:15-15:30) alongside the
-  cheap --live runs, not as a replacement for them."""
+--refresh-primed (2026-09-08, replaces the short-lived --live-full): shortlist_primed()
+  only depends on YESTERDAY's cached close, so re-running it mid-day returns the
+  identical ~53 names every time — it structurally cannot catch a same-day surprise
+  mover that wasn't already primed as of yesterday's close (real case: SYRMA +12.2%,
+  ZYDUSWELL +4.4% same-day movers, both absent from the primed shortlist, both
+  invisible to plain --live). --refresh-primed does the ONE expensive part (full
+  500-ticker fetch_live_bars(), ~20-30s measured post-close, cold start ~108s) and
+  recomputes the SAME structural primed checks against TODAY's live-augmented rows
+  instead of yesterday's frozen ones, writing the result to primed_cache.json. Meant
+  to be run periodically (e.g. every 2 hours 9:15-15:30), separately from --live.
+  --live then reads that cache when it's fresh (same calendar day) instead of
+  recomputing shortlist_primed() from yesterday's data — so the frequent, cheap
+  check-ins (--live, called anytime) automatically pick up whatever the last
+  --refresh-primed found, without themselves paying the full-universe cost. Falls
+  back to the plain yesterday-based shortlist_primed() if no cache exists yet or
+  it's stale (a different day) — never blocks on a missing refresh."""
 import argparse
+import json
+import sys
 from datetime import time as dtime
+from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
@@ -79,6 +86,23 @@ from sector_strength import sector_rs
 import breadth
 
 LIVE_CUTOFF_DEFAULT = "14:45"  # IST
+PRIMED_CACHE_FILE = "primed_cache.json"
+
+
+def _passes_primed_checks(t, rows, row, live_closes=None):
+    """The actual structural 'primed' test, shared by shortlist_primed() (yesterday's
+    frozen row) and shortlist_primed_live() (today's live-augmented row) — same
+    check, different row source. live_closes: see stage2_trend_template's docstring —
+    only meaningful when `row` is itself today's live-augmented row."""
+    if row.corp_action_day:
+        return False
+    if stage2_trend_template(row, t, row.Date, live_closes=live_closes) and base_pivot(rows, i=len(rows) - 1) is not None:
+        return True
+    required = ["ema34", "vol_avg10_prior", "high10_prior", "atr14_60ago",
+                 "ema34_rising10", "traded_value_sma20", "close_20ago"]
+    if row[required].isna().any():
+        return False
+    return base_filters_pass(row)
 
 
 def shortlist_primed(tickers):
@@ -94,20 +118,72 @@ def shortlist_primed(tickers):
         rows = df.reset_index()
         if len(rows) == 0:
             continue
-        i = len(rows) - 1
-        row = rows.iloc[i]
-        if row.corp_action_day:
-            continue
-        if stage2_trend_template(row, t, row.Date) and base_pivot(rows, i) is not None:
-            primed.add(t)
-            continue
-        required = ["ema34", "vol_avg10_prior", "high10_prior", "atr14_60ago",
-                     "ema34_rising10", "traded_value_sma20", "close_20ago"]
-        if row[required].isna().any():
-            continue
-        if base_filters_pass(row):
+        if _passes_primed_checks(t, rows, rows.iloc[-1]):
             primed.add(t)
     return sorted(primed)
+
+
+def shortlist_primed_live(tickers, live_bars, cutoff_ist=LIVE_CUTOFF_DEFAULT):
+    """Same structural checks as shortlist_primed(), but built off TODAY's live-
+    augmented row when a live bar was fetched for that ticker (see --refresh-primed
+    in the module docstring) — lets an intraday mover newly qualify as primed
+    instead of waiting for tomorrow's cache. Falls back to yesterday's cached row
+    for any ticker fetch_live_bars() couldn't get usable intraday data for. Also
+    passes live_closes (today's live prices for the whole live_bars set) into
+    stage2_trend_template's RS-rating gate — see relative_strength.py's
+    _universe_returns_live() docstring for why this is needed at all: without it,
+    the coiled_spring/VCP path can never fire live, no matter how live-augmented
+    the row itself is."""
+    live_closes = {t: bar["Close"] for t, bar in live_bars.items()} if live_bars else None
+    primed = set()
+    for t in tickers:
+        try:
+            if t in live_bars:
+                df = load_with_extra_row(t, live_bars[t], daily_pivots, cutoff_ist=cutoff_ist)
+            else:
+                df = load(t, daily_pivots)
+        except FileNotFoundError:
+            continue
+        rows = df.reset_index()
+        if len(rows) == 0:
+            continue
+        lc = live_closes if t in live_bars else None
+        if _passes_primed_checks(t, rows, rows.iloc[-1], live_closes=lc):
+            primed.add(t)
+    return sorted(primed)
+
+
+def refresh_primed_cache(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT):
+    """The expensive half of --refresh-primed: fetch live bars for the WHOLE
+    universe, recompute the primed list against today's data, write it out with
+    enough metadata (date, refresh time) for --live to know whether it's still
+    fresh. Returns the payload written, so the CLI can print a summary."""
+    live_bars = fetch_live_bars(tickers, cutoff_ist)
+    primed = shortlist_primed_live(tickers, live_bars, cutoff_ist)
+    payload = dict(
+        date=str(pd.Timestamp.now().date()),
+        refreshed_at=pd.Timestamp.now().strftime("%H:%M:%S"),
+        cutoff_ist=cutoff_ist,
+        n_live_bars=len(live_bars),
+        tickers=primed,
+    )
+    Path(PRIMED_CACHE_FILE).write_text(json.dumps(payload, indent=2))
+    return payload
+
+
+def _load_primed_cache_if_fresh():
+    """Returns the cached ticker list if primed_cache.json exists AND is from
+    today, else None (caller falls back to shortlist_primed())."""
+    path = Path(PRIMED_CACHE_FILE)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+    if payload.get("date") != str(pd.Timestamp.now().date()):
+        return None
+    return payload.get("tickers")
 
 
 def fetch_live_bars(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT):
@@ -225,7 +301,7 @@ def _near_miss_annotate(ticker, row, prev_row):
     )
 
 
-def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAULT, live_full=False):
+def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAULT):
     """candidates: real, gate-respecting signals (empty if require_regime and the
     gate's shut). watchlist: candidates whose PATTERN fired but only the regime gate
     blocked them (2026-08-31) — always computed, regardless of require_regime, so a
@@ -243,12 +319,11 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
     Close-vs-High distinction, nothing to do with the market regime."""
     live_bars = {}
     live_shortlist = []
-    if live_full:
-        live_shortlist = list(tickers)
+    if live:
+        cached = _load_primed_cache_if_fresh()
+        live_shortlist = cached if cached is not None else shortlist_primed(tickers)
         live_bars = fetch_live_bars(live_shortlist, cutoff_ist)
-    elif live:
-        live_shortlist = shortlist_primed(tickers)
-        live_bars = fetch_live_bars(live_shortlist, cutoff_ist)
+    live_closes = {t: bar["Close"] for t, bar in live_bars.items()} if live_bars else None
 
     candidates = []
     watchlist = []
@@ -270,14 +345,15 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
         scan_date = row.Date
         if row.corp_action_day:
             continue  # today's own data looks like a corporate-action glitch — skip
-        result = detect_entry(ticker, rows, i, require_regime=require_regime)
+        lc = live_closes if ticker in live_bars else None
+        result = detect_entry(ticker, rows, i, require_regime=require_regime, live_closes=lc)
         if result is not None:
             pattern, structural_low = result
             candidates.append(_annotate(ticker, pattern, structural_low, row, rows.iloc[i - 1],
                                          live=(ticker in live_bars), rows=rows, i=i))
             continue
         if require_regime:
-            ungated = detect_entry(ticker, rows, i, require_regime=False)
+            ungated = detect_entry(ticker, rows, i, require_regime=False, live_closes=lc)
             if ungated is not None:
                 pattern, structural_low = ungated
                 watchlist.append(_annotate(ticker, pattern, structural_low, row, rows.iloc[i - 1],
@@ -293,17 +369,31 @@ if __name__ == "__main__":
     parser.add_argument("--ignore-regime", action="store_true",
                          help="skip the Nifty ADX/200-SMA gate — observation only, NOT validated trade signals")
     parser.add_argument("--live", action="store_true",
-                         help="check a shortlist of primed tickers against today's intraday data instead of waiting for tomorrow's close")
-    parser.add_argument("--live-full", action="store_true",
-                         help="like --live but fetches intraday bars for the WHOLE 500-ticker universe, not just yesterday's primed shortlist -- catches same-day surprise movers shortlist_primed() can't see (slower: ~20-110s vs the shortlist's few seconds)")
+                         help="check a shortlist of primed tickers against today's intraday data instead of waiting for tomorrow's close -- uses primed_cache.json if refreshed today (see --refresh-primed), else falls back to yesterday's shortlist_primed()")
+    parser.add_argument("--refresh-primed", action="store_true",
+                         help="expensive: fetch live bars for the WHOLE 500-ticker universe and recompute the primed shortlist against today's data, caching it to primed_cache.json for --live to pick up. Run this every couple hours; run plain --live as often as you like in between.")
     parser.add_argument("--cutoff", default=LIVE_CUTOFF_DEFAULT,
-                         help=f"IST cutoff time for --live/--live-full's intraday snapshot (default {LIVE_CUTOFF_DEFAULT})")
+                         help=f"IST cutoff time for --live/--refresh-primed's intraday snapshot (default {LIVE_CUTOFF_DEFAULT})")
     args = parser.parse_args()
 
     tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
+
+    if args.refresh_primed:
+        old = _load_primed_cache_if_fresh() or []
+        payload = refresh_primed_cache(tickers, args.cutoff)
+        new = payload["tickers"]
+        added = sorted(set(new) - set(old))
+        dropped = sorted(set(old) - set(new))
+        print(f"primed_cache.json refreshed at {payload['refreshed_at']} IST "
+              f"({payload['n_live_bars']} live bars fetched): {len(new)} primed")
+        if added:
+            print(f"  newly primed: {added}")
+        if dropped:
+            print(f"  dropped: {dropped}")
+        sys.exit(0)
+
     scan_date, candidates, watchlist, near_miss, live_shortlist = scan(
-        tickers, require_regime=not args.ignore_regime, live=args.live or args.live_full,
-        cutoff_ist=args.cutoff, live_full=args.live_full,
+        tickers, require_regime=not args.ignore_regime, live=args.live, cutoff_ist=args.cutoff,
     )
     print(f"scan date: {scan_date.date() if scan_date is not None else 'no data'}")
     if scan_date is not None:

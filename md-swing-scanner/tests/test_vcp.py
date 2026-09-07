@@ -120,22 +120,22 @@ def _trend_row(**overrides):
 
 
 def test_stage2_trend_template_true_when_every_condition_holds(monkeypatch):
-    monkeypatch.setattr(vcp, "rs_rating", lambda ticker, date: 85)
+    monkeypatch.setattr(vcp, "rs_rating", lambda ticker, date, live_closes=None: 85)
     assert stage2_trend_template(_trend_row(), "TEST", "2024-01-01")
 
 
 def test_stage2_trend_template_false_when_ma_stack_wrong_order(monkeypatch):
-    monkeypatch.setattr(vcp, "rs_rating", lambda ticker, date: 85)
+    monkeypatch.setattr(vcp, "rs_rating", lambda ticker, date, live_closes=None: 85)
     row = _trend_row(sma50=90, sma150=100, sma200=95)  # sma50 < sma150, stack broken
     assert not stage2_trend_template(row, "TEST", "2024-01-01")
 
 
 def test_stage2_trend_template_false_when_rs_below_threshold(monkeypatch):
-    monkeypatch.setattr(vcp, "rs_rating", lambda ticker, date: 50)
+    monkeypatch.setattr(vcp, "rs_rating", lambda ticker, date, live_closes=None: 50)
     assert not stage2_trend_template(_trend_row(), "TEST", "2024-01-01")
 
 
 def test_stage2_trend_template_false_when_required_field_missing(monkeypatch):
-    monkeypatch.setattr(vcp, "rs_rating", lambda ticker, date: 85)
+    monkeypatch.setattr(vcp, "rs_rating", lambda ticker, date, live_closes=None: 85)
     row = _trend_row(sma200=float("nan"))
     assert not stage2_trend_template(row, "TEST", "2024-01-01")
