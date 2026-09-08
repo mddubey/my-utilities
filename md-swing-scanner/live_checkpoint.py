@@ -164,23 +164,37 @@ VELOCITY_WEIGHT = 0.20      # blend weight on velocity-rank vs distance-rank for
                              # R@1 62.3%->65.6%, R@2 82.0%->86.9% at 09:30->09:40; R@1 63.9%->73.8% at
                              # 09:25->09:35. See FINDINGS.md's Round-13 section for the full sweep.
 
-# Distance Calibration Curve (2026-09-06): P(fires later today | distance-to-trigger
-# right now), pooled across checkpoints 09:20-09:45 (n=21,273 candidate-checkpoint
-# pairs, 62 real days) -- checked robust at 09:20 and 09:40 independently before
-# trusting it. (upper_bound_pct, fire_rate_pct) pairs, ascending -- see FINDINGS.md's
-# "Distance Calibration Curve" section for the full table including sample sizes.
+# Distance Calibration Curve -- REBUILT 2026-09-08 (critic's Probability Calibration
+# Audit, the final v30-freeze pre-req). The original 2026-09-06 table measured
+# P(TOUCHES trigger_low later today | distance) -- and a held-out train/test split
+# (calibration_audit.py) found that number was itself overconfident in one real spot
+# (the 0.6% bucket: trained 70.5%, held out only 58.5%, outside the training set's
+# own 95% CI). Worse: checked directly what "touches" actually means for a trader --
+# of 602 real touches, only 43.4% CLOSED above trigger_low by end of day; 56.6% were
+# wicks that reversed. Touching and holding are near-independent (~40-50% hold-rate
+# regardless of how far away the candidate started), so a "touch" probability isn't
+# a good stand-in for "this becomes a real trade" -- it overstates the real odds by
+# roughly 2x, uniformly.
+#
+# This table now measures P(CLOSES above trigger_low by end of day | distance-to-
+# trigger right now) -- the question that actually matters. Rebuilt from the full
+# 63-day intraday_cache window (n=24,855 candidate-checkpoint pairs), validated with
+# the same train/test split methodology before trusting it (no single catastrophic
+# bucket this time; tight buckets show noise in both directions, not one-sided
+# overconfidence). (upper_bound_pct, hold_rate_pct) pairs, ascending.
 FIRE_RATE_BY_DISTANCE = [
-    (0.2, 88.0), (0.3, 81.3), (0.4, 77.8), (0.5, 68.0), (0.6, 71.9),
-    (0.8, 56.7), (1.0, 48.0), (1.5, 32.9), (2.0, 22.3), (3.0, 11.7),
-    (5.0, 3.8), (float("inf"), 0.5),
+    (0.2, 35.7), (0.3, 29.6), (0.4, 36.1), (0.5, 23.4), (0.6, 30.3),
+    (0.8, 22.8), (1.0, 17.4), (1.5, 12.5), (2.0, 8.6), (3.0, 4.6),
+    (5.0, 2.0), (float("inf"), 0.3),
 ]
 
 
 def calibrated_fire_rate(dist_pct):
-    """Historical P(fires later today) for a candidate currently this far from its
-    trigger -- a lookup, not a model fit, deliberately: the underlying curve is
-    monotonic enough that a simple bucket table is more honest than pretending to
-    interpolate precision the data doesn't support."""
+    """Historical P(CLOSES above trigger by end of day) for a candidate currently
+    this far from its trigger -- a lookup, not a model fit, deliberately: the
+    underlying curve is monotonic enough (up to real sampling noise in the thin
+    tight-distance buckets) that a simple bucket table is more honest than
+    pretending to interpolate precision the data doesn't support."""
     for upper, rate in FIRE_RATE_BY_DISTANCE:
         if dist_pct <= upper:
             return rate
@@ -191,7 +205,16 @@ def calibrated_fire_rate(dist_pct):
 # makes better decisions off a small number of named buckets than off two numbers that
 # only differ by a percentage point or two (e.g. "63.2% vs 64.7%") -- the raw number is
 # still shown alongside each tier for reference, not hidden.
-FIRE_TIERS = [(70, "HIGH"), (50, "WATCH"), (25, "WEAK"), (0, "IGNORE")]
+#
+# Thresholds re-derived 2026-09-08 alongside the "held" rebuild above -- the old
+# 70/50/25 cutoffs assumed a curve topping out near 88%; this one tops out near 36%,
+# so 70/50 would never fire at all. New cutoffs picked off the rebuilt curve's own
+# natural breaks (not re-optimized/tuned): 0.2-0.6% mostly cluster 30-36% -> HIGH,
+# 0.5%/0.8%/1.0% cluster 17-23% -> WATCH, 1.5%/2.0% cluster 9-13% -> WEAK, 3.0%+
+# drops under 5% -> IGNORE. Explicitly UNVALIDATED as tier boundaries in their own
+# right (same "no more parameter sweeps" standing rule) -- watch live for a few days
+# before deciding whether these hold up or need adjusting.
+FIRE_TIERS = [(25, "HIGH"), (15, "WATCH"), (5, "WEAK"), (0, "IGNORE")]
 
 
 def fire_tier(rate):
@@ -450,9 +473,14 @@ if __name__ == "__main__":
                 "sorted by how much it's pulled back -- more pullback = cheaper entry", "current_price", "price")
     _print_tier("TIER 2: KEPT GOING, STILL NEAR TRIGGER (settled, no timing race)", kept_going_near,
                 "sorted by clearance -- closest to trigger_low first", "current_price", "price")
+    # built from FIRE_TIERS directly (2026-09-08) -- a hardcoded copy of these
+    # thresholds went stale the last time FIRE_TIERS changed and nobody noticed
+    # until a live run showed the wrong numbers next to the tier labels.
+    _tier_label = " ".join(f"[{label}]>={lower}%" if lower > 0 else f"[{label}]<{FIRE_TIERS[i-1][0]}%"
+                            for i, (lower, label) in enumerate(FIRE_TIERS))
     _print_tier(f"TIER 3: WATCHING, not yet fired (top {TOP_N} of {len(watching)})", watching.head(TOP_N),
                 "ranked by distance blended 80/20 with closing-speed vs 10 min ago -- "
-                "[HIGH]>=70% [WATCH]>=50% [WEAK]>=25% [IGNORE]<25%, per the Distance Calibration Curve",
+                f"{_tier_label}, per the Distance Calibration Curve",
                 "close", "close")
     _print_tier("MISSED (fired, ran well past the band -- not actionable, informational only)", missed,
                 "if it settles back into tier 1/2 on a later run, it'll reappear there", "current_price", "price")
