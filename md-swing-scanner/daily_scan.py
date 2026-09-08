@@ -374,9 +374,23 @@ if __name__ == "__main__":
                          help="expensive: fetch live bars for the WHOLE 500-ticker universe and recompute the primed shortlist against today's data, caching it to primed_cache.json for --live to pick up. Run this every couple hours; run plain --live as often as you like in between.")
     parser.add_argument("--cutoff", default=LIVE_CUTOFF_DEFAULT,
                          help=f"IST cutoff time for --live/--refresh-primed's intraday snapshot (default {LIVE_CUTOFF_DEFAULT})")
+    parser.add_argument("--force", action="store_true",
+                         help="proceed even if the pre-flight state check fails (see state_validator.py) -- use only when you've manually confirmed the failure is a false positive")
     args = parser.parse_args()
 
     tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
+
+    if args.live or args.refresh_primed:
+        import state_validator
+        print("Pre-flight state check:")
+        state_ok, state_results = state_validator.validate(tickers)
+        state_validator.print_report(state_results)
+        if not state_ok and not args.force:
+            print("\nREFUSING to run a live scan against stale/missing state -- "
+                  "fix the failing check above (likely: run fetch_prices.py), "
+                  "or pass --force if you've confirmed it's a false positive.")
+            sys.exit(1)
+        print()
 
     if args.refresh_primed:
         old = _load_primed_cache_if_fresh() or []
