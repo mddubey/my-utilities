@@ -85,7 +85,7 @@ from datetime import datetime, timedelta, time as dtime
 import pandas as pd
 
 from backtest import load
-from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT
+from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT, _load_primed_cache_if_fresh
 from sector_strength import sector_rs
 
 # Live volume checks (2026-09-07) -- see FINDINGS.md. Two checks, built and
@@ -263,8 +263,17 @@ def classify_candidates(tickers, cutoff_ist=None):
     """Returns (pulled_back, kept_going_near, watching, missed) -- four DataFrames.
     pulled_back/kept_going_near/watching are the three actionable tiers, in priority
     order. missed is informational only (fired, ran past the band, not settled) --
-    not meant to be acted on, just visible so nothing silently vanishes."""
-    pool = shortlist_primed(tickers)
+    not meant to be acted on, just visible so nothing silently vanishes.
+
+    Pool source (fixed 2026-09-08 -- critic-flagged P0, "the dashboard ignores the
+    refreshed cache"): reads primed_cache.json when it's fresh (today, via
+    --refresh-primed), falling back to yesterday-based shortlist_primed() otherwise
+    -- same source daily_scan.py's own --live path already used, so trader_dashboard.py
+    morning/live_checkpoint.py's CLI stop silently recomputing a DIFFERENT, staler
+    pool than whatever --refresh-primed just built. One source of truth: refresh
+    builds the candidate universe, this function only ranks/filters/displays it."""
+    cached = _load_primed_cache_if_fresh()
+    pool = cached if cached is not None else shortlist_primed(tickers)
     effective_cutoff = cutoff_ist or LIVE_CUTOFF_DEFAULT
     prior_cutoff = _minus_minutes(effective_cutoff, VELOCITY_LOOKBACK_MIN)
     live = fetch_live_bars(pool, cutoff_ist=effective_cutoff)
