@@ -237,6 +237,40 @@ def vol_tier(pct):
     return VOL_TIERS[-1][1]
 
 
+def _effective_vol_pct(rec):
+    """Whichever volume comparison actually applies -- same priority trader_dashboard.py's
+    display already uses (vs-breakout for extension_days>=1, vs-normal otherwise)."""
+    breakout_pct = rec.get("vol_vs_breakout_pct")
+    if breakout_pct is not None and pd.notna(breakout_pct):
+        return breakout_pct
+    return rec.get("vol_vs_normal_pct")
+
+
+# Moving-away-on-volume exclusion (2026-09-11): a real, live case (OIL) showed
+# "STRONG volume" on the dashboard while the stock was actually moving AWAY from its
+# trigger -- the volume number alone read as encouraging when it was really just
+# confirming a real decline, not building toward a breakout. Checked directly first
+# whether a full breakdown-continuation pattern would have caught this (it wouldn't
+# have -- OIL never broke its own 10-day low, this was a much shorter-lived pullback
+# from a recent high) -- this is deliberately a much simpler, narrower check: exclude
+# a watching candidate outright, not just tag it, when BOTH (a) velocity is genuinely
+# negative (moving away, not just flat/noisy) and (b) volume is elevated (GOOD/STRONG)
+# enough that the move looks like real conviction, not drift. Threshold picked as a
+# reasonable first pass, not swept/optimized -- same "no parameter sweeps" standard
+# as everywhere else in this project.
+VELOCITY_AWAY_THRESHOLD_PCT = -0.05
+
+
+def _moving_away_on_volume(rec):
+    velocity = rec.get("velocity_pct")
+    if velocity is None or pd.isna(velocity) or velocity >= VELOCITY_AWAY_THRESHOLD_PCT:
+        return False
+    vol_pct = _effective_vol_pct(rec)
+    if vol_pct is None or pd.isna(vol_pct):
+        return False
+    return vol_tier(vol_pct) in ("GOOD", "STRONG")
+
+
 def _minus_minutes(cutoff_ist, minutes):
     t = datetime.strptime(cutoff_ist, "%H:%M")
     return (t - timedelta(minutes=minutes)).strftime("%H:%M")
@@ -403,6 +437,8 @@ def classify_candidates(tickers, cutoff_ist=None):
             if bar_prior is not None and bar_prior["High"] < trigger_low:
                 dist_prior_pct = (trigger_low / bar_prior["Close"] - 1) * 100
                 rec["velocity_pct"] = dist_prior_pct - dist_pct  # positive = closing fast
+            if _moving_away_on_volume(rec):
+                continue  # real conviction moving the wrong way -- not a watching candidate
             watching.append(rec)
 
     def _df(recs, sort_col, ascending):

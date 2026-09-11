@@ -1,2 +1,7 @@
 date,ticker,tier,price,notes
-2026-09-08 13:40,DIVISLAB,pulled_back,9500.50,"options entry 9500 CE 1 lot, spot near pivot 9467, quality 0.33, vol STRONG 263%"
+2026-09-08 13:40,DIVISLAB,pulled_back,9500.5,"options entry 9500 CE 1 lot, spot near pivot 9467, quality 0.33, vol STRONG 263%"
+2026-09-09 10:16,VIJAYA,pulled_back,1525.0,"stock entry 15 shares, quality 0.80 highest today, vol STRONG 2075%, stop 1384.83"
+2026-09-09 12:37,OIL,pulled_back,498.9,"options entry 495 CE at premium 15.55, spot near pivot 501.30 clr -0.48%, quality 0.67, vol GOOD 135%, extension_days=0 fresh day-1"
+2026-09-10 17:18,IFCI,stopped_out,85.15,"exited on model stop 87.73, entry 96.90 2026-09-02, real loss, mechanical trailing stop discipline worked as designed after two red days"
+2026-09-11 09:30,MOTILALOFS,stopped_out,993.4,"exited 1060 CE position, spot fell from around 1055-1060 area at entry to 993.40, long unwinding plus broad 3-day market slide, exited ahead of Sept 14 trading holiday weekend gap risk"
+2026-09-11 10:48,LAURUSLABS,pulled_back,1964.00,"options entry 1960 CE, spot 1967.90 at entry, clr_vs_pivot +0.46%, quality 0.54, vol GOOD 163%, extension_days=0 fresh day-1"
