@@ -87,9 +87,9 @@ def build_bearish_indicators(df):
     df["close_20ago"] = df.Close.shift(20)
     df["corp_action_day"] = df.Close.pct_change().abs() > CORP_ACTION_MOVE_PCT
     vol_prior = df.Volume.shift(1).rolling(VOL_ZSCORE_WINDOW)
-    df["vol_mean20_prior"] = vol_prior.mean()
-    df["vol_std20_prior"] = vol_prior.std()
-    df["vol_zscore"] = (df.Volume - df.vol_mean20_prior) / df.vol_std20_prior
+    df["vol_mean_prior"] = vol_prior.mean()
+    df["vol_std_prior"] = vol_prior.std()
+    df["vol_zscore"] = (df.Volume - df.vol_mean_prior) / df.vol_std_prior
     return df
 
 

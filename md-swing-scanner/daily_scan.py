@@ -80,7 +80,7 @@ import yfinance as yf
 from backtest import (load, load_with_extra_row, detect_entry, resistance_target,
                       stage2_trend_template, current_stop_level, MAX_INITIAL_RISK_PCT)
 from signals import base_filters_pass, entry_signal, near_miss_high_breakout
-from vcp import base_pivot, vcp_breakout
+from vcp import base_pivot, vcp_breakout, _vcp_vol_zscore
 from pivots import daily_pivots
 from sector_strength import sector_rs
 import breadth
@@ -276,13 +276,19 @@ def _annotate(ticker, pattern, structural_low, row, prev_row, live, rows, i):
     own target before closing back below it)."""
     target = resistance_target(row.Close, row)
     sector, sector_rs_pct = sector_rs(ticker, row.Date)
+    # Pattern-specific volume telemetry (2026-09-13, critic-requested -- reclassified as
+    # post-hoc confidence display, not a live entry gate, but must stay VISIBLE, not
+    # disappear): VCP's real optimal volume window (50 days) is meaningfully longer than
+    # Breakout Continuation's (8 days, row.vol_zscore) -- showing BC's number on a VCP
+    # candidate would silently misrepresent its own validated telemetry.
+    vol_zscore = _vcp_vol_zscore(rows, i) if pattern == "coiled_spring" else row.vol_zscore
     return dict(
         ticker=ticker, pattern=pattern, close=row.Close, target=target,
         structural_low=structural_low, live=live,
         pct_chg=(row.Close / prev_row.Close - 1) * 100 if prev_row.Close else None,
         pct_to_target=(target / row.Close - 1) * 100 if target else None,
         target_tested_today=target is not None and row.High >= target,
-        vol_zscore=row.vol_zscore,
+        vol_zscore=vol_zscore,
         is_fo=ticker in _fo_tickers(),
         dual_pattern=_also_qualifies_other_pattern(ticker, pattern, rows, i),
         stop=_initial_stop(pattern, structural_low, row),

@@ -87,6 +87,7 @@ import pandas as pd
 from backtest import load
 from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT, _load_primed_cache_if_fresh
 from sector_strength import sector_rs
+import intraday_cache
 
 # Live volume checks (2026-09-07) -- see FINDINGS.md. Two checks, built and
 # validated against real data before wiring in: (1) fresh-breach volume vs a
@@ -106,6 +107,23 @@ _SESSION_END = dtime(15, 30)
 _SESSION_MINUTES = (datetime.combine(datetime.today(), _SESSION_END)
                     - datetime.combine(datetime.today(), _SESSION_START)).seconds / 60.0
 
+# Scan-window cutoff (2026-09-13, RQ from the critic's v30.1 audit): candidate generation
+# stops at this time -- NOT a "wait to settle" delay at the open (tested and rejected, see
+# below), only a cutoff on the LATE end. Two things validated together, on the fresh-only
+# (production) population, no start buffer: (1) the very first 5-min bar (9:15-9:20) is the
+# single best-performing bar of the day, not the worst -- delaying scanning at the open would
+# specifically cut the best window; (2) restricting new-candidate generation to 9:15-13:00
+# (vs the full 9:15-15:30 session) gives a real ~10-16% relative expectancy lift on both the
+# options day+1 metric and the real swing check_exit() outcome (options exp +1.005%->+1.100%,
+# swing +1.200%->+1.397%). Configurable to "14:00" for a gentler cutoff (smaller lift,
+# ~10.3% of trades excluded vs ~16.5% at 13:00, same direction). Validated on Breakout
+# Continuation's intraday-timed population only -- VCP has zero fires inside the intraday-
+# cache window to check separately (VCP fires far too rarely, roughly once per ticker per
+# ~6 years, to have landed in the ~3-4 month cache), so applying this to VCP candidates too
+# is a reasoned generalization (same market-microstructure mechanism, not pattern-specific),
+# not an empirically confirmed one -- revisit once real VCP fires accumulate in the cache.
+SCAN_END_TIME = "13:00"
+
 
 def _elapsed_session_fraction(now=None):
     now = now or datetime.now()
@@ -117,6 +135,45 @@ def _elapsed_session_fraction(now=None):
     elapsed = (datetime.combine(datetime.today(), t)
                - datetime.combine(datetime.today(), _SESSION_START)).seconds / 60.0
     return elapsed / _SESSION_MINUTES
+
+
+# RVOL@Trigger fix (2026-09-12, critic audit response-21): _elapsed_session_fraction's
+# linear scaling is wrong for volume specifically -- real intraday volume is front/back
+# -loaded (heavy near the open and close, quiet midday), not uniform, so a 9:22 breach
+# and a 2:50 breach were being compared against the WRONG expected baseline (each
+# should be judged against how much volume a normal day typically has ALREADY traded
+# by that exact clock time, not a flat fraction of the full day). This replaces the
+# linear assumption with a real, historical clock-time-matched profile built from
+# intraday_cache (median fraction of a normal day's total volume that has actually
+# accumulated by this time-of-day, across the last `lookback_days` cached sessions).
+# Falls back to the old linear fraction if no intraday history exists for a ticker
+# (e.g. never cached / too new) -- this must never hard-fail the live path.
+def _clock_time_volume_fraction(ticker, now=None, lookback_days=20):
+    now = now or datetime.now()
+    t = now.time()
+    if t <= _SESSION_START:
+        return 0.0
+    if t >= _SESSION_END:
+        return 1.0
+    try:
+        bars = intraday_cache.load(ticker)
+    except FileNotFoundError:
+        return _elapsed_session_fraction(now)
+    if bars.empty:
+        return _elapsed_session_fraction(now)
+    idx = bars.index.tz_convert("Asia/Kolkata").tz_localize(None)
+    bars = bars.set_axis(idx)
+
+    fractions = []
+    for day, day_bars in bars.groupby(bars.index.normalize()):
+        day_total = day_bars.Volume.sum()
+        if not day_total:
+            continue
+        so_far = day_bars[day_bars.index.time <= t].Volume.sum()
+        fractions.append(so_far / day_total)
+    if len(fractions) < 5:
+        return _elapsed_session_fraction(now)
+    return float(pd.Series(fractions).tail(lookback_days).median())
 
 
 def _normal_day_volume_baseline(df, already_extended, lookback=25):
@@ -222,6 +279,77 @@ def fire_tier(rate):
         if rate >= lower:
             return label
     return FIRE_TIERS[-1][1]
+
+
+# Fresh-setup filter (2026-09-12): real backtest finding on the HONEST live-equivalent
+# fire population (base_filters_pass + intraday breach only, no lookahead -- n=14,225,
+# full multi-year history) -- once a candidate has already fired, whether it holds
+# through day+1 depends heavily on how extended it already was BEFORE today, using only
+# yesterday's own close-based indicators (never today's -- today's own RSI/Volume aren't
+# fully known at breach time). Swept as percentile thresholds 10-50%, confirmed a real,
+# smooth, low-concentration (4-10%) plateau in both features independently:
+#   yday RSI14: Q1 (freshest) 63.6% win/+0.52% median -> Q4 (most overbought) 41.3%/-0.34%
+#   yday 20d momentum: Q1 (least extended) 64.7%/+0.48% -> Q4 (most extended) 45.2%/-0.24%
+# Combined as EITHER condition (OR, not AND): RSI and momentum only correlate at 0.52, so
+# some genuinely fresh setups show up fresh on only one of the two measures on a given
+# day -- AND (both fresh) is higher-precision (68.8% win, n=1,923, 18.1% of real winners
+# caught) but OR captures more than double the real opportunity (62.4% win, n=5,188,
+# 43.0% of real winners caught) for a similar concentration (4.5%). Given this project's
+# standing bias against throwing away real opportunity for a marginal quality bump, OR is
+# the one wired in here -- shown as a flag, NOT a hard exclusion filter, same "reference
+# context, not a gate" treatment as quality_score/sector_rs elsewhere in this file.
+RSI_FRESH_MAX = 63.1            # yesterday's RSI14, bottom-25% cutoff from the full population
+MOMENTUM_20D_FRESH_MAX = 7.6    # yesterday's 20-day trailing gain %, bottom-25% cutoff
+
+
+def _fresh_setup(row):
+    rsi_fresh = pd.notna(row.rsi14) and row.rsi14 <= RSI_FRESH_MAX
+    momentum_20d = ((row.Close / row.close_20ago - 1) * 100
+                     if pd.notna(row.close_20ago) and row.close_20ago else None)
+    momentum_fresh = momentum_20d is not None and momentum_20d <= MOMENTUM_20D_FRESH_MAX
+    return bool(rsi_fresh or momentum_fresh)
+
+
+# Continuous Freshness score (2026-09-12, critic response-21 Part 3/11): the boolean
+# fresh_setup above collapses "RSI=38, momentum=poor" and "RSI=62, momentum=strong" into
+# the same pass/fail bucket -- real information thrown away, since RSI and momentum only
+# correlate at 0.52 (not 1.0). Freshness = mean(RSI_percentile, momentum_percentile),
+# lower = fresher, checked directly against the boolean OR on the full 14,225-trade
+# population: at the SAME 25% population size, Freshness scores 65.0% win/+0.52% median
+# vs OR's 62.4%/+0.43% at a full 36.5% -- strictly more efficient, not just "as good".
+# Percentile breakpoints below are the real empirical quantiles (0/5/10/.../100%) of
+# yesterday's RSI14 and 20-day momentum across that same population -- a fixed lookup
+# table (same pattern as FIRE_RATE_BY_DISTANCE above), not recomputed live, so this
+# doesn't depend on today's small candidate pool the way a live cross-sectional rank
+# would. Interpolated linearly between breakpoints for anything in between.
+RSI_PCT_BREAKS = [41.28, 56.97, 59.22, 60.73, 62.01, 63.1, 64.02, 64.94, 65.8, 66.59, 67.45,
+                  68.33, 69.17, 70.01, 70.9, 71.86, 72.9, 74.05, 75.4, 77.23, 93.83]
+MOMENTUM_PCT_BREAKS = [-10.2, 3.46, 4.87, 5.89, 6.77, 7.61, 8.37, 9.17, 9.98, 10.86, 11.76,
+                       12.68, 13.72, 14.86, 16.15, 17.59, 19.5, 21.93, 25.42, 31.67, 155.28]
+_PCT_STEPS = [i / 20 for i in range(21)]  # 0.00, 0.05, ..., 1.00 -- matches the breaks above
+
+
+def _percentile_from_breaks(value, breaks):
+    if value <= breaks[0]:
+        return 0.0
+    if value >= breaks[-1]:
+        return 1.0
+    for i in range(1, len(breaks)):
+        if value <= breaks[i]:
+            lo, hi = breaks[i - 1], breaks[i]
+            frac = (value - lo) / (hi - lo) if hi > lo else 0.0
+            return _PCT_STEPS[i - 1] + frac * (_PCT_STEPS[i] - _PCT_STEPS[i - 1])
+    return 1.0
+
+
+def _freshness_score(row):
+    """Lower = fresher (less extended). None if RSI/momentum aren't computable."""
+    if pd.isna(row.rsi14) or pd.isna(row.close_20ago) or not row.close_20ago:
+        return None
+    rsi_pct = _percentile_from_breaks(row.rsi14, RSI_PCT_BREAKS)
+    momentum_20d = (row.Close / row.close_20ago - 1) * 100
+    mom_pct = _percentile_from_breaks(momentum_20d, MOMENTUM_PCT_BREAKS)
+    return 0.5 * rsi_pct + 0.5 * mom_pct
 
 
 # UX (2026-09-07): raw vol_vs_normal_pct/vol_vs_breakout_pct numbers are hard to
@@ -383,7 +511,7 @@ def classify_candidates(tickers, cutoff_ist=None):
         trigger_high = high10_effective * (1 + TRIGGER_CLEARANCE_HIGH)
         quality_score = quality_pool.loc[t, "quality_score"] if t in quality_pool.index else None
         sector, sector_rs_pct = sector_rs(t, feature_rows[t]["date"])
-        frac = _elapsed_session_fraction()
+        frac = _clock_time_volume_fraction(t)
         vol_so_far = bar.get("Volume")
         vol_vs_normal_pct = vol_vs_breakout_pct = None
         if vol_so_far is not None and frac > 0:
@@ -402,7 +530,8 @@ def classify_candidates(tickers, cutoff_ist=None):
                      quality_score=quality_score, sector=sector, sector_rs=sector_rs_pct,
                      extension_days=feature_rows[t]["extension_days"],
                      high10_effective=high10_effective,
-                     vol_vs_normal_pct=vol_vs_normal_pct, vol_vs_breakout_pct=vol_vs_breakout_pct)
+                     vol_vs_normal_pct=vol_vs_normal_pct, vol_vs_breakout_pct=vol_vs_breakout_pct,
+                     fresh_setup=_fresh_setup(row), freshness_score=_freshness_score(row))
 
         if bar["High"] >= trigger_low:
             pullback_pct = (bar["High"] - bar["Close"]) / bar["High"] * 100
@@ -497,8 +626,10 @@ def _print_tier(label, df, note, price_col, price_label):
         if has_velocity:
             vel = f"  vel={r.velocity_pct:+.2f}%/{VELOCITY_LOOKBACK_MIN}min" if pd.notna(r.velocity_pct) else "  vel=n/a"
         fire = f"  [{fire_tier(r.fire_rate_pct)}] ~{r.fire_rate_pct:.0f}%" if has_fire_rate and pd.notna(r.fire_rate_pct) else ""
+        fscore = r.get("freshness_score")
+        fresh = f"  freshness={fscore*100:.0f}%{' [FRESH]' if r.get('fresh_setup') else ''}" if fscore is not None and pd.notna(fscore) else ""
         print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}")
+              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{fresh}")
 
 
 if __name__ == "__main__":

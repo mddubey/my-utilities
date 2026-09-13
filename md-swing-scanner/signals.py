@@ -3,7 +3,10 @@ import pandas as pd
 CLOSE_NEAR_HIGH_PCT = 0.70   # close sits in top 30% of day's range — not specified in source spec, my pick
 VOL_SURGE_MIN = 1.20         # volume must be >=20% above yesterday's, not just "more"
 BREAKOUT_MIN_PCT = 1.005     # close must clear yesterday's high by >=0.5%, not just any amount
-VOL_ZSCORE_WINDOW = 8        # ADOPTED (2026-08-31): a 20-day trailing window can straddle two
+BC_VOL_Z_WINDOW = 8          # RENAMED (2026-09-13, was VOL_ZSCORE_WINDOW) -- critic-requested,
+                              # to visually pair with vcp.VCP_VOL_Z_WINDOW=50 (grep-able ownership
+                              # now that the two patterns have separately-validated windows).
+                              # ADOPTED (2026-08-31): a 20-day trailing window can straddle two
                               # different phases — an active prior move plus the quiet base that
                               # followed it — and the prior move's volume inflates the mean/std
                               # enough to mute a genuinely strong NEW volume day (real case:
@@ -52,7 +55,20 @@ VOL_ZSCORE_WINDOW = 8        # ADOPTED (2026-08-31): a 20-day trailing window ca
 # tool even where the backtest edge case for keeping them is weak. Revisit only if the
 # opposite problem shows up (too few signals), not to chase a marginal median gain.
 RSI_MIN = 55
-RSI_MAX = 80  # ADOPTED (2026-09-01, was 68). A round-5 outside-critique correction: VCP's
+RSI_MAX = 90  # ADOPTED (2026-09-13, was 80). RQ-34 "Validation Population Drift" audit:
+              # the original 80 (below) was swept on a population gated by
+              # breakout_continuation's vol_zscore>=1.5 -- a signal live_checkpoint.py can
+              # never actually check (end-of-day-only, unknowable at the moment a live
+              # intraday trigger fires). Re-swept 68/72/75/80/85/90/100 on the REAL
+              # live-equivalent population (base_filters_pass + intraday High cross only,
+              # no vol_zscore gate) that's actually what the live dashboard surfaces: both
+              # options (day+1) expectancy and swing (check_exit) expectancy, plus
+              # concentration (matching this original sweep's own primary metric), keep
+              # improving from 80 through 85 to 90, then genuinely flatten 90->100
+              # (options exp +0.316%->+0.494%->+0.578%->+0.617%; concentration
+              # 4.9%->3.2%->2.8%->2.7%). The true plateau on the population that matters
+              # sits at 90, not 80.
+# Prior history (2026-09-01, RSI_MAX was 80): a round-5 outside-critique correction: VCP's
               # "no RSI ceiling needed, even RSI>72 is fine" finding does NOT transfer to
               # Breakout Continuation just because they share the same RSI number — VCP at
               # RSI 75 usually means weeks of quiet basing (elevated only because today is
@@ -63,7 +79,7 @@ RSI_MAX = 80  # ADOPTED (2026-09-01, was 68). A round-5 outside-critique correct
               # drops monotonically 52.2%->26.5%->24.3%->16.4%->15.7%->16.5% and flattens
               # right at 80 (85/100 statistically indistinguishable from 80 on every metric)
               # — same real-improvement-then-plateau shape as vcp.LAST_LEG_TOLERANCE and
-              # VOL_ZSCORE_WINDOW. Sample triples (211->767 BC trades) — real, not thin: only
+              # BC_VOL_Z_WINDOW. Sample triples (211->767 BC trades) — real, not thin: only
               # ~90 of those are poached from VCP (VCP's own n drops 713->663, its own
               # win/median/concentration barely move, 61.6%->61.7%/62.1%, ~2.9% flat,
               # 19.5%->22.0%), the rest fire under NEITHER pattern today. Checked the poached
@@ -132,13 +148,13 @@ def build_indicators(df):
     df["sma200_20ago"] = df.sma200.shift(20)  # for "200MA trending up for at least a month"
     df["high_252"] = df.High.rolling(252).max()
     df["low_252"] = df.Low.rolling(252).min()
-    # z-score volume (prior VOL_ZSCORE_WINDOW days, excludes today — same no-lookahead
+    # z-score volume (prior BC_VOL_Z_WINDOW days, excludes today — same no-lookahead
     # convention as the rest of this file), for testing as an alternative to the flat
     # "1.2x yesterday" checklist item
-    vol_prior = df.Volume.shift(1).rolling(VOL_ZSCORE_WINDOW)
-    df["vol_mean20_prior"] = vol_prior.mean()
-    df["vol_std20_prior"] = vol_prior.std()
-    df["vol_zscore"] = (df.Volume - df.vol_mean20_prior) / df.vol_std20_prior
+    vol_prior = df.Volume.shift(1).rolling(BC_VOL_Z_WINDOW)
+    df["vol_mean_prior"] = vol_prior.mean()
+    df["vol_std_prior"] = vol_prior.std()
+    df["vol_zscore"] = (df.Volume - df.vol_mean_prior) / df.vol_std_prior
     return df
 
 

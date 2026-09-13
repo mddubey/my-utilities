@@ -88,25 +88,29 @@ def test_base_pivot_none_when_recent_low_is_stale():
 
 def test_vcp_breakout_fires_on_close_above_pivot_with_sufficient_zscore(monkeypatch):
     monkeypatch.setattr(vcp, "base_pivot", lambda df, i: (100.0, 90.0))
-    df = pd.DataFrame({"Close": [101.0], "vol_zscore": [1.0]})
+    monkeypatch.setattr(vcp, "_vcp_vol_zscore", lambda df, i: 1.0)
+    df = pd.DataFrame({"Close": [101.0]})
     assert vcp_breakout(df, 0, zscore_min=0.5) == (100.0, 90.0)
 
 
 def test_vcp_breakout_none_when_volume_insufficient(monkeypatch):
     monkeypatch.setattr(vcp, "base_pivot", lambda df, i: (100.0, 90.0))
-    df = pd.DataFrame({"Close": [101.0], "vol_zscore": [0.1]})
+    monkeypatch.setattr(vcp, "_vcp_vol_zscore", lambda df, i: 0.1)
+    df = pd.DataFrame({"Close": [101.0]})
     assert vcp_breakout(df, 0, zscore_min=0.5) is None
 
 
 def test_vcp_breakout_none_when_close_not_above_pivot(monkeypatch):
     monkeypatch.setattr(vcp, "base_pivot", lambda df, i: (100.0, 90.0))
-    df = pd.DataFrame({"Close": [99.0], "vol_zscore": [5.0]})
+    monkeypatch.setattr(vcp, "_vcp_vol_zscore", lambda df, i: 5.0)
+    df = pd.DataFrame({"Close": [99.0]})
     assert vcp_breakout(df, 0, zscore_min=0.5) is None
 
 
 def test_vcp_breakout_none_when_no_base_found(monkeypatch):
     monkeypatch.setattr(vcp, "base_pivot", lambda df, i: None)
-    df = pd.DataFrame({"Close": [101.0], "vol_zscore": [5.0]})
+    monkeypatch.setattr(vcp, "_vcp_vol_zscore", lambda df, i: 5.0)
+    df = pd.DataFrame({"Close": [101.0]})
     assert vcp_breakout(df, 0, zscore_min=0.5) is None
 
 

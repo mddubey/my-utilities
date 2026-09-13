@@ -38,6 +38,25 @@ VCP_VOL_ZSCORE_MIN = 0.5      # actual default — verified via sweep (2026-08-3
                                # loosest z-score version (>=0, "just above average") tripled
                                # the sample (14->41) AND improved every quality metric versus
                                # the flat 1.8x ratio; 0.5 was the smooth optimum, not a cherry-pick
+VCP_VOL_Z_WINDOW = 50    # ADOPTED (2026-09-13, was implicitly signals.BC_VOL_Z_WINDOW=8,
+                               # shared with Breakout Continuation). RQ-34 audit: re-swept this
+                               # pattern's own volume-baseline window in isolation (5-60 days,
+                               # live-equivalent population -- structural base_pivot() + intraday
+                               # breach, no vol_zscore gate at entry time) rather than assuming
+                               # BC's 8-day answer transfers. Rank-correlation between this
+                               # window's z-score and real day+1 pnl climbs steadily from 5
+                               # through 30 (0.028->0.288), then genuinely plateaus 32-60
+                               # (0.288-0.295, flat) -- confirmed a real plateau, not thinning-
+                               # sample noise, since this metric uses the full population at
+                               # every window (not a shrinking threshold-cut subset). 50 sits
+                               # inside that empirical plateau AND matches the externally-cited
+                               # Minervini/IBD convention (breakout volume commonly measured
+                               # against a 50-day average) -- both the data and the published
+                               # methodology agree, so 50 rather than an arbitrary point in the
+                               # 32-60 flat range. Makes sense structurally too: VCP measures a
+                               # slow multi-week volume dry-up/expansion, a genuinely different
+                               # timescale from BC's fast momentum burst -- the two patterns were
+                               # never going to share one optimal window.
 LAST_LEG_TOLERANCE = 0.40     # ADOPTED (2026-08-31): the strict last_depth<=depths[-2] rule
                                # required the final leg to be tighter than the PRIOR leg with
                                # zero slack — a human reading a chart wouldn't reject a base
@@ -139,6 +158,20 @@ def base_pivot(df, i):
     return legs[-1][1], legs[-1][3]  # (swing high before the final pullback, that pullback's low)
 
 
+def _vcp_vol_zscore(df, i, window=VCP_VOL_Z_WINDOW):
+    """This pattern's own volume z-score, using VCP_VOL_Z_WINDOW (not the shared,
+    BC-tuned signals.BC_VOL_Z_WINDOW=8 column) — same no-lookahead convention as
+    signals.py (window is the `window` days strictly BEFORE today, excluding today)."""
+    start = max(0, i - window)
+    window_vol = df.Volume.iloc[start:i]
+    if len(window_vol) < window:
+        return None
+    std = window_vol.std()
+    if not std:
+        return None
+    return (df.Volume.iloc[i] - window_vol.mean()) / std
+
+
 def vcp_breakout(df, i, zscore_min=VCP_VOL_ZSCORE_MIN):
     """Returns (pivot, structural_low) if today (index i) breaks out of a genuine
     multi-contraction base on real volume, else None. Does NOT include the trend
@@ -150,7 +183,8 @@ def vcp_breakout(df, i, zscore_min=VCP_VOL_ZSCORE_MIN):
     pivot, structural_low = base
     row = df.iloc[i]
     if zscore_min is not None:
-        volume_ok = pd.notna(row.vol_zscore) and row.vol_zscore >= zscore_min
+        vz = _vcp_vol_zscore(df, i)
+        volume_ok = vz is not None and vz >= zscore_min
     else:
         baseline_vol = df.Volume.iloc[max(0, i - 10):i].mean()
         volume_ok = row.Volume >= VCP_BREAKOUT_VOL_MULT * baseline_vol
