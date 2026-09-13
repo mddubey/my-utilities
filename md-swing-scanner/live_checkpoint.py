@@ -176,6 +176,62 @@ def _clock_time_volume_fraction(ticker, now=None, lookback_days=20):
     return float(pd.Series(fractions).tail(lookback_days).median())
 
 
+ACCEPTANCE_STREAK_THRESHOLD = 3  # consecutive 5-min closes above trigger_low
+
+# Execution telemetry (2026-09-13, critic-requested display -- Body/ATR and Acceptance
+# state, post-hoc confidence signals, NEVER gates -- see RQ-37/FINDINGS.md, both
+# tested and rejected as entry or stop-management gates). ONLY intraday_cache has
+# TODAY's actual 5-min bars, and intraday_cache.refresh() is normally a separate,
+# periodic job -- it does NOT update automatically as this file runs. So this
+# refreshes just the one already-fired ticker on demand (never the full watching
+# pool -- that would mean a live yfinance call per candidate in a 500-ticker
+# universe, an unbounded cost this file's whole two-pass design exists to avoid).
+# A network hiccup here must never break the rest of the dashboard -- falls back to
+# (None, "Pending") on any failure, same "never hard-fail the live path" convention
+# as _clock_time_volume_fraction above.
+def _execution_telemetry(ticker, trigger_low, atr14, now=None):
+    """Returns (body_atr, acceptance_state) for a ticker that has ALREADY fired today.
+    body_atr: |Close-Open|/ATR14 of the breach bar (the first bar where High crossed
+    trigger_low) -- None if unavailable. acceptance_state: "Accepted" if the streak of
+    consecutive closes above trigger_low ever reached ACCEPTANCE_STREAK_THRESHOLD
+    today (as of `now`), else "Pending" -- deliberately never "Rejected" live, since
+    the day isn't over and the streak could still develop; that judgment only makes
+    sense in hindsight, after market close."""
+    now = now or datetime.now()
+    if pd.isna(atr14) or not atr14:
+        return None, "Pending"
+    try:
+        intraday_cache.refresh([ticker])
+        bars = intraday_cache.load(ticker)
+    except Exception:
+        return None, "Pending"
+    if bars.empty:
+        return None, "Pending"
+    idx = bars.index.tz_convert("Asia/Kolkata").tz_localize(None)
+    bars = bars.set_axis(idx)
+    today = bars[bars.index.normalize() == pd.Timestamp(now.date())]
+    today = today[today.index.time <= now.time()]
+    if today.empty:
+        return None, "Pending"
+    crossed = today[today.High >= trigger_low]
+    if crossed.empty:
+        return None, "Pending"
+    breach_bar = crossed.iloc[0]
+    body_atr = abs(breach_bar.Close - breach_bar.Open) / atr14
+
+    streak = 0
+    accepted = False
+    for close in today[today.index >= crossed.index[0]].Close:
+        if close > trigger_low:
+            streak += 1
+            if streak >= ACCEPTANCE_STREAK_THRESHOLD:
+                accepted = True
+                break
+        else:
+            streak = 0
+    return body_atr, ("Accepted" if accepted else "Pending")
+
+
 def _normal_day_volume_baseline(df, already_extended, lookback=25):
     """Median daily Volume over the last `lookback` cached rows, excluding any
     day that was itself already inside a breakout run -- avoids a recent spike
@@ -352,6 +408,28 @@ def _freshness_score(row):
     return 0.5 * rsi_pct + 0.5 * mom_pct
 
 
+CONSOLIDATION_LOOKBACK = 20   # trading days
+CONSOLIDATION_TOLERANCE_PCT = 3.0  # Close within this %-below-high10_prior counts as "quiet"
+
+
+def _consolidation_days(df, i):
+    """Count of days in the trailing CONSOLIDATION_LOOKBACK days where that day's own
+    Close sat within CONSOLIDATION_TOLERANCE_PCT% below that day's own high10_prior --
+    quiet, not-yet-broken-out base-building, not extension. Real, validated (2026-09-13):
+    correlation with the formal VCP base detector is -0.038, genuinely not redundant with
+    it. Display/ranking context only, never a gate -- daily-bar only, no live data gap."""
+    start = max(0, i - CONSOLIDATION_LOOKBACK)
+    window = df.iloc[start:i]
+    count = 0
+    for r in window.itertuples():
+        if pd.isna(r.high10_prior) or not r.high10_prior:
+            continue
+        gap_pct = (r.high10_prior - r.Close) / r.high10_prior * 100
+        if 0 <= gap_pct <= CONSOLIDATION_TOLERANCE_PCT:
+            count += 1
+    return count
+
+
 # UX (2026-09-07): raw vol_vs_normal_pct/vol_vs_breakout_pct numbers are hard to
 # scan at a glance mid-market -- same categorical-tag treatment as FIRE_TIERS,
 # thresholds picked against today's real observed range (16-455%).
@@ -482,12 +560,14 @@ def classify_candidates(tickers, cutoff_ist=None):
 
         normal_vol_baseline, normal_vol_n = _normal_day_volume_baseline(df, already_extended)
         breakout_day_vol = _breakout_day_volume(df, already_extended) if extension_days >= 1 else None
+        consolidation_days = _consolidation_days(df, i)
 
         feature_rows[t] = dict(row=df.iloc[i], features=_quality_features(t, df, i),
                                 date=df.iloc[i].Date, high10_effective=high10_effective,
                                 extension_days=extension_days,
                                 normal_vol_baseline=normal_vol_baseline, normal_vol_n=normal_vol_n,
-                                breakout_day_vol=breakout_day_vol)
+                                breakout_day_vol=breakout_day_vol,
+                                consolidation_days=consolidation_days)
 
     quality_pool = pd.DataFrame({t: v["features"] for t, v in feature_rows.items()}).T
     if not quality_pool.empty:
@@ -531,7 +611,8 @@ def classify_candidates(tickers, cutoff_ist=None):
                      extension_days=feature_rows[t]["extension_days"],
                      high10_effective=high10_effective,
                      vol_vs_normal_pct=vol_vs_normal_pct, vol_vs_breakout_pct=vol_vs_breakout_pct,
-                     fresh_setup=_fresh_setup(row), freshness_score=_freshness_score(row))
+                     fresh_setup=_fresh_setup(row), freshness_score=_freshness_score(row),
+                     consolidation_days=feature_rows[t]["consolidation_days"])
 
         if bar["High"] >= trigger_low:
             pullback_pct = (bar["High"] - bar["Close"]) / bar["High"] * 100
@@ -544,10 +625,12 @@ def classify_candidates(tickers, cutoff_ist=None):
             # just staying inside it.
             clearance_vs_raw_pivot_pct = (bar["Close"] / high10_effective - 1) * 100
             entry_vs_trigger_pct = (bar["Close"] / trigger_low - 1) * 100
+            body_atr, acceptance_state = _execution_telemetry(t, trigger_low, row.atr14)
             rec = dict(**common, day_high=bar["High"], current_price=bar["Close"],
                       pullback_pct=pullback_pct, clearance_now_pct=clearance_now_pct,
                       clearance_vs_raw_pivot_pct=clearance_vs_raw_pivot_pct,
-                      entry_vs_trigger_pct=entry_vs_trigger_pct)
+                      entry_vs_trigger_pct=entry_vs_trigger_pct,
+                      body_atr=body_atr, acceptance_state=acceptance_state)
             band_ceiling_pct = TRIGGER_CLEARANCE_HIGH * 100  # 0.6%, the official band's own top edge
             # Downside deliberately uncapped (2026-09-07, explicit user instruction):
             # further below the raw pivot is only ever a BETTER price, never "missed" --
@@ -628,8 +711,14 @@ def _print_tier(label, df, note, price_col, price_label):
         fire = f"  [{fire_tier(r.fire_rate_pct)}] ~{r.fire_rate_pct:.0f}%" if has_fire_rate and pd.notna(r.fire_rate_pct) else ""
         fscore = r.get("freshness_score")
         fresh = f"  freshness={fscore*100:.0f}%{' [FRESH]' if r.get('fresh_setup') else ''}" if fscore is not None and pd.notna(fscore) else ""
+        cdays = r.get("consolidation_days")
+        consol = f"  consol={cdays:.0f}d" if cdays is not None and pd.notna(cdays) else ""
+        batr = r.get("body_atr")
+        body = f"  body/atr={batr:.2f}" if batr is not None and pd.notna(batr) else ""
+        accept = r.get("acceptance_state")
+        acc = f"  accept={accept}" if accept else ""
         print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{fresh}")
+              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}")
 
 
 if __name__ == "__main__":
