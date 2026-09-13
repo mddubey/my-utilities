@@ -1797,3 +1797,28 @@ RVOL@Trigger left genuinely inconclusive, not rejected: only 364/690 trades have
 Nothing from today beyond the two `live_checkpoint.py` wire-ins (Freshness Score, RVOL@Trigger *fraction* fix — the clock-time volume fraction is still a real, correct fix and stays wired in; only the *predictive* RVOL@Trigger feature itself is what got re-rejected above) is adopted into production. Standing rejections as of today: acceptance-delay/streak-confirmation as an entry gate; runaway-vs-pullback prediction as a target; acceptance as an execution-state stop-tightening trigger; RVOL@Trigger as a predictive feature (corrected verdict, see above — inconclusive/rejected, not promoted). Standing "real but not yet actionable" findings: body_atr as a fragility signal (not win-rate, not runaway-shape); velocity as a weak swing-side lead. Portfolio-constrained ranking is unresolved/inconclusive pending a more robust test. Freshness Score remains the only signal validated across every population, every exit regime, and every metric (win rate, magnitude, fragility) tested so far.
 
 **Standing methodology lesson from this correction**: when re-implementing a production formula for offline research, verify against the actual source (`grep`/`Read` the real function), don't reconstruct it from memory or a "close enough" existing column — a plain 20-day mean vs. a 25-day median-excluding-extension-days looks like a trivial difference but changed a "promote" verdict into a "no signal" one.
+
+## RVOL@Trigger — RETIRED (2026-09-13, final). RQ-37 — CLOSED/ARCHIVED.
+
+**RVOL@Trigger.** The underlying full-day `vol_zscore` signal is real and large (a ~25-point win-rate gap on the honest live-equivalent population, bigger than freshness's own effect) — never in question. RVOL@Trigger, the real-time proxy for that end-of-day event, is also genuinely time-gated (correlation with the real event grows from +0.118 at <30min elapsed to +0.58 at 2-3hr, confirmed not a U-shape/curve-tracking artifact but simple cumulative-data reliability). But across every way it was actually tested as a *decision* tool this session, it never converted into a usable edge:
+1. Win-rate quartile cut on the raw metric — no signal (update-28/31, corrected in the RVOL baseline fix above).
+2. Hindsight proxy-chain (does high RVOL reliably flag the real event, does that translate to win rate) — the event-detection step works (10.7%→53.6% hit rate by quartile) but doesn't chain through to a clean win-rate effect at available sample sizes (2hr+ subset, n=222, rank-corr -0.001).
+3. **Capital-allocation/portfolio-ranking test (the critic's own proposed final experiment, with a pre-declared retirement rule)**: for every day with multiple already-fired candidates (66 days in the intraday-covered window, up to 32 simultaneous fires), ranked Freshness-only vs. Freshness+RVOL vs. Freshness+Distance vs. all three, capped at 2 or 3 positions:
+
+| Cap | Freshness only | Freshness + RVOL |
+|---|---|---|
+| 2 | 65.0% win / +0.60% med / +0.88% mean | 59.2% / +0.35% / +0.64% |
+| 3 | 62.4% / +0.39% / +0.66% | 57.3% / +0.20% / +0.54% |
+
+Freshness+RVOL underperforms Freshness-only at both caps, on every metric, not close (n=522, the full available intraday-covered sample, not a cherry-pick). **Per the critic's own pre-declared rule ("if Freshness+RVOL does not outperform Freshness-only, RVOL leaves the production roadmap completely, no more maybe") — RVOL@Trigger is retired.**
+
+**Rejected item: RVOL@Trigger.** Reason: predicts end-of-day volume correctly, but does not improve entry filtering, portfolio ranking, or D+1 expectancy over Freshness, across three independent tests. Not to be revisited unless a genuinely new decision mechanism is proposed (not another win-rate cut or hindsight chain). The underlying `_clock_time_volume_fraction` fix in `live_checkpoint.py` stays wired in as a correct, standalone fix (real intraday volume is front/back-loaded, not linear) — only the *predictive* RVOL@Trigger feature built on top of it is retired.
+
+**RQ-37 (acceptance as an execution-state variable for stop management) — closed, archived.** Three independent tests, three independent failures, same underlying mechanism each time:
+- Wait for acceptance before entering (update-27) → loses the edge (premium paid erases it).
+- Tighten the stop on non-acceptance after entering (update-30) → loses the edge (54.5%→42.1% win on the rejected subset; whipsaws out recoverable trades).
+- Pullback/retest confirmation as a quality filter (pullback-after-streak work) → loses the edge (filters out the best trades — the 21.2% "runaway" group — not the worst ones).
+
+**Do not revisit "acceptance-based stop tightening" or "wait for confirmation" in any form.** If acceptance/streak state comes back as a research thread, it must be for a genuinely different purpose (e.g., a passive confidence display, never gating entry or modifying an open position's risk).
+
+**Standing methodology note, now a permanent project principle**: measurement correctness is different from decision usefulness. Checklist Pass, Acceptance Streak, RVOL, and Body/ATR were all measured *correctly* at some point in this project's history — none of the four turned out to be useful for a live decision (entry gate, portfolio rank, or stop management) once tested honestly. A signal passing a correctness check is necessary, not sufficient, before it can be trusted to drive a real action.
