@@ -180,40 +180,31 @@ ACCEPTANCE_STREAK_THRESHOLD = 3  # consecutive 5-min closes above trigger_low
 
 # Execution telemetry (2026-09-13, critic-requested display -- Body/ATR and Acceptance
 # state, post-hoc confidence signals, NEVER gates -- see RQ-37/FINDINGS.md, both
-# tested and rejected as entry or stop-management gates). ONLY intraday_cache has
-# TODAY's actual 5-min bars, and intraday_cache.refresh() is normally a separate,
-# periodic job -- it does NOT update automatically as this file runs. So this
-# refreshes just the one already-fired ticker on demand (never the full watching
-# pool -- that would mean a live yfinance call per candidate in a 500-ticker
-# universe, an unbounded cost this file's whole two-pass design exists to avoid).
-# A network hiccup here must never break the rest of the dashboard -- falls back to
-# (None, "Pending") on any failure, same "never hard-fail the live path" convention
-# as _clock_time_volume_fraction above.
-def _execution_telemetry(ticker, trigger_low, atr14, now=None):
+# tested and rejected as entry or stop-management gates). Reuses the real per-5-min-bar
+# data fetch_live_bars(..., return_bars=True) already makes for the whole pool in one
+# batched call -- no separate fetch needed. (An earlier version of this function called
+# intraday_cache.refresh() per ticker, redundantly re-fetching what was already pulled
+# and thrown away moments earlier; corrected once caught.)
+def _execution_telemetry(intraday_window, trigger_low, atr14):
     """Returns (body_atr, acceptance_state) for a ticker that has ALREADY fired today.
     body_atr: |Close-Open|/ATR14 of the breach bar (the first bar where High crossed
     trigger_low) -- None if unavailable. acceptance_state: "Accepted" if the streak of
     consecutive closes above trigger_low ever reached ACCEPTANCE_STREAK_THRESHOLD
-    today (as of `now`), else "Pending" -- deliberately never "Rejected" live, since
-    the day isn't over and the streak could still develop; that judgment only makes
-    sense in hindsight, after market close."""
-    now = now or datetime.now()
-    if pd.isna(atr14) or not atr14:
+    today (as of the window's last bar), else "Pending" -- deliberately never
+    "Rejected" live, since the day isn't over and the streak could still develop;
+    that judgment only makes sense in hindsight, after market close.
+
+    intraday_window: today's real per-5-min-bar dataframe, reused directly from
+    fetch_live_bars(..., return_bars=True)'s "_intraday_window" -- NOT a fresh fetch
+    (2026-09-13, corrected: an earlier version of this function called
+    intraday_cache.refresh() per ticker here, which re-fetched data that
+    fetch_live_bars had already pulled moments earlier in the same call and then
+    discarded -- redundant, less efficient than reusing it, and wrote to disk
+    unnecessarily; intraday_cache is for long-term historical backfill, not
+    same-day live polling)."""
+    if pd.isna(atr14) or not atr14 or intraday_window is None or intraday_window.empty:
         return None, "Pending"
-    try:
-        intraday_cache.refresh([ticker])
-        bars = intraday_cache.load(ticker)
-    except Exception:
-        return None, "Pending"
-    if bars.empty:
-        return None, "Pending"
-    idx = bars.index.tz_convert("Asia/Kolkata").tz_localize(None)
-    bars = bars.set_axis(idx)
-    today = bars[bars.index.normalize() == pd.Timestamp(now.date())]
-    today = today[today.index.time <= now.time()]
-    if today.empty:
-        return None, "Pending"
-    crossed = today[today.High >= trigger_low]
+    crossed = intraday_window[intraday_window.High >= trigger_low]
     if crossed.empty:
         return None, "Pending"
     breach_bar = crossed.iloc[0]
@@ -221,7 +212,7 @@ def _execution_telemetry(ticker, trigger_low, atr14, now=None):
 
     streak = 0
     accepted = False
-    for close in today[today.index >= crossed.index[0]].Close:
+    for close in intraday_window[intraday_window.index >= crossed.index[0]].Close:
         if close > trigger_low:
             streak += 1
             if streak >= ACCEPTANCE_STREAK_THRESHOLD:
@@ -516,7 +507,7 @@ def classify_candidates(tickers, cutoff_ist=None):
     pool = cached if cached is not None else shortlist_primed(tickers)
     effective_cutoff = cutoff_ist or LIVE_CUTOFF_DEFAULT
     prior_cutoff = _minus_minutes(effective_cutoff, VELOCITY_LOOKBACK_MIN)
-    live = fetch_live_bars(pool, cutoff_ist=effective_cutoff)
+    live = fetch_live_bars(pool, cutoff_ist=effective_cutoff, return_bars=True)
     live_prior = fetch_live_bars(pool, cutoff_ist=prior_cutoff)
 
     feature_rows = {}
@@ -625,7 +616,8 @@ def classify_candidates(tickers, cutoff_ist=None):
             # just staying inside it.
             clearance_vs_raw_pivot_pct = (bar["Close"] / high10_effective - 1) * 100
             entry_vs_trigger_pct = (bar["Close"] / trigger_low - 1) * 100
-            body_atr, acceptance_state = _execution_telemetry(t, trigger_low, row.atr14)
+            intraday_window = bar.get("_intraday_window")
+            body_atr, acceptance_state = _execution_telemetry(intraday_window, trigger_low, row.atr14)
             rec = dict(**common, day_high=bar["High"], current_price=bar["Close"],
                       pullback_pct=pullback_pct, clearance_now_pct=clearance_now_pct,
                       clearance_vs_raw_pivot_pct=clearance_vs_raw_pivot_pct,

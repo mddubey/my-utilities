@@ -186,9 +186,19 @@ def _load_primed_cache_if_fresh():
     return payload.get("tickers")
 
 
-def fetch_live_bars(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT):
+def fetch_live_bars(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT, return_bars=False):
     """Pass 2 — see module docstring. Returns {ticker: {Date, Open, High, Low, Close,
-    Volume}} for tickers with usable intraday data up to cutoff_ist today."""
+    Volume}} for tickers with usable intraday data up to cutoff_ist today.
+
+    return_bars=False (default, unchanged behavior): only the aggregate.
+    return_bars=True (2026-09-13, for live_checkpoint.py's execution telemetry):
+    also keeps the real per-5-min-bar `window` dataframe under "_intraday_window" --
+    this function ALREADY does one single batched yf.download for every ticker in
+    `tickers`, real per-bar granularity, then throws it all away keeping only the
+    aggregate. A second, separate per-ticker fetch to get that same granularity back
+    (which is what an earlier version of this feature did, via intraday_cache.refresh())
+    is both redundant and less efficient than just keeping what's already here --
+    caller must not mutate/persist "_intraday_window", it's only for same-call reuse."""
     if not tickers:
         return {}
     yf_tickers = [f"{t}.NS" for t in tickers]
@@ -213,6 +223,8 @@ def fetch_live_bars(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT):
             Date=today, Open=window.Open.iloc[0], High=window.High.max(),
             Low=window.Low.min(), Close=window.Close.iloc[-1], Volume=window.Volume.sum(),
         )
+        if return_bars:
+            bars[t]["_intraday_window"] = window
     return bars
 
 
