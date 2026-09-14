@@ -1822,3 +1822,196 @@ Freshness+RVOL underperforms Freshness-only at both caps, on every metric, not c
 **Do not revisit "acceptance-based stop tightening" or "wait for confirmation" in any form.** If acceptance/streak state comes back as a research thread, it must be for a genuinely different purpose (e.g., a passive confidence display, never gating entry or modifying an open position's risk).
 
 **Standing methodology note, now a permanent project principle**: measurement correctness is different from decision usefulness. Checklist Pass, Acceptance Streak, RVOL, and Body/ATR were all measured *correctly* at some point in this project's history — none of the four turned out to be useful for a live decision (entry gate, portfolio rank, or stop management) once tested honestly. A signal passing a correctness check is necessary, not sufficient, before it can be trusted to drive a real action.
+
+## Multi-timeframe EMA support hypothesis (2026-09-14) — real, but options and swing need different timeframes; two variants dropped; EMA34-break exit overlay re-confirmed rejected.
+
+**Origin**: user's own trading experience — "34EMA hourly + 8EMA daily used to be a deadly combo for intraday," and for swing the equivalent support should sit one timeframe wider (hourly→daily/weekly). Confirmed via web search this is a real, standard multi-timeframe EMA technique (8/13/21/34 "EMA ribbon"), though the common convention is same-period-across-timeframes-for-alignment or fast-EMA-entry/slow-EMA-anchor-on-one-timeframe — not the specific "34 on the short TF, 8 on the long TF" cross-swap the user recalled. Tested the literal hypothesis anyway rather than dismissing on convention alone.
+
+**Correction to an earlier result in this same thread (a real bug, not just refinement)**: the first hourly EMA8/34 bucket table built for OPTIONS used a 3-trading-day forward window to classify "touched EMA8 only / touched EMA34 held / touched EMA34 broke," then correlated it against `day1_pnl_pct` (the day+1-open options exit). But the options position is already closed at day+1's open — so most of that 3-day window (day+1, day+2) occurs *after* the trade has already settled. Not a live-available signal, just a same-underlying-quality correlate. Recomputed on the only genuinely actionable window (same entry day only, `hourly_ema_actionable_window.py`) — the ladder inverts:
+
+| Same-day-only bucket | n | OPTIONS win | med |
+|---|---|---|---|
+| never touched EMA8/34 all day | 191 (40.9%) | **87.4%** | **+1.54%** |
+| touched EMA8 only | 229 (49.0%) | 52.8% | +0.10% |
+| touched EMA34, held | 30 (6.4%) | 53.3% | +0.09% |
+| touched EMA34, broke | 17 (3.6%) | 41.2% | -0.47% |
+
+Read: for options, it isn't "shallow pullback to 8 fine, break of 34 bad" — it's "any same-day pullback at all is a big step down from a clean run," full stop. The earlier (wrong) 3-day-window table stays useful for SWING though, since a swing position is genuinely still open across those days — no lookahead problem there.
+
+**Daily-level search for the best swing support (`daily_level_search.py`) — originally run on the 467-trade fresh population, corrected below to a properly-powered n=7,108. See the population-size audit section at the end of this entry** for why and what changed. Ranked by win-rate spread (never_touched − broke), final (big-population) numbers:
+
+| Level | never_touched | held | broke | spread | n (never/held/broke) |
+|---|---|---|---|---|---|
+| SMA50 | 84.3%/+3.82% | 56.1%/+0.95% | 22.6%/-7.05% | +61.7pp | 3804/1142/2116 |
+| EMA34 | 93.3%/+4.83% | 74.2%/+2.61% | 32.2%/-5.30% | +61.1pp | 2356/1506/3246 |
+| EMA21 | 98.3%/+5.72% | 88.7%/+3.89% | 42.7%/-1.68% | +55.6pp | 1075/1577/4456 |
+| EMA8 | 96.0%/+6.11% | 98.3%/+5.68% | 57.8%/+1.28% | +38.2pp | 25/597/6486 |
+| SMA150 | 69.6%/+2.64% | 46.5%/-1.05% | 36.5%/-4.95% | +33.1pp | 5055/434/1189 |
+| SMA200 | 68.0%/+2.50% | 54.1%/+0.46% | 42.3%/-2.75% | +25.7pp | 4954/296/1177 |
+
+**Ranking is unchanged from the small-sample version** (SMA50 ≈ EMA34 > EMA21 > EMA8 > SMA150 > SMA200) — same conclusion, ~15x the data. EMA34/SMA50 remain the best, essentially tied (already the adopted swing signal). EMA21 remains a genuine secondary/early-warning signal, not a replacement — holding it costs little (98.3%→88.7%) but breaking it is nearly as damaging as breaking EMA34 (42.7% win). EMA8's "held"/"never touched" buckets turned out even stronger once properly sampled (n=25/597 vs the earlier unreliable n=11/40) — 98.3% win when held — but it's still the weakest *discriminator* in practice, since 91% of the population (6,486/7,108) breaks it regardless, so it rarely segments anything. SMA150/SMA200 confirmed weaker.
+
+**Touch-bar direction (bullish vs bearish close), not "pin bar" shape, is what actually carries signal — and it's timeframe-matched to product, exactly like everything else this project has found. Numbers below are the corrected, big-population (n=7,108) version — see the audit section for what changed from the original small-sample run:**
+
+- Hourly EMA8, same-day window, OPTIONS (genuinely intraday-dependent, can't be re-run on a bigger population — no intraday data exists before the 93-day cache): bullish close at touch 66.4%/+0.38% (n=116) vs bearish close 41.1%/-0.46% (n=158) — a real ~25pp gap, checked for outlier concentration (broad distribution, 14 separate wins from +0.17% to +1.84%, not one lucky trade). A stricter "true pin bar" (bullish + closes back above + lower wick ≥2× body) pushes to 76.5% but thins to n=17 — promising, not proven. Swing side on the same touch bucket is flat (60.3% vs 57.6%) — options-specific, as expected. This one stays on the small sample; there is no bigger population to check it against.
+- Daily EMA8, 20-day window: bullish close at touch — OPTIONS 60.2%/+0.35% (n=1,959) vs bearish 60.7%/+0.37% (n=5,124), flat as expected; SWING 72.5%/+2.94% vs 56.9%/+1.17% — a real ~15.6pp gap, confirms the small-sample read (71.4% vs 57.0%) almost exactly.
+- **Daily EMA34 touch-bar direction — corrected, was reported as noise, is actually real.** Small sample (n=52 vs 219) showed 44.2% vs 42.0%, called noise. Big sample (n=959 vs 3,793): SWING 55.3%/+0.73% (bullish) vs 43.0%/-1.75% (bearish) — a genuine ~12.3pp gap, and win rate is a count-based metric so this isn't a magnitude-outlier artifact (≈530 vs ≈1,631 winners, not a handful of trades). OPTIONS stays flat both times (57.9% vs 56.2%). The small sample was simply underpowered, not showing a true null — retracting the "noise" call. The n=20 thin pin-bar-off-EMA34 curiosity (85.0% options / 40.0% swing) wasn't re-tested at scale and is left as originally reported, flagged thin.
+
+## Population-size audit on the EMA/stall thread — two corrections, two reconfirmations (2026-09-14, continued)
+
+**The bug**: several tests above (`daily_level_search.py`, `daily_pinbar_check.py`, `ema34_exit_overlay_check.py`, `ema_combo_check.py`, and the stall-exit overlay test below) were built against the 467-trade freshness-conditioned population purely because that's what was on hand from the hourly EMA work earlier in the thread — but none of them actually need intraday data (they're pure daily-bar questions), so restricting them to the tiny 93-day intraday-cache window was an unforced, unnecessary constraint. Caught directly by the user ("why just 467? this is a swing trade, population must be bigger"). Re-ran all of them against `runs/rsi_max_sweep_80.csv`'s full live-equivalent population (`base_filters_pass()` + intraday High-cross, `breakout_cont` only, n=14,225, spanning 2021-09-28 to 2026-09-10), freshness-conditioned the same way (median split, n=7,108) — 15x the sample, same freshness logic, full history instead of 93 days.
+
+One genuine limitation, not fixable: the `SCAN_END_TIME=13:00` cutoff needs intraday breach-hour, which only exists inside the 93-day cache. Bracketed instead of ignored — computed the stall-exit result on n=386 (freshness+cutoff, cache-window-only) alongside n=467 (freshness-only, same window) and n=7,108 (freshness-only, full history): all three move in the same direction, and the cutoff-restricted bracket (n=386) sits between the two freshness-only samples, not off on its own — reasonable evidence the freshness-only big population isn't silently missing something the cutoff would have caught for this specific swing-exit question.
+
+**Two real corrections:**
+1. Daily EMA34 touch-bar direction (noise → real), detailed inline above.
+2. **3-day-stall exit overlay (reconsideration-shortlist item 3) — softened from "real cost" to "near wash."** Small-sample verdict (n=467): win rate/median up, expectancy down 18% (+1.200%→+0.985%), read as a real "chase the tail" cost. Big-population verdict (n=7,108): win 61.3%→64.3%, median +1.79%→+2.20%, expectancy +0.726%→+0.704% (**only -3%**, not -18%) — direction unchanged but magnitude much softer. On the 939 trades the overlay actually fires on (vs only 74 before): originally 75.0% win/+3.62% median/+5.352% expectancy → overlay 97.0% win/+4.44% median/+5.180% expectancy, better on 536/939 (57.1%, a real majority, not the earlier near-coin-flip 51%). Total cost across fired trades: -161.2pp on n=939 (≈-0.17pp/trade average) vs the small sample's -100.7pp on n=74 (≈-1.36pp/trade average) — an order of magnitude milder per trade. **Revised verdict: closer to a wash-to-mild-positive than a clear rejection.** Not a confident "adopt" either — expectancy still dips slightly, and this hasn't been through a capital-constrained portfolio simulation the way the 2026-09-05/06 stall-exit work was — but the small-sample "real cost" framing overstated the downside. Treat as inconclusive-leaning-neutral, not rejected.
+
+**Two reconfirmations (no correction needed, just refreshed evidence):**
+1. **EMA34-break exit overlay (item 4, already closed above) — reconfirmed, more decisively rejected at scale.** Big population (n=7,108): win 61.3%→54.4% (-6.9pp, vs the small sample's -5.2pp), expectancy +0.726%→+0.573% (-21%, same relative size as before), concentration worsens 7.8%→9.9%. On the 2,060 trades it fires on (vs 121 before): -1,092.4pp total (vs -116.9pp), same recoveries-cost-more-than-savings mechanism, now on a base 15x larger. Standing "confirmed closed" verdict holds, evidence is now much stronger.
+2. **The literal combo test (34-short-TF-confirmation + 8-long-TF-support) — reconfirmed tautological at scale.** 7,108/7,108 trades above daily EMA8 at entry (100%, matching the small sample's 467/467); 6,984/6,984 of those with enough history above weekly EMA8 too. Zero variance either way, full history. No correction needed.
+
+**Daily-level search and daily-EMA8 pin-bar direction — refreshed, not corrected**: same conclusions, both detailed inline above with the updated big-population numbers.
+
+**Standing methodology lesson, worth keeping alongside the "verify formula against production source" one**: a test's population shouldn't inherit a scope restriction from whatever data happened to be on hand from a *different, unrelated* test earlier in the same session — check whether the actual data dependency (here: true intraday bars) is real before reusing a convenient population. Two of five re-tested findings changed as a direct result (one reversed, one softened); the other three held up, in one case much more strongly. Both outcomes are useful — this audit wasn't just error-correction, it also strengthened confidence in the findings that survived.
+
+**Net for the original hypothesis**: partially right, mechanism different than recalled. EMA34/SMA50 tell you if the trade is structurally sound (options=hourly EMA34, swing=daily EMA34/SMA50); EMA8's touch-candle *direction* (not shape) is a secondary "still alive" tell at whichever timeframe matches the product (hourly EMA8→options, daily EMA8→swing). None of this is wired into `live_checkpoint.py` — descriptive findings only, consistent with the FILTER/RANK/LABEL discipline until an actionable decision is designed and tested.
+
+**Two variants tested and dropped, both genuinely dead ends (not just noisy)**:
+1. **The user's literal combo** (34 EMA on the short timeframe for entry confirmation + 8 EMA on the long timeframe for "overall support," e.g. daily EMA8 for options, weekly EMA8 for swing) — checked directly (`ema_combo_check.py`): 467/467 trades are above both the daily EMA8 and the weekly EMA8 at entry, zero variance. Tautological, not just weak: this scanner's breakout trigger (`high10_prior * 1.005`, a fresh 10-day-high clearance) already guarantees price is above its own fast EMA on any coarser timeframe — the condition can never be false for a candidate that reached the scanner at all.
+2. **Hourly SMA50 as a "wider" intraday support level** (an attempt to find a genuinely wider support without jumping to the daily timeframe) — dropped: 227/239 trades (95%) that already broke hourly EMA34 also break hourly SMA50 same day, no differentiation (`hourly_wider_support_check.py`). Not a new information source — no overnight gap, no new session, just a slower MA on the same intraday clock as one that's already broken.
+
+## EMA34-break as an exit-rule overlay (2026-09-14) — re-tested on the current population, confirms the 2026-09-02 rejection, still rejected.
+
+This was reconsideration-shortlist item 4 from `critic_update_35.md` ("EMA34-break automatic early-exit," flagged there as "worth confirming, not assuming" given the noise reduction from freshness+cutoff since the original test). Tested as an **overlay** (exit at whichever fires first: the real `check_exit()` stop/target/trailing logic, or a daily Close closing below daily EMA34) — not a replacement, since the existing exit logic is not in question, only whether adding one more early-exit trigger helps (`ema34_exit_overlay_check.py`, full 467-trade population, sanity-checked the recomputed baseline exactly reproduces the original `swing_pnl_pct`, 0 mismatches).
+
+| | win rate | median | expectancy | concentration | avg loss |
+|---|---|---|---|---|---|
+| current rule alone | 61.7% | +1.55% | +1.200% | 36.3% | -5.47% |
+| current rule + EMA34-break overlay | 56.5% | +1.08% | +0.950% | 45.2% | -4.74% |
+
+Overlay makes every aggregate metric worse, including concentration (45.2% vs 36.3% — the result becomes *more* outlier-dependent, not less). It fired early on 121/467 trades (25.9%). Isolating just those 121: the current rule had *already* correctly flagged them as mostly bad (19.8% win, -4.680% expectancy on the original rule) — the overlay doesn't rescue anything there, but it takes the 19.8% (~24 trades) that were going to recover into real winners and kills them at a loss before they can, dropping win rate on that subset to 0.0% and expectancy to -5.647%. Net -116.9pp across those 121 trades. Same mechanism as the original 2026-09-02 rejection ("real recoveries cost more than the early exits saved") and the RQ-37 acceptance-based stop-tightening rejection above — reproduces cleanly on the current, cleaner population rather than reversing. **Confirmed closed — do not revisit unless a materially different trigger condition (not "break of a support MA") is proposed.** (Superseded/reconfirmed at the fresh40 standard below — same conclusion.)
+
+## Standing population discipline adopted, freshness=0.40 (2026-09-14, continued) — every test above re-run under one consistent standard
+
+**New standing rule** (also saved to persistent memory, `feedback_population_choice_for_backtests.md`, so it applies automatically in future sessions without being re-requested): freshness cutoff = **0.40** (not a median split), and every daily-bar test gets run on **three** population variants side by side:
+- **BIG** — full 2021-2026 history, `runs/pop_fresh40_big.csv`, n=5,213 (`base_filters_pass()` + intraday High-cross, `breakout_cont` only, from `runs/rsi_max_sweep_80.csv`)
+- **SMALL** — 93-day intraday-cache window only, `runs/pop_fresh40_small.csv`, n=365 (needed for anything intraday, but computed for every test as a bracket)
+- **SMALL+1PM cutoff** — same window restricted to real breach hour < 13:00, `runs/pop_fresh40_cutoff.csv`, n=298
+
+Why 0.40 specifically: a full threshold sweep (0.20 to no-filter) on the big population shows **no natural knee anywhere** — options win/expectancy climbs smoothly and monotonically as the cutoff tightens (53.6%/+0.318% unfiltered → 62.5%/+0.776% at ≤0.40 → 68.7%/+1.129% at ≤0.20), swing stays nearly flat the whole range (60.6-61.5% regardless of cutoff). That's the signature of a genuine ranking signal, not a gating one — confirms freshness was correctly built as rank-only, never a hard filter. 0.40 isn't a validated optimum, just a reasonable, moderately strict, defensible reference point (n=5,213 of 14,225, ~36.6%) — same status as the 0.5% entry-clearance pick elsewhere in this project.
+
+**Results, re-run across all three populations (`rerun_all_fresh40.py`):**
+
+**Reconfirmed cleanly, no change from the median-split versions above:**
+- Daily-level search (EMA34/SMA50 cascade): ranking holds in all 3 pops (never_touched 88-94% → held 58-76% → broke 21-33%), sharper at 0.40 than at median.
+- Daily EMA8/EMA34 touch-bar direction: swing gap real and consistent everywhere (EMA8 ~15-16pp, EMA34 ~8-13pp); options flat everywhere.
+- EMA34-break exit overlay: rejected in all 3 (win -5 to -7pp, expectancy -10% to -18%).
+- Hourly actionable-window (options): never-touched still dramatically best (87-89%), any touch ~46%; cutoff barely moves it.
+- Hourly EMA8 pin-bar (options): bullish/bearish gap even bigger at 0.40 (~29pp) than at median (~25pp); cutoff changes almost nothing here (only 1-3 trades excluded from this bucket).
+
+**Softened, not rejected — 3-day-stall overlay.** Win/median improve in all 3 populations; expectancy dips everywhere but the size scales with statistical power: **-3%** on the reliable big population (n=5,213, +0.774%→+0.749%) vs **-16% to -17%** on the two small ones (n=365: +1.184%→+0.984%; n=298: +1.345%→+1.125%). The best-powered number should be trusted most — reads as "near wash, mild real cost," not zero cost as the single big-population number alone might have implied, but also not the sharp rejection the original small-sample-only read suggested.
+
+**New finding — the SMA50-AND gate's two legs behave differently, and one is regime-dependent right now.** "Above SMA50" holds up in direction across all 3 populations — win rate and swing expectancy consistently favor "kept" (BIG: 62.3% vs 57.3% swing win, exp +0.908 vs +0.282; SMALL: 62.4% vs 53.7%, +1.353 vs +0.205; CUTOFF: 63.0% vs 54.5%, +1.571 vs +0.038). Options expectancy flips slightly toward "removed" in the two small samples, but against a much cleaner and more consistent swing signal, that reads as small-sample noise, not a real reversal.
+
+**"SMA50 rising" is a different story — mildly positive on the full 5-year history, but clearly backwards on the recent period, reproducing in two independent small-population cuts:**
+
+| | kept (rising) | removed (falling) |
+|---|---|---|
+| BIG (5yr): swing win/exp | 62.3% / +0.980 | 58.8% / +0.301 |
+| SMALL (93-day): swing win/exp | 58.6% / +0.695 | **70.0% / +2.924** |
+| CUTOFF (93-day, 1PM): swing win/exp | 59.1% / +0.809 | **71.2% / +3.226** |
+
+Same direction, same rough magnitude, in two overlapping-but-distinct recent-period samples — not a coincidence, though concentration is elevated on the "removed" buckets (61-66%) so the exact magnitude is likely somewhat inflated; the win-rate gap itself (a count-based, artifact-free number) still agrees with the direction. This isn't just "doesn't help" — over the last ~3 months specifically, requiring Nifty's SMA50 to be rising would have actively hurt, reproducing the same backwards shape the original 2026-09-01 VCP-weak-window test found, just in a different period and pattern.
+
+**Final verdict for reconsideration-shortlist item 5**: split the gate into its two legs, don't treat it as one unit. "Above SMA50" is a real, mild, *ranking-worthy* signal (not a gate — the removed population is still profitable in every population tested, e.g. BIG removed: 58.2% options win/+0.589% exp, still solidly tradeable — cutting it for a few points of edge repeats the "practicality over marginal edge" mistake this project has avoided elsewhere). "SMA50 rising" should stay rejected, and is actively working backwards in the current regime specifically — worth remembering as a live warning sign, not just a closed research question.
+
+## Market breadth redundancy check (2026-09-14) — reconsideration-shortlist item 6, confirmed NOT redundant with freshness
+
+Different question from items 3-5: breadth (`breadth.breadth_pct`, % of Nifty500 above its own 200-SMA) was already adopted as a real, monotonic RANKING signal on the raw population, never rejected, never a gate. The open question was whether it still adds independent lift on top of freshness+cutoff, or has quietly become redundant — the same overlap risk already found once this project between `consolidation_days` and streak-confirmation. Tested via `breadth_redundancy_check.py` across the standard 3-population bracket.
+
+**BIG population (n=4,794 with breadth data, full 2021-2026 range: breadth 12.8%-95.8%)** — the population that actually has enough range to test this properly:
+- Correlation(breadth_pct, freshness_score) = **-0.007**, essentially zero — genuinely independent information, same shape as the earlier consolidation_days/VCP-detection precedent (-0.038).
+- Threshold cuts show a clean, smooth, monotonic climb on **both** metrics even with freshness≤0.40 already applied: options 63.0%→64.6% (≥50% to ≥75% breadth), swing 62.3%→66.2%. Quartile split confirms it too, most clearly at the top (Q4, breadth 86.6-95.8%: 65.2% options win/+0.59% med, **70.3%** swing win/+2.78% med — clearly the best cell).
+
+**SMALL/CUTOFF (n=365/298, 93-day window)** — quartile pattern here looks messy (a Q2 spike to ~79% options win, swing actually declining Q1→Q4) but this is a range problem, not a contradicting finding: breadth in this recent window only spans **39.8%-60.1%**, a narrow band sitting near the middle of the historical range — there's no real "high" or "low" breadth extreme in this window to test against, so the quartile split is subdividing noise within a compressed band. Different situation from the SMA50-rising finding (which showed a strong, consistent, *wide-range* contrarian signal on two independent brackets) — this one lacks range, not signal, and shouldn't be read as a regime-dependence flag the way SMA50-rising was.
+
+**Verdict**: breadth is **not redundant** with freshness — confirmed on the population with enough range to actually test it. No reversal, no regime-dependence warning like item 5's second leg. Already implemented as ranking-only (never a gate) in production — no code change needed. Closes item 6 as a reconfirmation.
+
+**Reconsideration-shortlist status after items 3-6**: item 3 (3-day-stall) closed as near-wash/mild real cost; item 4 (EMA34-break exit) reconfirmed rejected; item 5 (SMA50-AND gate) split — "above" promoted to a ranking candidate, "rising" stays rejected and flagged as currently backwards; item 6 (breadth) reconfirmed not redundant, no change. Remaining open: items 1-2 (2R/3R fixed target, trail-only exit replay) and the theta-bleed/DTE check.
+
+## 2R/3R fixed target and trail-only exit replay (2026-09-14) — items 1-2, sharpened from "ambiguous trade-off" to a clear reject
+
+Replays the original 2026-09-03 "Exit-strategy comparison" (`exit_strategy_replay.py`), which found a genuine, unresolved trade-off: baseline (moving resistance, current production) had the cleanest win rate (65.0%) but left expectancy on the table; 2R/3R/trail-only had better raw expectancy but only ~50.2% of nominal "2R winners" ever reached the real target (the rest got stopped near breakeven on the way back down), and trail-only's edge was mostly a coin-flip median propped up by rare huge winners (24.7% concentration). Same entry convention as everything else this session (`trigger = high10_prior * 1.005`, `R = ATR_TRAIL_MULT(3.0) * atr14` at entry) — the fixed-target variants set `state["target"]` once at entry and call `check_exit(..., use_resistance=False)` so the resistance ratchet never overrides it; trail-only leaves `target=None` the whole trade (pure stop/climax).
+
+**First pass, on the freshness≤0.40 population, looked like a real deterioration** — win rate for all three alternatives dropped to 46.6-50.3%, median went **negative** (-0.17% to -0.90%), and the 2R target-hit rate fell to 20.7-32.9% depending on population. Initial (wrong) explanation: freshness selects calmer, less-extended setups that don't run far enough to reach a wide target.
+
+**That explanation didn't survive a direct check, per user pushback ("what, you are saying fresh stocks are bad or something") — correctly skeptical.** Re-ran the identical 4-variant comparison on the fully **unfiltered** population (n=14,225, no freshness cutoff at all, same breakout_cont-only, trigger-based entry):
+
+| Variant | win rate | median | 2R target-hit rate |
+|---|---|---|---|
+| baseline | 60.9% | +1.77% | — |
+| 2R | 45.0% | -0.89% | **36.5%** |
+| 3R | 45.0% | -0.90% | 19.3% |
+| trail-only | 45.0% | -0.90% | — |
+
+Nearly identical to the freshness-conditioned result (45.0% vs 46.7% win, -0.89% vs -0.49% median, 36.5% vs 32.9% target-hit) — **freshness has essentially no effect on this question, in either direction.** The real reason today's numbers look worse than the original 2026-09-03 result (50.2% target-hit, ~50% win) is a population-scope difference: that test used `detect_entry()`, which combined both patterns (breakout_cont + VCP) and likely a different entry convention, while every test this session (and the live strategy itself) uses breakout_cont-only, trigger-based entry specifically. Not an apples-to-apples comparison, and not worth chasing further — **per direct user instruction, the project only works with trigger-based entry now**, so the old combined-pattern population is obsolete, not a baseline worth reconciling against.
+
+**Verdict for items 1-2, on the only entry mechanism that's actually live**: baseline (moving resistance) beats all three alternatives on win rate and median, consistently, with or without freshness (win rate 60.9-61.2% vs 45.0-50.3%; median +1.77-1.78% vs -0.02% to -0.90%). The alternatives only look better on raw mean-R (+0.11-0.16R vs baseline's +0.06-0.12R), and that edge is concentration-fragile on smaller samples (SMALL/CUTOFF populations show 82-100% concentration on the alternatives — almost entirely outlier-driven there; BIG's concentration stays sane, 3.4-14.1%, so BIG is the number to trust and even there the alternatives clearly lose on win-rate/median). This sharpens the original "genuine unresolved trade-off, not a settled switch-to-X" framing into a real answer: **on the current trigger-based entry, baseline is the clear, decisive choice — not an ambiguous one.** Freshness was never the relevant variable here; closing items 1-2 as reconfirmed-reject, not reconsidered.
+
+**Reconsideration-shortlist final status, all 6 items closed**: item 1-2 (2R/3R, trail-only) reconfirmed reject, sharpened from ambiguous to decisive; item 3 (3-day-stall) near-wash/mild cost; item 4 (EMA34-break exit) reconfirmed reject; item 5 (SMA50-AND gate) split — "above" promoted to ranking candidate, "rising" stays rejected and currently backwards; item 6 (breadth) reconfirmed not redundant. Only the theta-bleed/DTE check remains open from the original list.
+
+## Theta-bleed / DTE check (2026-09-14) — the last open item from critic_update_35.md, real and bigger than the original hypothesis expected
+
+**Original question**: the 2026-09-02 options premium/time-stop rejections were built on the OLD long-hold ITM+next strategy (median 21-day hold), where the mechanism was "real edge lives in convex winners that need time to recover from a 30-50% drawdown; cutting early kills them." That reasoning doesn't obviously apply to the CURRENT strategy (day+1 exit, full stop, no multi-week recovery window to protect). Proposed hypothesis: "theta bleed over a single day is a small, bounded cost unless DTE is already critically low." Tested directly rather than asserted, via real option contracts (not the stock-price day1_pnl_pct proxy used everywhere else this session — that proxy has no concept of DTE, since no contract is ever actually picked for it). `theta_bleed_check.py`: 500-trade sample from the freshness≤0.40 big population, ATM/current-month (the established recipe for a same-day/day+1 capture trade per 2026-09-06/07's findings), real `option_backtest.simulate_option_trade()`, n=346 with valid contract data.
+
+**Result: the hypothesis was wrong in an important way — this is not a small, bounded, near-expiry-only cost.**
+
+| DTE bucket | n | win rate | median opt return | median stock return |
+|---|---|---|---|---|
+| ≤5 | 18 | 33.3% | **-15.62%** | -0.10% |
+| 6-10 | 77 | 39.0% | **-7.99%** | +0.61% |
+| 11-15 | 72 | 29.2% | **-15.36%** | +0.20% |
+| 16-20 | 105 | 45.7% | -3.46% | +0.44% |
+| 21-25 | 65 | 47.7% | +0.00% | +0.59% |
+| 26+ | 9 | 66.7% | +16.87% | +1.70% |
+
+Pearson corr(DTE, opt_pnl_pct) = +0.109, rank-corr +0.155 — modest as a single number, but the bucket shape shows the real story: returns stay clearly negative through roughly DTE≈15 (the first half of a monthly cycle, not just the final days near expiry), only turning neutral-to-positive past DTE≈16-20. Checked for outliers directly (not an artifact): every bucket (18-105 trades) is a broad, well-distributed spread of individual returns, not a couple of large losers. Also checked against the existing `MIN_EXPIRY_RUNWAY_DAYS=5` protection (rolls to next-month if front-month DTE would drop below 5) — our observed DTE floor of 5 confirms that protection is already active, yet the negative effect clearly extends well past it, all the way to ~DTE 15.
+
+**Verified this is a real option-mechanics effect, not a confound in which trades happen to fire at low DTE** (direct user challenge: "but options we are exiting in fast momentum" — a fair question, since the hold is fixed at ~1 day regardless of DTE). Checked the underlying stock's own day+1 return against the same DTE buckets: it's essentially flat (median +0.10% to +1.70%, no trend, corr(DTE, stock_pnl_pct)=**0.029**, versus the option's 0.109) — DTE has nothing to do with which trades fire or how well the stock moves. The divergence lives entirely in the option pricing, not the trade quality: an ATM option's percentage time-decay rate scales roughly like 1/DTE (standard option Greeks relationship), so the same small, ordinary stock move gets priced completely differently depending on remaining time value — a DTE≈8 contract sheds a much larger fraction of its value per day than a DTE≈25 one, even though both are held for exactly one day. A fast exit doesn't neutralize this, because it's the decay *rate*, not the number of days held, that's different.
+
+**Practical implication, not yet tested as a live rule**: DTE-at-entry looks like a genuine candidate for a live filter or ranking signal on the options leg specifically — e.g., prefer entries with DTE≥16, or tighten `MIN_EXPIRY_RUNWAY_DAYS` well beyond its current 5-day floor for this specific (ATM, current-month, day+1-exit) combination. This is a real, new, actionable finding distinct from the old (correctly rejected) long-hold premium-stop idea — not yet built or tested as an actual gate/ranking rule.
+
+## Reconsideration-shortlist closeout, all 7 items resolved (2026-09-14) — final synthesis
+
+Everything raised in `critic_update_35.md`'s Part B is now closed. Summary of net changes to the standing view:
+
+- **Confirmed unchanged (no new action)**: EMA34-break exit overlay (item 4) — rejection reconfirmed, more decisively at scale. 2R/3R/trail-only exits (items 1-2) — rejection reconfirmed and sharpened from "ambiguous trade-off" to a clear decision, once isolated to the actual live entry mechanism (trigger-based). Market breadth (item 6) — confirmed still adding real, independent lift on top of freshness, not redundant; already ranking-only in production, no change needed.
+- **Softened**: 3-day-stall exit overlay (item 3) — from "real cost" down to "near wash, mild real cost that shrinks with sample size." Still not adopted, but no longer a clean rejection either.
+- **New, real findings that didn't exist before this reconsideration pass**:
+  - SMA50-AND gate (item 5) splits into two legs with different fates: "Nifty above its own SMA50" is a genuine, mild, *ranking-worthy* signal (never a gate, since the removed population is still solidly profitable). "Nifty SMA50 rising" stays rejected, and is *currently* working backwards in the recent-period data specifically — a live warning sign, not just closed history.
+  - Theta-bleed/DTE — the single most consequential finding of this whole pass. Not "small and bounded" as hypothesized; a real, verified (not a confound), substantial effect across roughly the first half of the monthly expiry cycle. This is the one genuinely new, actionable candidate to come out of the whole reconsideration exercise — everything else either reconfirmed a prior stance or ruled something out.
+- **A repeated meta-lesson, worth carrying forward past this specific list**: several of today's re-tests were initially run on an unnecessarily small, intraday-cache-limited population purely because that's what was already loaded from unrelated earlier work — caught directly by user pushback twice in this session (once on population size, once on a wrong mechanistic story for the exit-strategy replay). Both times, checking against a bigger or differently-scoped population changed the conclusion. The standing population-choice discipline adopted mid-session (`feedback_population_choice_for_backtests.md`) exists specifically because of this.
+
+**Net for the live strategy right now**: nothing new is wired into production code from this whole pass. Everything else is either already correctly reflected in the current setup (breadth ranking, moving-resistance exit, no stall/EMA34-break gate) or stays a documented non-adoption (SMA50-rising, 2R/3R/trail-only, 3-day-stall). ~~The one candidate worth prioritizing next: a DTE-based filter or ranking signal on the options leg.~~ *(retracted — see correction directly below, found within the same session before being acted on)*
+
+## CORRECTION to the theta-bleed/DTE finding above — real bug, not a real signal (2026-09-14, same day)
+
+The theta-bleed result above (median swinging from -15.62% at DTE≤5 to +16.87% at DTE≥26, "verified" via a stock-return control) was built on a real methodological bug: `theta_bleed_check.py` used `option_backtest.simulate_option_trade()`'s built-in exit price, which resolves via `exit_row.ClsPric` — day+1's option **Close**, not day+1's **Open**. But the actual adopted day+1 recipe (documented 2026-09-06/07, directly above this in the file) exits near day+1's **open**, specifically because close-based day+1 exit was already found to be dramatically worse (ATM: 45.5% win/-2.59% median at close vs 82.0% win/+5.03% median at open) — "the open isn't the ceiling, it's a safe floor; the real opportunity is intraday on day+1, not a multi-day hold." I ran directly into that exact, already-documented trap myself without noticing, because `simulate_option_trade()`'s Close-to-Close convention is the right one for *other* purposes in this codebase (multi-day holds, expiry settlement) but silently wrong for this specific same-day question.
+
+**Caught only when building the DTE<16 skip-filter test forced a direct comparison against expectations** (`theta_bleed_check_open_exit.py`, same 331-trade sample, entry_px unchanged (entry day's option Close — the already-established, flagged intraday-fill approximation) but exit_px corrected to day+1's option **Open**):
+
+| DTE bucket | n | win rate | median |
+|---|---|---|---|
+| ≤5 | 16 | 75.0% | +2.87% |
+| 6-10 | 74 | 59.5% | +1.91% |
+| 11-15 | 69 | 56.5% | +1.26% |
+| 16-20 | 99 | 51.5% | +0.26% |
+| 21-25 | 64 | 62.5% | +0.99% |
+| 26+ | 9 | 88.9% | +3.01% |
+
+Correlation(DTE, opt_pnl_pct) = **-0.013** (was +0.109) — essentially zero, no monotonic pattern, and if anything the lowest-DTE bucket looks best (though thin, n=16). Skip-filter test (skip options leg when DTE<16, keep the stock/swing signal regardless): kept (DTE≥16) 57.6% win/+1.07% median vs skipped (DTE<16) 59.7% win/**+1.51%** median — **the trades this filter would remove are slightly better than the ones it keeps.** A DTE<16 filter would be actively counterproductive, not neutral.
+
+**Corrected, final answer to the original theta-bleed question**: DTE does not meaningfully affect the day+1-open-exit strategy. The original hypothesis in `critic_update_35.md` ("theta bleed over a single day is a small, bounded cost unless DTE is already critically low") was directionally right and, once measured correctly, actually understated how negligible the effect is — there's no detectable DTE effect at all on the open-based exit, not even a small one concentrated at low DTE. **Do not build a DTE-based filter or ranking signal — closing this as a genuine null result, not a missed opportunity.**
+
+**Standing methodology lesson, worth keeping alongside "verify formula against production source"**: a shared helper function (here, `simulate_option_trade()`) can be correct for the purpose it was originally built for and silently wrong for a different, superficially similar question — check what exit convention a reused function actually implements before trusting its output for a new question, especially when this project has *already* documented that the specific convention (close vs. open) materially changes the answer for exactly this kind of same-day trade.
