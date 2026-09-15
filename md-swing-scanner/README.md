@@ -85,9 +85,10 @@ without relying on any single session's memory.
   ticker with no cache yet gets the full 5-year history, an already-cached ticker only
   fetches and appends days since its own last cached date. Defaults to the NIFTY 500
   list, which already covers the F&O subset too (a strict superset).
-- `fetch_stock_options.py` — NSE F&O bhavcopy cache for the options layer (`options_cache/`, ~2.7GB), UDiFF format, 2024-01 onward.
+- `fetch_stock_options.py` — NSE F&O bhavcopy cache for the options layer (`options_cache/`, ~5.4GB as of 2026-09, 1,052 daily files, 2024-01 onward), UDiFF format.
 - `fetch_stock_options_pre2024.py` — extends `options_cache/` back to 2022-06 by normalizing NSE's discontinued pre-UDiFF bhavcopy format, which never carried a lot-size column; backfills each ticker's lot size from its earliest 2024+ reference value (position-sizing approximation only, doesn't affect the option's own % return — see the file's own comments).
-- `intraday_cache.py` — 5-minute intraday bars (`intraday_cache/`, ~190MB, all 500
+- `fetch_cash_bhav.py` — NSE's real, never-retroactively-adjusted cash-market closes (`cash_bhav_cache/`, ~10MB) for specific dates `option_backtest.py` needs a real spot price for (expiry settlement) — fixes a split-adjustment bug where `data_cache`'s yfinance-sourced closes get silently rescaled after the fact.
+- `intraday_cache.py` — 5-minute intraday bars (`intraday_cache/`, ~215MB, all 500
   tickers), built 2026-09-02 specifically to survive past yfinance's own rolling
   60-day retention window (confirmed: anything older is rejected outright). Once a
   day ages out of that window it's gone from Yahoo for good unless already saved
@@ -144,6 +145,46 @@ standalone if needed.
 - `tests/` — deterministic unit/integration tests (pytest). Found a real bug in
   `weekly_pivots()` on the first run (see `pivots.py`'s comments) — run these after
   touching any signal/exit logic, before trusting a new backtest number.
+
+## Deployment — which data actually needs to travel with the code (2026-09-15)
+
+Every cache directory is gitignored, so none of this comes along with `git clone` — checked directly which of them the LIVE-facing tools (`trader_dashboard.py`, `daily_scan.py`, `live_checkpoint.py`, `monitor_positions.py`, plus their dependencies `market_regime.py`/`breadth.py`/`relative_strength.py`) actually read from disk, vs. which are backtest-only:
+
+| Cache | Size | Needed for live use? |
+|---|---|---|
+| `data_cache/` | ~51MB | **Yes** — every live tool's real dependency (daily OHLC, `_NIFTY.csv` regime data, `_BREADTH.csv`) |
+| `intraday_cache/` | ~215MB | **Yes** — `live_checkpoint.py`'s clock-time volume-pace baseline needs ~20 days of real intraday history (degrades gracefully to a linear-fraction fallback if missing, but real signal quality needs it) |
+| `options_cache/` | ~5.4GB | **No** — only `option_backtest.py` and one-off research scripts touch it; confirmed via direct grep that no live tool imports it |
+| `cash_bhav_cache/` | ~10MB | **No** — same as above, options-settlement-pricing only |
+| `runs/` | ~77MB | **No** — pure backtest/research output, no live tool reads from it |
+
+So a server/hosted deployment only needs `data_cache/` + `intraday_cache/` (~266MB total) plus the small git-tracked config files (`nifty500_universe.csv`, `fo_universe.csv`, `trade_journal.csv`) and your own `open_positions.csv` (gitignored — copy it manually, it's your real position state) — nowhere near the 5-10GB a naive "just copy everything" approach would assume. `options_cache/`, `cash_bhav_cache/`, and `runs/` are safe to keep local-only.
+
+**Important**: unlike `options_cache/` (a static historical archive, fetch once and done), `data_cache/` and `intraday_cache/` need to stay *current* to be useful live — run `fetch_prices.py` (daily) and keep `intraday_cache/` topped up (`intraday_cache.refresh()`, or rely on `daily_scan.py`'s own `fetch_live_bars()` for same-day intraday — see `live_checkpoint.py`'s comments on the difference) on whatever schedule the deployment runs on, not just a one-time copy at deploy time.
+
+### Disaster recovery — rebuilding `options_cache/` and `cash_bhav_cache/` from zero
+
+Neither of these is backed up anywhere outside this machine. If lost, both are rebuildable from NSE's own public historical archive (no other data source needed), in this order:
+
+```
+# 1. UDiFF-format era (2024-01 onward) — must run FIRST, the next step reads these
+#    files back to build its lot-size reference map.
+python3 fetch_stock_options.py 2024-01-01 2026-09-03
+
+# 2. Pre-UDiFF era (back to 2022-06) — normalizes the old format, backfills lot
+#    size from step 1's cached data. Will error/produce an empty lot-size map if
+#    run before step 1.
+python3 fetch_stock_options_pre2024.py 2022-06-01 2023-12-31
+
+# 3. Cash-market settlement prices for option_backtest.py's expiry pricing —
+#    only needs the specific dates the swing backtest's trade set requires, so
+#    this must run AFTER a fresh runs/trades_v28_fo.csv exists (regenerate via
+#    backtest.py + option_backtest.py's own trade-set pipeline first if runs/
+#    wasn't kept either).
+python3 fetch_cash_bhav.py
+```
+
+Real cost: step 1+2 together are ~1,050 individual HTTP requests to `nsearchives.nseindia.com` (one zipped bhavcopy per trading day, ~5-11MB each unzipped) — expect real wall-clock time (tens of minutes to a few hours depending on NSE's response time/any rate-limiting), not instant. NSE's archive is static once published, so there's no risk of the *historical data itself* changing — the risk is purely operational (the URL scheme or archive availability shifting over a long enough gap, which hasn't been an issue as of 2026-09 but hasn't been tested against a multi-year-old date range either).
 
 ## Setup
 
