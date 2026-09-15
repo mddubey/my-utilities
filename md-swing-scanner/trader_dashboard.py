@@ -40,7 +40,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from backtest import load, current_stop_level
+from backtest import load, current_stop_level, STRUCTURAL_LOOKBACK_BC
 from vcp import stage2_trend_template, base_pivot
 from signals import base_filters_pass
 from daily_scan import _initial_stop, _fo_tickers
@@ -78,8 +78,14 @@ def run_evening(tickers, fo_tickers):
             bp = base_pivot(df.iloc[:i + 1].reset_index(drop=True), i)
             pattern, structural_low = "coiled_spring", (bp[1] if bp else None)
         else:
-            pattern, structural_low = "breakout_cont", None
-        stop = _initial_stop(pattern, structural_low, row) if structural_low is not None or pattern == "breakout_cont" else None
+            # (2026-09-15) breakout_cont's own structural low, same 20-day-lookback
+            # convention as detect_entry() in backtest.py -- current_stop_level() now
+            # needs a real value here too (used to be harmless when None since BC's
+            # pre-engagement stop didn't touch structural_low at all).
+            pattern = "breakout_cont"
+            lo = max(0, i - STRUCTURAL_LOOKBACK_BC)
+            structural_low = df.iloc[lo:i].Low.min() if i > lo else row.Close * 0.9
+        stop = _initial_stop(pattern, structural_low, row) if structural_low is not None else None
         fo_tag = "[F&O]" if r.is_fo else "[NO OPTIONS]"
         held_tag = "  [ALREADY HOLDING]" if r.ticker in held else ""
         to_trigger_pct = (r.trigger_low / r.close - 1) * 100

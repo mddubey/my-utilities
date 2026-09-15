@@ -2015,3 +2015,152 @@ Correlation(DTE, opt_pnl_pct) = **-0.013** (was +0.109) — essentially zero, no
 **Corrected, final answer to the original theta-bleed question**: DTE does not meaningfully affect the day+1-open-exit strategy. The original hypothesis in `critic_update_35.md` ("theta bleed over a single day is a small, bounded cost unless DTE is already critically low") was directionally right and, once measured correctly, actually understated how negligible the effect is — there's no detectable DTE effect at all on the open-based exit, not even a small one concentrated at low DTE. **Do not build a DTE-based filter or ranking signal — closing this as a genuine null result, not a missed opportunity.**
 
 **Standing methodology lesson, worth keeping alongside "verify formula against production source"**: a shared helper function (here, `simulate_option_trade()`) can be correct for the purpose it was originally built for and silently wrong for a different, superficially similar question — check what exit convention a reused function actually implements before trusting its output for a new question, especially when this project has *already* documented that the specific convention (close vs. open) materially changes the answer for exactly this kind of same-day trade.
+
+## MAX_HOLD_DAYS = 15 — the swing-vs-positional identity correction, wired into production `check_exit()` (2026-09-14)
+
+**The real finding underneath the whole stop-loss research thread**: every exit-rule test this session (the stop-family sweep, the MAE-early-exit check, the Body/ATR-conditional stop, and originally the Family C rejection) was implicitly validated against an **uncapped** baseline — the current production `check_exit()` has no day-count limit at all, and its real hold-time tail (p90=23 days, max 67-81 days on the live-equivalent population) is already a positional-trade time horizon, not a swing one. This was never questioned until a direct user challenge: "practically it will be impossible for me to leave the trade open for more than 2 weeks or at max 3." Every prior verdict in this thread ("cutting losers early always loses") was measured against an alternative (ride indefinitely) that was never actually tradeable to begin with.
+
+**Quantified the real cost of a hard cap directly, on the standard freshness≤0.40 population bracket (daily/intraday/intraday+cutoff), before locking anything in:**
+
+| Cap | daily win/exp | intraday win/exp | intraday+cutoff win/exp | % of trades hitting the cap |
+|---|---|---|---|---|
+| Uncapped | 61.2% / 0.774% | 61.1% / 1.184% | 61.7% / 1.345% | 0% |
+| 25d | 60.1% / 0.759% | 60.0% / 1.197% | 60.7% / 1.349% | 7-8% |
+| 20d | 59.4% / 0.775% | 59.7% / 1.234% | 60.7% / 1.392% | 15-16% |
+| **15d (adopted)** | 58.5% / 0.707% | 59.7% / 1.093% | 59.7% / 1.143% | 28-32% |
+| 10d | 57.3% / 0.688% | 58.6% / 1.049% | 59.1% / 1.046% | 49-55% |
+
+A 20-day cap actually matched or slightly *beat* uncapped expectancy on the two more representative populations — the extreme tail wasn't where the edge lived. 15 days (the adopted value) costs a real but modest amount (win rate -1.4 to -2.7pp, expectancy -9% to -15% relative) and sits inside the user's stated hard ceiling (2-3 weeks) — a deliberately conservative choice within that constraint, not a data-optimized one.
+
+**Re-tested the previously-rejected early-exit ideas (3-day-stall, fixed-days-after-arm) WITHIN this cap, not against the old uncapped baseline — and the picture changed materially.** Against a mandatory 15-day cap, every active mechanism shows a real win-rate improvement (+1.7 to +2.9pp) with only a modest expectancy cost (6-12% relative) — a genuine either/or trade-off, not the clean rejection these ideas got when tested against an effectively-unlimited alternative. Checked whether that residual expectancy cost was even real on the population that matters most (intraday+cutoff, n=298, same 298 trades under both rules): **paired mean difference (fixed-3-days-after-arm − passive) = -0.071%, SE=0.115%, 95% CI = [-0.296%, +0.155%]** — spans zero. Bootstrapped expectancy difference confirms it (95% CI [-0.318%, +0.144%]). 242 of 298 trades (81%) are literally identical outcomes under both rules; of the 56 that differ, it's close to a coin flip (30 better, 26 worse). **The apparent expectancy cost of fixed-3-days-after-arm is not statistically distinguishable from noise on the population that matters most** — only the win-rate gain and the (real, consistent) concentration improvement are trustworthy there. Revised verdict: fixed-3-days-after-arm is a legitimate, simple candidate (no streak-tracking needed, just a countdown once armed at 0.55R) — not proven better than passively riding to the cap, but not provably worse either, with a real win-rate upside.
+
+**Wired `MAX_HOLD_DAYS = 15` directly into `check_exit()`** (`backtest.py`), not left as a research-only constraint — `state["days_held"]` is now tracked (initialized to 0 by the caller, incremented once per call), and a `hit_max_hold` condition joins resistance/climax/stop as a real exit reason (`"max_hold_cap"`), checked with lowest priority (only fires if none of the other three already did that day). Both call sites that build a `check_exit()` state dict were updated (`backtest.py`'s `simulate_ticker`, `monitor_positions.py`), plus a new `days_held`/remaining-days line added to `monitor_positions.py`'s live output so an open position's approach to the cap is visible before it fires, not just after. Verified end-to-end on real data (10-ticker sample): 13/46 trades (28%) hit `max_hold_cap`, `holding_days` showing 21-24 calendar days for the 15-trading-day cap (correct conversion, ~5 trading days/week). All 69 tests still pass.
+
+**Standing project-identity correction, not just a parameter**: this strategy is a short-term swing system with a hard, real hold-time ceiling — that ceiling is now a first-class part of the exit logic itself, not an assumption anyone has to remember to apply manually. Any future exit-rule research should treat the 15-day-capped mechanism as the baseline to beat, not the old uncapped one.
+
+## SMA21 trailing-exit family, Family C reconsidered, VCP Stop Geometry Audit — the critic's full post-cap priority list closed out (2026-09-14/15)
+
+Three items, all run on the standard freshness≤0.40, 3-population bracket (daily/intraday/intraday+cutoff), all with `MAX_HOLD_DAYS=15` already baked into `check_exit()` so every comparison below is apples-to-apples with what's actually live.
+
+### 1. SMA21 standalone trailing-exit family — real, then simplified further than expected
+
+Kept entry and the pre-engagement initial stop untouched, only replaced the existing post-engagement floor (`max(base_stop, EMA21)`, Close-based, single-day) with four variants: (A) Close<SMA21, (B) Low<SMA21, (C) two consecutive closes<SMA21, (D) Close<SMA21−0.5×ATR.
+
+| Variant | daily win/exp | intraday win/exp | intraday+cutoff win/exp | concentration |
+|---|---|---|---|---|
+| current (EMA21) | 58.5% / 0.707% | 59.7% / 1.093% | 59.7% / 1.143% | baseline |
+| A: Close<SMA21 | 58.5% / 0.703% | 59.5% / 1.074% | 59.4% / 1.116% | ~same |
+| B: Low<SMA21 | 58.8% / 0.679% | 59.7% / 1.059% | 59.7% / 1.115% | worse |
+| **C: 2 closes<SMA21** | 59.8% / 0.758% | 61.4% / 1.150% | 61.7% / 1.214% | better, all 3 pops |
+| **D: SMA21−0.5×ATR** | 59.7% / 0.737% | 61.4% / 1.172% | 61.7% / 1.243% | better, all 3 pops |
+
+C and D both beat current on win rate, expectancy, *and* concentration, simultaneously, on all three populations — the only exit-rule result all session that wins on every axis instead of trading one for another. Checked significance on the smallest population: win-rate gain comes from a real, lopsided flip (7 trades loss→win, 1 win→loss, McNemar exact p=0.070 — just short of conventional significance on 8 discordant pairs, but the same shape holds cleanly on the two bigger populations too).
+
+**Then asked whether ATR was doing anything in either winning variant — it wasn't.** C's `or Close<base_stop` ATR fallback never actually fired in practice; stripping it out changed nothing. D's `0.5×ATR` buffer, replaced with a plain fixed 2% buffer (no ATR anywhere), performed as well or slightly better on every population (intraday+cutoff: 62.1%/1.251% vs the ATR version's 61.7%/1.243%). Max loss stayed bounded in every no-ATR version too. **ATR was vestigial, carried over from the old formula.**
+
+**Current best candidate for the post-engagement trailing mechanism: once up 3% from entry, exit when Close falls below SMA21 − 2%. No ATR anywhere in this stage.**
+
+**Robustness check (critic's explicit ask before promotion, not a re-optimization)**: 3×3 grid, activation∈{2%,3%,4%} × buffer∈{1%,2%,3%}, around the found-best 3%/2% cell. Result: a genuine, broad plateau — win rate 58.9-60.4% and expectancy 0.728-0.745% across all 9 cells on daily (similarly tight ranges on the other two populations) — every single cell beats the current mechanism, none stands out as a lucky single point. Passes the robustness bar; 3%/2% sits in the middle of the plateau, not chased to an edge.
+
+### 2. Family C (structural initial stop) × SMA21 interaction — reversed once, on a direct user challenge
+
+First pass: paired Family C's structural-low initial stop (1.0×ATR buffer, the already-established best/representative value, no re-sweep per critic's instruction) with the new SMA21−2% trailing exit, against the current 3×ATR initial stop + same SMA21−2% trail:
+
+| Population | 3×ATR initial + SMA21−2% | Family-C structural initial + SMA21−2% |
+|---|---|---|
+| daily (n=5,213) | 59.9% / 0.737% / conc 10.1% | 60.6% / **0.811%** / conc **9.2%** — real edge |
+| intraday (n=365) | 61.6% / 1.172% / conc 41.3% | 61.6% / 1.148% / conc 42.1% — tied win, slightly worse |
+| intraday+cutoff (n=298) | 62.1% / 1.251% / conc 46.7% | 62.1% / 1.227% / conc 47.7% — tied win, slightly worse |
+
+Same shape seen twice before with Family C alone: real edge on the big 5-year population, ties-to-mild-negative on the smaller, more representative ones. Initially concluded (matching the critic's own pre-stated logic — "if it doesn't improve expectancy after the SMA21 change, Family C becomes redundant") that this closes Family C.
+
+**Directly challenged ("but can it be a data gap?") before accepting that — and the challenge was right.** Isolated the trades where the two initial-stop rules actually produce a different outcome:
+- On intraday+cutoff (n=298): only 31 trades differ (10.4%), and **all 31 are losers under both rules** (0% win either way) — Family C only changes the loss size here (net slightly worse, -8.69% vs -7.91% median), never rescues one into a win.
+- On daily (n=5,213): 790 trades differ (15.2%). Among those, Family C **flips 38 trades from a loss into a win, and flips zero trades from a win into a loss** — a real, one-directional, downside-free rescue mechanism, not noise.
+
+**Reconciled**: the rescue event is rare (38/5,213 ≈ 0.7% of all trades over 5 years). A 93-day window simply doesn't contain enough trades to reliably show even one occurrence — that's a genuine data-length limitation for a low-frequency effect, not evidence the effect is fake. Since the mechanism is asymmetric (only ever helps when it differs, never hurts), the long-history population is the trustworthy read here, not the short recent one — the reverse of the usual lesson this session, specifically because this question is about a rare event where sample *length* matters more than recency. **Revised, final verdict: keep Family C** — real, small, downside-free, best evidenced on the population large enough to contain it.
+
+Checked hold-time compliance for the combined mechanism (structural initial + SMA21−2% trail): p90/max = 15/15 on every population, same hard ceiling as everything else — Family C's wider initial stop doesn't reintroduce the positional-hold problem, because `MAX_HOLD_DAYS` is enforced inside `check_exit()` itself regardless of which stop mechanism is active.
+
+**Final recommended combination for Breakout Continuation**: structural-low initial stop (20-day lookback, 1.0×ATR buffer, no `MAX_INITIAL_RISK_PCT` cap — that cap was never part of the tested mechanism; `stop_family_research.py`'s Family C variant is uncapped, and this is what the reported numbers above reflect) → SMA21−2% trailing exit once up 3% → existing resistance target/climax exit → `MAX_HOLD_DAYS=15`.
+
+**Wired into production (2026-09-15)**: `signals.py` (`sma21` column added to `build_indicators()`), `backtest.py` (`STRUCTURAL_LOOKBACK_BC`, `STRUCTURAL_STOP_ATR_BUFFER`, `SMA21_TRAIL_BUFFER_PCT` constants; `detect_entry()` computes BC's real structural low; `current_stop_level()` branches per pattern for the BASE stop only — BC now uses the structural−1×ATR floor pre-engagement, VCP keeps its unchanged structural-low floor — while the post-engagement floor is now the SAME SMA21−2% mechanism for both patterns (falling back to EMA21 if SMA21 is NaN); `simulate_ticker()` tracks `atr_entry`), `monitor_positions.py` (mirrors the same structural-low/atr_entry convention for live position tracking). All unit tests updated and passing. End-to-end validation — replaying the production `check_exit`/`current_stop_level` directly against the same population CSVs — reproduced the research numbers exactly: daily 60.6%/+0.811%/conc 9.2%, intraday 61.6%/+1.148%/conc 42.1%, intraday+cutoff 62.1%/+1.227%/conc 47.7%, hold p90/max=15/15 on all three.
+
+### 3. VCP Stop Geometry Audit (RQ-43A) — production asymmetry confirmed justified, more decisively than predicted
+
+Critic's exact question: BC's structural low (tested above) turned out much wider than 3×ATR (median ~14.8% vs ~8.7%, wider in 96% of trades) — is VCP's *existing* structural-low stop (already live in production, `current_stop_level`'s pattern-specific branch) the same kind of accidentally-positional mechanism, just never checked? Built the live-equivalent VCP population (`base_pivot()` + intraday-equivalent High cross, no vol_zscore gate, `LAST_LEG_TOLERANCE=0.40` matching production, n=3,971; n=2,048 at freshness≤0.40) and measured structural distance, the hypothetical 3×ATR distance, their ratio, and real performance with `MAX_HOLD_DAYS=15` already applied:
+
+| | full population (n=3,971) | freshness≤0.40 (n=2,048) |
+|---|---|---|
+| Structural stop distance | median 4.49% | median 4.47% |
+| 3×ATR distance (hypothetical) | median 10.97% | median 10.77% |
+| **Ratio (structural/ATR)** | **0.44** | **0.43** |
+| Structural *wider* than 3×ATR | 0.2% of trades | 0.3% of trades |
+| Capped by the 8%-max-risk rule | 1.8% | 2.0% |
+| Hold days (med/p90/max) | 6/15/15 | 6/14/15 |
+| Win / expectancy | 66.9% / +4.972% | 59.0% / +2.404% |
+
+**Result is the exact opposite of BC's, and stronger than the critic's own prediction** ("roughly similar to ATR" — turns out to be less than half the width, not merely similar). VCP's structural low is *tighter* than an equivalent 3×ATR stop in 99.7-99.8% of trades, median distance under half of ATR's. The 8%-max-risk hard cap (Minervini's published ceiling) almost never needs to bind (<2% of trades) because the base geometry itself is already tight. Mechanism: a VCP base is by construction a volatility-compressing consolidation, so its structural low sits close to price; BC's "structural low" (a plain 20-day rolling minimum, no compression requirement) has no such property and can sit far below price if the stock had any real range in that window. Hold-time comfortably inside the cap (p90 matches the 14-15 day ceiling by construction, median just 6 days — VCP resolves faster than BC on average).
+
+**Verdict: the production asymmetry (BC gets ATR-based, VCP gets structural-based) is empirically justified, not an inconsistency — and VCP's version is the safer of the two, not a hidden risk. No production change needed for VCP's initial stop.**
+
+### 4. VCP-SMA21 transfer test — one clean comparison, adopted
+
+The gap flagged above (whether VCP should also get the SMA21−2% post-engagement floor) was closed as the critic specified: one clean comparison against the existing VCP live-equivalent population (`runs/vcp_live_equiv_tol_0.4.csv`, full n=3,971 and freshness≤0.40 n=2,048 — same population the Geometry Audit above used), no re-sweep, no re-optimization, no re-testing Family C for VCP (Family C is a BC-only initial-stop concept; VCP's initial stop was untouched here). `vcp_sma21_transfer_check.py` replicates `check_exit()`'s real logic (resistance ratchet, climax gate, `MAX_HOLD_DAYS` cap all copied verbatim) with only the post-engagement floor mechanism swapped between the two variants:
+
+| | current (EMA21 floor) | candidate (SMA21−2% floor) |
+|---|---|---|
+| Full pop (n=3,971) | 66.9% / +4.972% / conc 2.5% | 65.4% / **+5.133%** / conc **2.4%** |
+| Freshness≤0.40 (n=2,048) | 59.0% / +2.404% / conc 6.8% | 56.9% / **+2.473%** / conc **6.6%** |
+
+Same trade-off shape already seen and accepted for BC: win rate down ~1.5-2pp (holds through a few more small pullbacks before exiting), but expectancy and concentration both improve on *both* populations — a real, if modest, edge, not a wash. Hold-time cap unaffected (p90/max=15/15 throughout).
+
+**Decision (critic's rule: adopt if better-or-tied, no significance test demanded since this is a transfer decision, not a new-edge discovery): adopted.** Wired into production 2026-09-15 — `current_stop_level()`'s `coiled_spring` branch now shares the exact same SMA21−2% post-engagement mechanism as `breakout_cont` (only the pre-engagement base-stop mechanism still differs by pattern, per the Geometry Audit's justified asymmetry). End-to-end validation (production `check_exit` replayed directly against the same population) reproduced the candidate numbers exactly.
+
+## Exit architecture — frozen (2026-09-15)
+
+| | Breakout Continuation | VCP / Coiled Spring |
+|---|---|---|
+| Initial stop | `structural_low` (20-day lookback) `− 1.0×ATR` | `structural_low` (`base_pivot()`), capped at `MAX_INITIAL_RISK_PCT`=8% |
+| Post-engagement floor (both, once up `TRAIL_ENGAGE_PCT`=3%) | `SMA21 × (1 − 0.02)`, falls back to EMA21 if SMA21 is NaN | *same* |
+| Resistance target | moving pivot ladder, ratchets up only — unchanged | *same* |
+| Climax exit | fresh-high + volume-climax + weak close gate — unchanged | *same* |
+| Hard cap | `MAX_HOLD_DAYS`=15 trading days — unchanged | *same* |
+
+Both patterns now share every exit mechanism except the initial-stop calculation, which stays genuinely different by design (BC's 20-day rolling minimum has no compression property and can sit far from price; VCP's base-pivot structural low is already volatility-compressed by construction — the Geometry Audit confirmed this asymmetry is earned, not accidental).
+
+**Critic's remaining list, per their own explicit sequencing**: Freshness × Stop Distance interaction — now unblocked, the stop architecture is settled; this can move back up in priority. Time-without-progress stop — parked, not rejected (explicit concern: stacking a 4th temporal exit mechanism on top of the cap + fixed-days-after-arm candidate + the SMA21 trail risks losing attribution of which piece is actually creating the edge — see this project's own "keep it simple" discipline elsewhere).
+
+## Freshness × Stop Distance interaction (2026-09-15) — mostly confirms "purely additive," one borderline swing-only lead flagged, not actionable
+
+Same additive-model-check methodology as the earlier Freshness × Distance-to-trigger / Freshness × Consolidation interactions (`freshness_interaction_check.py`, critic update-28) — does the trade's own initial-stop width (real production formula: `structural_low − STRUCTURAL_STOP_ATR_BUFFER×atr_entry`, the exact same calculation now wired into `current_stop_level()`) interact with freshness, or are the two effects independent? Population: `runs/rsi_max_sweep_80.csv`, the full unfiltered daily Breakout Continuation set (n=14,225) — deliberately NOT pre-filtered to freshness≤0.40 here, since freshness is one of the two axes under study.
+
+**2×2 halves check (Fresh/Extended × Near/Far stop distance)**:
+
+| | Near (tight stop) | Far (wide stop) |
+|---|---|---|
+| Fresh — options | 62.8% / +0.68% | 54.9% / +0.68% |
+| Fresh — swing | 61.9% / +0.61% | 59.9% / **+1.03%** |
+| Extended — options | 48.7% / -0.02% | 45.7% / -0.05% |
+| Extended — swing | 64.2% / +0.61% | 58.9% / +0.47% |
+
+**Options: confirms purely additive, same as the earlier Distance/Consolidation interactions** — cross-term difference-in-differences +0.030pp, SE 0.092, |t|=0.32. No real synergy; freshness and stop distance just add.
+
+**Swing: a real-looking but borderline asymmetry, not clearly significant** — cross-term +0.550pp, SE 0.304, |t|=1.81 (≈p=0.07, the same borderline level this session already treated cautiously for the SMA21 Family-C flip). Direction: **fresh trades benefit from a wider stop** (+0.611%→+1.028% mean, median +1.730%→+2.072%, consistent direction not just a mean shift), **extended trades get no such benefit** (+0.605%→+0.473%, flat-to-slightly-worse). Checked for outlier inflation before trusting it (standing rule): top-10 concentration in every cell is 11.0-21.8%, well under the 40% danger threshold — real, not tail-driven. The quartile-level grid (4×4) shows the same shape more granularly: mean pnl rises monotonically with stop width across the three freshest quartiles, then flattens/reverses in the most-extended quartile.
+
+**Plausible mechanism, consistent with this session's own "MD Breakout Theorem"**: fresh/early-cycle breakouts are more likely genuine, so giving them room to survive normal adverse excursion pays off; by the time a stock is already extended, a wide adverse excursion is more often a real reversal than noise, so the same room doesn't help.
+
+**Not promoted to a rule, for two reasons**: (1) a single borderline test (|t|=1.81, no second population to cross-check, unlike the SMA21/Family-C finding which had two independent populations pointing the same direction before being accepted) isn't enough on its own; (2) stop distance isn't a free dial here — it's *derived* from the structural low and ATR, not something choosable per trade. The only way to "act" on this would be a freshness-conditional override on stop width, which is exactly the same shape as the Body/ATR-conditional tighter-stop idea already tested and rejected earlier this session (and MAE-threshold, EMA34-break, 3-day-stall before that) — every one of those failed because a real minority of the "should be cut" subgroup recovers into a big winner, and a rule built on a borderline single-test signal is a bad place to risk repeating that failure. **Verdict: real, weak, swing-only, flagged as a lead — not validated, not actionable, no code change.**
+
+## Pre-live-day regression check (2026-09-15) — two real crash bugs found and fixed in tools NOT covered by the unit tests
+
+Today's `current_stop_level()` rewrite made `breakout_cont` require `state["structural_low"]` and `state["atr_entry"]` to both be real numbers (previously BC's pre-engagement stop only used `peak_close`/`atr14`, never touched `structural_low` at all). `backtest.py`/`monitor_positions.py`/`tests/test_backtest.py` were all updated together, but two other real, currently-used tools build their own ad-hoc state dicts and were missed — both would have thrown at the first BC candidate encountered:
+
+1. **`daily_scan.py`'s `_initial_stop()`** (the `stop=₹X` column shown on every Tradable-Today/Watchlist row) — its state dict never included `atr_entry`. Fixed: added `atr_entry=row.atr14`, same convention as everywhere else.
+2. **`trader_dashboard.py`'s `run_evening()`** (the "tonight's candidates" list) — passed `structural_low=None` for every `breakout_cont` candidate, harmless before today since BC never read it, fatal now. Fixed: computes a real structural low the same way `detect_entry()` does (20-day pre-entry `Low.min()`, `STRUCTURAL_LOOKBACK_BC`).
+
+Both confirmed fixed by actually running them end-to-end on real cached data (not just re-reading the diff): `daily_scan.py` produced real stop values for two live BC watchlist candidates (PAYTM ₹1488.00, PINELABS ₹145.93); `trader_dashboard.py evening` produced real stop values for its top-5 candidates including a live BC one (KOTAKBANK ₹379.78). All 72 unit tests still pass.
+
+**`monitor_position.py` (singular, older, pre-`monitor_positions.py` single-ticker CLI tool, superseded 10 days ago) has the same latent bug (no `atr_entry`, and a `structural_low=entry_price` placeholder that was never a real value even before today) — not fixed, since it isn't referenced anywhere and doesn't appear to be the tool actually in use (`monitor_positions.py`, plural, is what every other tool and this whole session's monitoring work wraps). Flagging its existence rather than silently leaving a dead trap; worth a decision (fix or delete) if it's ever invoked again.
+
+**Live position check, same day**: the three real open positions in `open_positions.csv` (GRANULES, ANANDRATHI, VIJAYA — all `breakout_cont`) were re-read under the new mechanism via `monitor_positions.py`: stops recompute to ₹838.42 / ₹2048.75 / ₹1372.64 respectively, all still comfortably inside their `MAX_HOLD_DAYS=15` window (3, 4, 2 trading days held). Data freshness checked directly: cache tops out at Friday 2026-09-11's close, which is correct, not stale — Sept 12-13 were a weekend and Sept 14 a market holiday (confirmed via the trade journal's own note), and today (Tuesday Sept 15) hadn't closed yet at the time of this check. A `fetch_prices.py` run confirmed "0 new, 0 updated, 500 already current" — separately confirmed this environment's outbound yfinance calls are being rate-limited (HTTP 429, general internet egress itself is fine) rather than a real data gap.

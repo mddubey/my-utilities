@@ -7,7 +7,7 @@ and reports how long it's been since the position last made a fresh high — inf
 only, not a validated exit rule on its own, but a useful "is this stalling" data point."""
 import pandas as pd
 
-from backtest import load, check_exit, current_stop_level, resistance_target, MAX_INITIAL_RISK_PCT
+from backtest import load, check_exit, current_stop_level, resistance_target, MAX_INITIAL_RISK_PCT, STRUCTURAL_LOOKBACK_BC
 from pivots import daily_pivots
 from vcp import base_pivot
 
@@ -29,16 +29,21 @@ def monitor(positions_df):
             continue
         entry_idx = idx[0]
 
-        structural_low = None
+        entry_row = rows.iloc[entry_idx]
         if pattern == "coiled_spring":
             base = base_pivot(rows, entry_idx)
             structural_low = base[1] if base else entry_price * (1 - MAX_INITIAL_RISK_PCT)
             structural_low = max(structural_low, entry_price * (1 - MAX_INITIAL_RISK_PCT))
+        else:
+            # (2026-09-15) breakout_cont's own structural low, same convention as
+            # detect_entry() in backtest.py -- 20-day pre-entry lookback minimum.
+            lo = max(0, entry_idx - STRUCTURAL_LOOKBACK_BC)
+            structural_low = rows.iloc[lo:entry_idx].Low.min() if entry_idx > lo else entry_price * 0.9
 
-        entry_row = rows.iloc[entry_idx]
         target = resistance_target(entry_price, entry_row)
         state = dict(entry_price=entry_price, peak_close=entry_price,
-                      peak_high=entry_row.High, structural_low=structural_low, target=target)
+                      peak_high=entry_row.High, structural_low=structural_low, target=target,
+                      days_held=0, atr_entry=entry_row.atr14)
         peak_high_date = entry_row.Date
 
         triggered = None
@@ -69,6 +74,10 @@ def monitor(positions_df):
             print(f"  current target : {'₹' + format(state['target'], '.2f') if state['target'] is not None else 'n/a'}")
             print(f"  peak close so far: ₹{state['peak_close']:.2f}  |  days since last fresh high: {days_since_new_high}"
                   f"{'  (no progress in a while — worth a manual look, not a hard rule)' if days_since_new_high >= 15 else ''}")
+            from backtest import MAX_HOLD_DAYS
+            remaining = MAX_HOLD_DAYS - state["days_held"]
+            print(f"  trading days held: {state['days_held']}/{MAX_HOLD_DAYS}"
+                  f"{f'  ({remaining} left before the hard cap forces an exit)' if remaining > 0 else '  (cap should have fired — check exit logic)'}")
     return
 
 

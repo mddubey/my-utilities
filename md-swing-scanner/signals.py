@@ -125,6 +125,11 @@ def build_indicators(df):
     df = df.copy()
     df["ema8"] = ema(df.Close, 8)
     df["ema21"] = ema(df.Close, 21)  # VCP's published trailing-stop MA (Minervini: trail 10/21-EMA post-engage)
+    df["sma21"] = df.Close.rolling(21).mean()  # (2026-09-15) Breakout Continuation's new
+                                                 # post-engagement trailing exit -- see
+                                                 # backtest.py's current_stop_level() comment
+                                                 # and FINDINGS.md's SMA21 trailing-exit thread
+                                                 # for why SMA (not EMA) and why no ATR involved
     df["ema34"] = ema(df.Close, 34)
     df["rsi14"] = rsi(df.Close, 14)
     df["atr14"] = atr(df, 14)

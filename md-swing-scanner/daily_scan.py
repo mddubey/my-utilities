@@ -275,7 +275,7 @@ def _initial_stop(pattern, structural_low, row):
     if pattern == "coiled_spring":
         structural_low = max(structural_low, entry_price * (1 - MAX_INITIAL_RISK_PCT))
     state = dict(entry_price=entry_price, peak_close=entry_price, peak_high=row.High,
-                 structural_low=structural_low, target=None)
+                 structural_low=structural_low, target=None, atr_entry=row.atr14)
     return current_stop_level(pattern, state, row)
 
 

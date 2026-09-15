@@ -84,8 +84,53 @@ ATR_TRAIL_MULT = 3.0         # Breakout Continuation's base stop pre-engagement 
                               # published Chandelier Exit standard is 3x ATR on a 22-day lookback;
                               # testing at the sourced value in place of our earlier ad-hoc 2.0
 MAX_INITIAL_RISK_PCT = 0.08  # Coiled Spring/VCP only — Minervini's published hard-cap stop
+MAX_HOLD_DAYS = 15           # (2026-09-14) real trading-days cap, both patterns — locked in after
+                              # today's stop-loss research made the underlying problem obvious: every
+                              # prior exit-rule test this session (and the earlier Family-C structural-
+                              # stop rejection) had been implicitly validated against an UNCAPPED,
+                              # effectively-positional baseline (p90=23 days, max 67-81 days on the
+                              # live-equivalent population) that was never the actual objective — this
+                              # is meant to be a short-term swing strategy, not positional. Tested
+                              # directly (not assumed): capping at 15 trading days costs a real but
+                              # modest amount vs uncapped (win rate -1 to -3pp, expectancy -9% to -15%
+                              # relative on the properly fresh<=0.40-conditioned populations); a 20-day
+                              # cap actually matched or slightly BEAT uncapped expectancy on the two more
+                              # representative populations, so 15 is a deliberately conservative choice
+                              # within the user's stated hard ceiling (2-3 weeks), not a data-optimized
+                              # one. Re-tested the previously-rejected fixed-days-after-arm/3-day-stall
+                              # early-exit ideas WITHIN this cap (not against the old uncapped baseline)
+                              # and the picture changed: fixed-3-days-after-arm's apparent expectancy
+                              # cost on the most representative population turned out to be statistically
+                              # indistinguishable from noise (bootstrapped 95% CI spanned zero) — the
+                              # earlier "cutting early always loses" verdicts were partly an artifact of
+                              # comparing against an implicitly-positional alternative, not a clean
+                              # rejection of early exits in general.
 TRAIL_ENGAGE_PCT = 1.03      # Both patterns (2026-08-30, was VCP-only) — give a normal pivot retest
-                              # room before trailing tightens onto the 21-EMA
+                              # room before trailing tightens onto the 21-EMA (VCP) / SMA21 (BC, below)
+STRUCTURAL_LOOKBACK_BC = 20  # (2026-09-15) Breakout Continuation's new initial stop, promoted after
+                              # the "Family C" research thread: structural_low = lowest Low over the
+                              # 20 trading days BEFORE entry (returned by detect_entry, stored at
+                              # entry, does NOT trail with peak_close -- a fixed invalidation floor,
+                              # not a chandelier). Replaces the old peak_close-relative 3xATR trail
+                              # for BC's pre-engagement stage only.
+STRUCTURAL_STOP_ATR_BUFFER = 1.0  # BC's structural_low - this*atr_entry = the actual initial stop.
+                              # Chosen value ("Family C, 1.0x buffer") from a sweep of 0/0.25/0.5/1.0 --
+                              # all four widen the stop and improve win-rate/expectancy vs the old
+                              # 3xATR mechanism on the full 2021-2026 population; 1.0x showed the
+                              # largest, most consistent one-directional edge (see FINDINGS.md: 38
+                              # loss->win flips, 0 win->loss flips vs the old mechanism, on the
+                              # trades where the two rules actually differ -- a real but RARE (~0.7%
+                              # of all trades) rescue effect, confirmed not to reproduce reliably on
+                              # a 93-day window purely because that's too short to contain enough
+                              # occurrences of a rare event, not because the effect isn't real).
+SMA21_TRAIL_BUFFER_PCT = 0.02  # (2026-09-15) BC's new post-engagement trail: once up TRAIL_ENGAGE_PCT,
+                              # exit if Close < SMA21*(1-this). Replaces the old EMA21 floor for BC
+                              # only (VCP keeps EMA21 pending its own audit -- see FINDINGS.md).
+                              # Passed a 3x3 robustness grid (activation 2/3/4% x buffer 1/2/3%) --
+                              # every cell beat the old mechanism, no single lucky point. ATR was
+                              # tested as part of this floor (SMA21 - 0.5xATR) and found to add
+                              # nothing measurable over a plain fixed-percent buffer -- removed
+                              # entirely, this is deliberately NOT ATR-scaled.
 CLIMAX_VOL_LOOKBACK = 20     # "heaviest volume of the run" — Wyckoff buying-climax / O'Neil exhaustion
 CLIMAX_WEAK_CLOSE_PCT = 0.30 # close in the bottom 30% of the day's range — symmetric with the existing
                               # CLOSE_NEAR_HIGH_PCT=0.70 entry filter (signals.py), not a new arbitrary number
@@ -237,7 +282,13 @@ def detect_entry(ticker, rows, i, require_regime=True, live_closes=None):
         # choppy markets (52% win rate / +0.25% median when Nifty ADX<20, vs 71-73% /
         # ~+2% otherwise).
         if not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True, require_above_sma50=TEST_SMA50_ABOVE, require_sma50_rising=TEST_SMA50_RISING, allow_sma50_recovery=TEST_SMA50_RECOVERY, sma50_recovery_lookback=TEST_SMA50_RECOVERY_LOOKBACK, min_breadth=TEST_MIN_BREADTH):
-            return "breakout_cont", None
+            # (2026-09-15) structural_low for BC now real, not None -- lowest Low over the
+            # STRUCTURAL_LOOKBACK_BC trading days strictly before entry (no lookahead, same
+            # convention as the research thread). Caller (simulate_ticker) combines this with
+            # atr_entry via STRUCTURAL_STOP_ATR_BUFFER, see current_stop_level().
+            lo = max(0, i - STRUCTURAL_LOOKBACK_BC)
+            structural_low = rows.iloc[lo:i].Low.min() if i > lo else row.Close * 0.9
+            return "breakout_cont", structural_low
         return None
     if stage2_trend_template(row, ticker, row.Date, live_closes=live_closes) and (not require_regime or market_trending(row.Date, require_rising=TEST_ADX_RISING, require_uptrend=TEST_ADX_UPTREND, require_above_sma200=True, require_above_sma50=TEST_SMA50_ABOVE, require_sma50_rising=TEST_SMA50_RISING, allow_sma50_recovery=TEST_SMA50_RECOVERY, sma50_recovery_lookback=TEST_SMA50_RECOVERY_LOOKBACK, min_breadth=TEST_MIN_BREADTH)):
         # VCP is explicitly a bull-market pattern in the original methodology, not a
@@ -253,39 +304,69 @@ def current_stop_level(pattern, state, row):
     uses internally to decide hit_stop, exposed separately so a live position-monitor
     can report "move your SL to X" without re-deriving the logic by hand.
 
-    Both patterns now share ONE mechanism (2026-08-30): a pattern-specific base stop,
-    which tightens to the 21-EMA once the trade is up TRAIL_ENGAGE_PCT — previously
-    only Coiled Spring/VCP had this second stage, Breakout Continuation trailed at a
-    flat 3xATR for the whole hold no matter how extended (giving back the same % of
-    any move, small or huge). The base stop itself still differs per pattern on
-    purpose — VCP's is the real structural base low, Breakout Continuation's is the
-    ATR chandelier — that's each pattern's actual entry logic, not incidental
-    variation to remove."""
-    base_stop = (state["structural_low"] if pattern == "coiled_spring"
-                 else state["peak_close"] - ATR_TRAIL_MULT * row.atr14)
+    Both patterns share the same two-stage SHAPE (pre-engagement base stop, then
+    tightens once the trade is up TRAIL_ENGAGE_PCT) but the base-stop MECHANISM differs
+    per pattern, on purpose, while the post-engagement floor is now the SAME for both
+    (2026-09-15 update, see STRUCTURAL_LOOKBACK_BC/STRUCTURAL_STOP_ATR_BUFFER/
+    SMA21_TRAIL_BUFFER_PCT above and FINDINGS.md's SMA21/Family-C/VCP-transfer thread
+    for the full validation):
+
+    - VCP/coiled_spring: base stop is the real structural base low (`state["structural_low"]`,
+      already capped at entry by MAX_INITIAL_RISK_PCT). Unchanged — the VCP Stop Geometry
+      Audit confirmed this base stop is already tight (median ~4.5% vs an equivalent
+      3xATR's ~11%, wider than ATR in only ~0.3% of trades), so there was nothing to fix
+      here.
+    - breakout_cont: base stop is now `structural_low - STRUCTURAL_STOP_ATR_BUFFER*atr_entry`
+      -- a FIXED floor set at entry (does not trail with peak_close, unlike the old 3xATR
+      chandelier), replacing the old peak_close-relative ATR trail.
+    - BOTH patterns, post-engagement: `SMA21 * (1 - SMA21_TRAIL_BUFFER_PCT)`, not EMA21 and
+      not ATR-scaled. Validated standalone for breakout_cont first (beat the old EMA21
+      mechanism on win/expectancy/concentration on every population), then transferred to
+      VCP as one clean comparison (critic-specified, no re-sweep): expectancy and
+      concentration both improved on VCP too (full pop +4.972%->+5.133%, freshness<=0.40
+      +2.404%->+2.473%), win rate down ~1.5-2pp (same known "fewer but bigger" trade-off
+      seen on breakout_cont) — adopted per the critic's better-or-tied rule. Falls back to
+      the old max(base_stop, EMA21) only in the rare case SMA21 is still undefined (first
+      ~21 trading days of a ticker's cached history)."""
+    if pattern == "coiled_spring":
+        base_stop = state["structural_low"]
+    else:
+        base_stop = state["structural_low"] - STRUCTURAL_STOP_ATR_BUFFER * state["atr_entry"]
+
     if state["peak_close"] >= state["entry_price"] * TRAIL_ENGAGE_PCT:
-        return max(base_stop, row.ema21)
+        if pd.isna(row.sma21):
+            return max(base_stop, row.ema21)
+        return max(base_stop, row.sma21 * (1 - SMA21_TRAIL_BUFFER_PCT))
     return base_stop
 
 
 def check_exit(pattern, state, row, use_resistance=True):
     """Given a currently-open position's `state` (dict: entry_price, peak_close,
-    peak_high, structural_low, target) and today's `row`, returns (exit_reason_or_None,
-    updated_state) — a pure function, no side effects, so both the historical backtest
-    loop and a live daily position-monitor share the exact same exit logic without risk
-    of the two quietly drifting apart (pulled out of simulate_ticker 2026-08-30, same
-    reason as detect_entry above).
+    peak_high, structural_low, target, days_held) and today's `row`, returns
+    (exit_reason_or_None, updated_state) — a pure function, no side effects, so both the
+    historical backtest loop and a live daily position-monitor share the exact same exit
+    logic without risk of the two quietly drifting apart (pulled out of simulate_ticker
+    2026-08-30, same reason as detect_entry above).
 
     Exit rule for BOTH patterns: a hard structural stop, then an ATR trail (Breakout
     Continuation) or 21-EMA trail (VCP, published Minervini practice) once the trade is
-    working — no fixed day-count cap for either, VCP holds a working breakout for weeks
-    to months per the real methodology, failure shows up structurally not on a calendar.
-    Plus a moving resistance target (refreshed to the current week's nearest pivot above
-    price each day, ratchets up only) and a gated climax-top exit (fresh high on the
-    heaviest volume of the run, closing weak — Wyckoff/O'Neil exhaustion signature, only
-    evaluated once the position is already up >=CLIMAX_MIN_GAIN_PCT to avoid firing on
-    the entry bar's own qualifying volume spike)."""
+    working, plus a moving resistance target (refreshed to the current week's nearest
+    pivot above price each day, ratchets up only), a gated climax-top exit (fresh high on
+    the heaviest volume of the run, closing weak — Wyckoff/O'Neil exhaustion signature,
+    only evaluated once the position is already up >=CLIMAX_MIN_GAIN_PCT to avoid firing
+    on the entry bar's own qualifying volume spike), and a hard MAX_HOLD_DAYS cap.
+
+    The day-count cap is new (2026-09-14) — every earlier version of this docstring said
+    "no fixed day-count cap... failure shows up structurally not on a calendar," which
+    was true as written but had never been checked against what the strategy is actually
+    for: real trading-days research this session found the uncapped mechanism's tail
+    (p90=23 days, max 67-81 days on the live-equivalent population) was already a
+    positional-trade hold time, not a swing one, regardless of pattern. See
+    MAX_HOLD_DAYS's own comment for the numbers. `state["days_held"]` must be
+    initialized to 0 by the caller at entry and is incremented once per call here —
+    both call sites (`simulate_ticker` below and `monitor_positions.py`) do this."""
     state = dict(state)
+    state["days_held"] = state.get("days_held", 0) + 1
     made_new_high = row.High > state["peak_high"]  # before updating — "did TODAY set a fresh high"
     state["peak_close"] = max(state["peak_close"], row.Close)
     state["peak_high"] = max(state["peak_high"], row.High)
@@ -304,9 +385,10 @@ def check_exit(pattern, state, row, use_resistance=True):
                   and close_pos <= CLIMAX_WEAK_CLOSE_PCT)
 
     hit_stop = row.Close < current_stop_level(pattern, state, row)
+    hit_max_hold = state["days_held"] >= MAX_HOLD_DAYS
 
-    if hit_resistance or hit_stop or hit_climax:
-        reason = "resistance" if hit_resistance else "climax" if hit_climax else "stop"
+    if hit_resistance or hit_stop or hit_climax or hit_max_hold:
+        reason = "resistance" if hit_resistance else "climax" if hit_climax else "stop" if hit_stop else "max_hold_cap"
         return reason, state
     return None, state
 
@@ -366,7 +448,8 @@ def simulate_ticker(ticker, df, use_resistance, min_rr=0.0, require_regime=True)
                     structural_low = max(structural_low, entry_price * (1 - MAX_INITIAL_RISK_PCT))
                 pattern = pattern_candidate
                 state = dict(entry_price=entry_price, peak_close=entry_price,
-                              peak_high=row.High, structural_low=structural_low, target=target)
+                              peak_high=row.High, structural_low=structural_low, target=target,
+                              days_held=0, atr_entry=row.atr14)
         else:
             exit_reason, state = check_exit(pattern, state, row, use_resistance=use_resistance)
             if exit_reason is not None:
