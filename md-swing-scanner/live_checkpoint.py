@@ -87,6 +87,8 @@ import pandas as pd
 from backtest import load
 from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT, _load_primed_cache_if_fresh
 from sector_strength import sector_rs
+from vcp import stage2_trend_breakdown, base_pivot
+from signals import base_filters_pass
 import intraday_cache
 
 # Live volume checks (2026-09-07) -- see FINDINGS.md. Two checks, built and
@@ -553,12 +555,31 @@ def classify_candidates(tickers, cutoff_ist=None):
         breakout_day_vol = _breakout_day_volume(df, already_extended) if extension_days >= 1 else None
         consolidation_days = _consolidation_days(df, i)
 
+        # Trend-strength context (2026-09-16, user-requested): which gate(s) this
+        # candidate actually clears -- VCP's Stage-2 template + a valid base, and/or
+        # Breakout Continuation's own base_filters_pass -- plus a couple of the most
+        # decision-relevant margin details, not just the collapsed pass/fail already
+        # implied by being on the primed list at all (see stage2_trend_breakdown()'s own
+        # docstring in vcp.py: being primed only proves clearing AT LEAST ONE gate, not
+        # both, and a bare "True" hides how comfortable or marginal the pass was).
+        trend = stage2_trend_breakdown(df.iloc[i], t, df.iloc[i].Date)
+        vcp_qualified = bool(trend["all_pass"] and base_pivot(df, i) is not None)
+        bc_required = ["ema34", "vol_avg10_prior", "high10_prior", "atr14_60ago",
+                       "ema34_rising10", "traded_value_sma20", "close_20ago"]
+        bc_qualified = (not df.iloc[i][bc_required].isna().any()) and bool(base_filters_pass(df.iloc[i]))
+        high_252 = df.iloc[i].get("high_252")
+        pct_to_52w_high = (df.iloc[i].Close / high_252 * 100) if pd.notna(high_252) and high_252 else None
+
         feature_rows[t] = dict(row=df.iloc[i], features=_quality_features(t, df, i),
                                 date=df.iloc[i].Date, high10_effective=high10_effective,
                                 extension_days=extension_days,
                                 normal_vol_baseline=normal_vol_baseline, normal_vol_n=normal_vol_n,
                                 breakout_day_vol=breakout_day_vol,
-                                consolidation_days=consolidation_days)
+                                consolidation_days=consolidation_days,
+                                vcp_qualified=vcp_qualified, bc_qualified=bc_qualified,
+                                sma_stack_ok=trend["above_all_smas"] and trend["ma_stack"] and trend["sma200_rising"]
+                                             if trend["above_all_smas"] is not None else None,
+                                rs_rating=trend["rs_rating"], pct_to_52w_high=pct_to_52w_high)
 
     quality_pool = pd.DataFrame({t: v["features"] for t, v in feature_rows.items()}).T
     if not quality_pool.empty:
@@ -603,7 +624,10 @@ def classify_candidates(tickers, cutoff_ist=None):
                      high10_effective=high10_effective,
                      vol_vs_normal_pct=vol_vs_normal_pct, vol_vs_breakout_pct=vol_vs_breakout_pct,
                      fresh_setup=_fresh_setup(row), freshness_score=_freshness_score(row),
-                     consolidation_days=feature_rows[t]["consolidation_days"])
+                     consolidation_days=feature_rows[t]["consolidation_days"],
+                     vcp_qualified=feature_rows[t]["vcp_qualified"], bc_qualified=feature_rows[t]["bc_qualified"],
+                     sma_stack_ok=feature_rows[t]["sma_stack_ok"], rs_rating=feature_rows[t]["rs_rating"],
+                     pct_to_52w_high=feature_rows[t]["pct_to_52w_high"])
 
         if bar["High"] >= trigger_low:
             pullback_pct = (bar["High"] - bar["Close"]) / bar["High"] * 100
@@ -709,8 +733,20 @@ def _print_tier(label, df, note, price_col, price_label):
         body = f"  body/atr={batr:.2f}" if batr is not None and pd.notna(batr) else ""
         accept = r.get("acceptance_state")
         acc = f"  accept={accept}" if accept else ""
+        gates = []
+        if r.get("vcp_qualified"):
+            gates.append("VCP")
+        if r.get("bc_qualified"):
+            gates.append("BC")
+        gate = f"  gate=[{'+'.join(gates)}]" if gates else "  gate=[none]"
+        stack = r.get("sma_stack_ok")
+        smastack = f"  sma_stack={'OK' if stack else 'no'}" if stack is not None else ""
+        rsr = r.get("rs_rating")
+        rsrating = f"  rs={rsr:.0f}" if rsr is not None and pd.notna(rsr) else ""
+        p52 = r.get("pct_to_52w_high")
+        pct52 = f"  52wk={p52:.0f}%" if p52 is not None and pd.notna(p52) else ""
         print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}")
+              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{gate}{smastack}{rsrating}{pct52}")
 
 
 if __name__ == "__main__":

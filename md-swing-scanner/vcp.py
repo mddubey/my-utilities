@@ -7,16 +7,23 @@ LOW_52W_MIN_MULT = 1.25   # price must be at least 25% above its 52-week low
 HIGH_52W_MAX_MULT = 0.75  # price must be within 25% of its 52-week high (i.e. >= 75% of it)
 
 
-def stage2_trend_template(row, ticker, date, live_closes=None):
-    """Long-term uptrend confirmation, checked BEFORE looking at any short-term pattern
-    at all — this is the actual gate that separates a real base-building leader from a
-    random quiet patch inside an unremarkable or declining stock.
+def stage2_trend_breakdown(row, ticker, date, live_closes=None):
+    """The individual Stage-2 sub-conditions, exposed separately (2026-09-16) so a live
+    monitoring tool can show WHICH conditions passed and by what margin, not just the
+    collapsed True/False stage2_trend_template() returns -- same reasoning as detect_entry/
+    check_exit being the single source of truth elsewhere in this project: one place
+    computes these conditions, stage2_trend_template() below is now a thin wrapper over
+    this, not a second copy.
 
-    live_closes (optional): passed straight through to rs_rating() for a live `date`
-    not yet cached to disk anywhere — see its docstring. Never set by backtests."""
+    Returns a dict with each sub-condition (bool) plus the raw rs_rating (float or None)
+    and an "all_pass" key matching stage2_trend_template()'s own return value exactly.
+    If any required column is NaN, every sub-condition and all_pass come back None/False
+    rather than raising -- same missing-data behavior as before this refactor."""
     required = ["sma50", "sma150", "sma200", "sma200_20ago", "high_252", "low_252"]
     if row[required].isna().any():
-        return False
+        return dict(above_all_smas=None, ma_stack=None, sma200_rising=None,
+                     off_52w_low=None, near_52w_high=None, rs_rating=None,
+                     strong_rs=None, all_pass=False)
     above_all_smas = row.Close > row.sma50 and row.Close > row.sma150 and row.Close > row.sma200
     ma_stack = row.sma50 > row.sma150 > row.sma200
     sma200_rising = row.sma200 > row.sma200_20ago
@@ -24,7 +31,21 @@ def stage2_trend_template(row, ticker, date, live_closes=None):
     near_52w_high = row.Close >= HIGH_52W_MAX_MULT * row.high_252
     rs = rs_rating(ticker, date, live_closes=live_closes)
     strong_rs = rs is not None and rs >= RS_RATING_MIN
-    return above_all_smas and ma_stack and sma200_rising and off_52w_low and near_52w_high and strong_rs
+    all_pass = (above_all_smas and ma_stack and sma200_rising
+                and off_52w_low and near_52w_high and strong_rs)
+    return dict(above_all_smas=above_all_smas, ma_stack=ma_stack, sma200_rising=sma200_rising,
+                 off_52w_low=off_52w_low, near_52w_high=near_52w_high, rs_rating=rs,
+                 strong_rs=strong_rs, all_pass=all_pass)
+
+
+def stage2_trend_template(row, ticker, date, live_closes=None):
+    """Long-term uptrend confirmation, checked BEFORE looking at any short-term pattern
+    at all — this is the actual gate that separates a real base-building leader from a
+    random quiet patch inside an unremarkable or declining stock.
+
+    live_closes (optional): passed straight through to rs_rating() for a live `date`
+    not yet cached to disk anywhere — see its docstring. Never set by backtests."""
+    return stage2_trend_breakdown(row, ticker, date, live_closes=live_closes)["all_pass"]
 
 
 # --- multi-contraction base detection ---

@@ -136,8 +136,38 @@ def _print_tier(label, df, note, price_col, price_label, held):
         # unlike the old pp/r1/r2 resistance_target() this replaced (which goes blank
         # once price runs past all three classic pivot levels).
         pivot = f"  pivot={r.high10_effective:.2f}" if "high10_effective" in r and pd.notna(r.high10_effective) else ""
+        # (2026-09-15) this dashboard's own _print_tier had drifted from live_checkpoint.py's
+        # richer one -- freshness_score is this project's single most validated signal
+        # across every population/exit-regime/metric tested (see FINDINGS.md), and it was
+        # silently missing here even though classify_candidates() already computes it.
+        # Added these four fields to match live_checkpoint.py's own display exactly,
+        # rather than re-deriving the formatting independently.
+        fscore = r.get("freshness_score")
+        fresh = f"  freshness={fscore*100:.0f}%{' [FRESH]' if r.get('fresh_setup') else ''}" if fscore is not None and pd.notna(fscore) else ""
+        cdays = r.get("consolidation_days")
+        consol = f"  consol={cdays:.0f}d" if cdays is not None and pd.notna(cdays) else ""
+        batr = r.get("body_atr")
+        body = f"  body/atr={batr:.2f}" if batr is not None and pd.notna(batr) else ""
+        accept = r.get("acceptance_state")
+        acc = f"  accept={accept}" if accept else ""
+        # (2026-09-16) trend-strength context, same reasoning/source as the freshness
+        # fix above -- being on the primed list only proves clearing AT LEAST ONE of
+        # VCP/BC's gates, not both, and a bare pass hides the margin. See
+        # vcp.stage2_trend_breakdown()'s own docstring.
+        gates = []
+        if r.get("vcp_qualified"):
+            gates.append("VCP")
+        if r.get("bc_qualified"):
+            gates.append("BC")
+        gate = f"  gate=[{'+'.join(gates)}]" if gates else "  gate=[none]"
+        stack = r.get("sma_stack_ok")
+        smastack = f"  sma_stack={'OK' if stack else 'no'}" if stack is not None else ""
+        rsr = r.get("rs_rating")
+        rsrating = f"  rs={rsr:.0f}" if rsr is not None and pd.notna(rsr) else ""
+        p52 = r.get("pct_to_52w_high")
+        pct52 = f"  52wk={p52:.0f}%" if p52 is not None and pd.notna(p52) else ""
         print(f"  {ticker_label:18s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}{clr}{pivot}{vol}  {q}  {sec}{dist}{vel}{fire}{ext}{held_tag}")
+              f"{price_label}={r[price_col]:9.2f}{clr}{pivot}{vol}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{ext}{held_tag}{gate}{smastack}{rsrating}{pct52}")
 
 
 def run_morning(tickers, cutoff):
