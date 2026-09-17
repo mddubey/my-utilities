@@ -401,6 +401,54 @@ def _freshness_score(row):
     return 0.5 * rsi_pct + 0.5 * mom_pct
 
 
+# Fragility risk (2026-09-17, critic-promoted to live telemetry, see FINDINGS.md's
+# "Fragility Margin" section) -- NOT the real Fragility Margin itself, which is a day+1
+# outcome (exit price vs. trigger) only knowable in hindsight. This is a live ESTIMATE
+# built from the two pre-entry features that `fragility_margin_check.py` found actually
+# predict it (freshness_score, body_atr), using their real empirical quartile fragile
+# rates from that research (n=491 winners) as a lookup, not an arbitrary formula.
+# Individual spreads are modest (12.4%-26.0% freshness, 12.5%-25.7% body_atr) -- this is
+# a directional estimate for execution-risk awareness, explicitly NOT a filter/gate (the
+# critic was explicit: fragile trades include real winners, e.g. PAYTM-style explosions --
+# skipping them would repeat the exact mistake the acceptance/pullback/Body-ATR gates
+# already made and got rejected for).
+FRESHNESS_FRAGILE_BREAKS = [0.027, 0.2036, 0.4306, 0.6452, 0.9553]  # quartile edges, winners only
+FRESHNESS_FRAGILE_RATES = [12.4, 20.2, 19.2, 26.0]                  # fragile rate % per quartile
+BODY_ATR_FRAGILE_BREAKS = [0.0, 0.1002, 0.1894, 0.3332, 1.5366]
+BODY_ATR_FRAGILE_RATES = [25.7, 19.2, 20.2, 12.5]                   # reversed: bigger body = less fragile
+
+
+def _fragility_quartile_bin(value, breaks):
+    if value is None or pd.isna(value):
+        return None
+    if value <= breaks[1]:
+        return 0
+    if value <= breaks[2]:
+        return 1
+    if value <= breaks[3]:
+        return 2
+    return 3
+
+
+def _fragility_risk(freshness_score, body_atr):
+    """Returns (label, estimated_fragile_pct) or (None, None) if neither input is
+    available. label in {"Low", "Medium", "High"} -- execution-risk framing, not a
+    win/loss call. Thresholds (16%/22%) split the ~12-26% real range roughly into
+    thirds around the population's own 16.5% base fragile rate."""
+    f_bin = _fragility_quartile_bin(freshness_score, FRESHNESS_FRAGILE_BREAKS)
+    b_bin = _fragility_quartile_bin(body_atr, BODY_ATR_FRAGILE_BREAKS)
+    rates = []
+    if f_bin is not None:
+        rates.append(FRESHNESS_FRAGILE_RATES[f_bin])
+    if b_bin is not None:
+        rates.append(BODY_ATR_FRAGILE_RATES[b_bin])
+    if not rates:
+        return None, None
+    est_pct = sum(rates) / len(rates)
+    label = "Low" if est_pct < 16 else "High" if est_pct > 22 else "Medium"
+    return label, est_pct
+
+
 CONSOLIDATION_LOOKBACK = 20   # trading days
 CONSOLIDATION_TOLERANCE_PCT = 3.0  # Close within this %-below-high10_prior counts as "quiet"
 
@@ -618,16 +666,29 @@ def classify_candidates(tickers, cutoff_ist=None):
                 if expected_breakout:
                     vol_vs_breakout_pct = vol_so_far / expected_breakout * 100
 
+        freshness_score = _freshness_score(row)
+        # Live body_atr proxy: today's live partial bar's Open/Close (all that's known
+        # intraday) against yesterday's frozen atr14 -- same "use the live partial bar,
+        # not a final value we don't have yet" convention as dist_to_trigger/velocity
+        # elsewhere in this function. Genuinely approximate (today's Close isn't final),
+        # same caveat as every other live-partial-bar feature here.
+        body_atr_live = None
+        bar_open, bar_close = bar.get("Open"), bar.get("Close")
+        if bar_open is not None and bar_close is not None and pd.notna(row.get("atr14")) and row.atr14:
+            body_atr_live = abs(bar_close - bar_open) / row.atr14
+        fragility_label, fragility_est_pct = _fragility_risk(freshness_score, body_atr_live)
+
         common = dict(ticker=t, trigger_low=trigger_low, trigger_high=trigger_high,
                      quality_score=quality_score, sector=sector, sector_rs=sector_rs_pct,
                      extension_days=feature_rows[t]["extension_days"],
                      high10_effective=high10_effective,
                      vol_vs_normal_pct=vol_vs_normal_pct, vol_vs_breakout_pct=vol_vs_breakout_pct,
-                     fresh_setup=_fresh_setup(row), freshness_score=_freshness_score(row),
+                     fresh_setup=_fresh_setup(row), freshness_score=freshness_score,
                      consolidation_days=feature_rows[t]["consolidation_days"],
                      vcp_qualified=feature_rows[t]["vcp_qualified"], bc_qualified=feature_rows[t]["bc_qualified"],
                      sma_stack_ok=feature_rows[t]["sma_stack_ok"], rs_rating=feature_rows[t]["rs_rating"],
-                     pct_to_52w_high=feature_rows[t]["pct_to_52w_high"])
+                     pct_to_52w_high=feature_rows[t]["pct_to_52w_high"],
+                     fragility_label=fragility_label, fragility_est_pct=fragility_est_pct)
 
         if bar["High"] >= trigger_low:
             pullback_pct = (bar["High"] - bar["Close"]) / bar["High"] * 100
@@ -745,8 +806,10 @@ def _print_tier(label, df, note, price_col, price_label):
         rsrating = f"  rs={rsr:.0f}" if rsr is not None and pd.notna(rsr) else ""
         p52 = r.get("pct_to_52w_high")
         pct52 = f"  52wk={p52:.0f}%" if p52 is not None and pd.notna(p52) else ""
+        flabel = r.get("fragility_label")
+        fragility = f"  fragility={flabel}(~{r.get('fragility_est_pct'):.0f}%)" if flabel else ""
         print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{gate}{smastack}{rsrating}{pct52}")
+              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{gate}{smastack}{rsrating}{pct52}{fragility}")
 
 
 if __name__ == "__main__":

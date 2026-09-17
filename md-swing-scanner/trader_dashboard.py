@@ -168,8 +168,12 @@ def _print_tier(label, df, note, price_col, price_label, held):
         rsrating = f"  rs={rsr:.0f}" if rsr is not None and pd.notna(rsr) else ""
         p52 = r.get("pct_to_52w_high")
         pct52 = f"  52wk={p52:.0f}%" if p52 is not None and pd.notna(p52) else ""
+        # (2026-09-17) critic-promoted Fragility Margin to live telemetry -- same
+        # both-print-layers discipline as freshness/gate above, learned the hard way.
+        flabel = r.get("fragility_label")
+        fragility = f"  fragility={flabel}(~{r.get('fragility_est_pct'):.0f}%)" if flabel else ""
         print(f"  {ticker_label:18s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}{clr}{pivot}{vol}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{ext}{held_tag}{gate}{smastack}{rsrating}{pct52}")
+              f"{price_label}={r[price_col]:9.2f}{clr}{pivot}{vol}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{ext}{held_tag}{gate}{smastack}{rsrating}{pct52}{fragility}")
 
 
 def run_morning(tickers, cutoff):
