@@ -2201,3 +2201,90 @@ Grew out of a live, real-time investigation of AEGISLOG (held that day): `detect
 **Verified against real live data**: AEGISLOG correctly shows `gate=[VCP] sma_stack=OK rs=99 52wk=92%`; several other same-day candidates (GESHIP, PAYTM, COALINDIA, REDINGTON, DIVISLAB, PTCIL) correctly show `gate=[BC]` only. Two names (LENSKART, MEESHO) correctly show no trend-strength fields at all — confirmed this is the NaN-guard working as designed (genuinely missing Stage-2 input columns), not a display bug.
 
 **Explicitly scoped as a diagnostic/judgment layer, not a new validated signal**: this project already tested and rejected "dual-pattern qualification implies higher confidence" (win rate identical, 65.0% either way, on 40 real dual-qualified trades) — clearing both gates is not evidence of anything extra on its own. The value here is efficiency (seeing what would otherwise require manually re-running `detect_entry`/`stage2_trend_template`/`base_filters_pass` by hand, as happened live in this thread) and qualitative context (how much structural cushion a held position has, consistent with this project's own "MD Breakout Theorem" reasoning about tolerating normal adverse excursion) — not a new backtested ranking rule.
+
+## RQ-47: Production Population Consistency Audit (2026-09-16/17) — 0 unexplained drift between live and backtest gates
+
+Triggered by comparing a real third-party algo platform's trade call (StrykeX, AEGISVOPAK 2026-09-15) against our own logic: first pass said "liquidity is the only blocker" (checking `base_filters_pass()` alone), a correction then found `checklist_pass()` *also* independently fails (weak close, only 50.5% up the day's range vs. the required 70%) — but `checklist_pass()`/`reject_theta_trap()` turned out not to be part of `_passes_primed_checks()` (the actual live gate `shortlist_primed()`/`classify_candidates()` use) at all, only part of `entry_signal()` (the backtest/EOD gate). Both statements were true, just about two different, previously-undocumented gates — meaning the live dashboard and the backtest performance numbers had never been checked against each other for consistency.
+
+**Built `population_equivalence_audit.py`**: for every real intraday breach across the full 5-year, 500-stock history (High crossing the trigger — what a live IOC would fill on), computes two independent verdicts using the real production functions (not re-derivations): **LIVE** = `daily_scan._passes_primed_checks()` on yesterday's frozen row + today's real High crossing the trigger; **BACKTEST** = `signals.entry_signal()` on today's fully-closed EOD row. Diffs them and attributes every mismatch to a specific cause.
+
+**Result**: 72,860 breach events, 80.1% agree, 19.9% (14,487) mismatch — **every single one now attributable**, `OTHER_UNKNOWN` = 0. Getting to zero required catching two real bugs in the *audit script itself* (not production): (1) forgot to check `breakout_continuation()`'s own volume z-score condition, separate from `base_filters_pass()` — explained 5,464 of an initial 1,347+4,117 unexplained cases once added; (2) one remaining case (BEL, 2024-01-15) was an exact floating-point tie (`Close == high10_prior`) that fails `breakout_continuation()`'s strict `>` check but wasn't caught by a `<`-instead-of-`<=` label.
+
+| Category | Count | % | Read |
+|---|---|---|---|
+| EOD-only telemetry (weak close never confirmed: 6,300; vol z-score gate: 5,464; `checklist_pass`: 1,320) | 13,084 | 90.3% | Expected — the live IOC genuinely fills, the EOD/audit gate correctly doesn't confirm it until the close is known. Not a bug. |
+| Day-to-day indicator drift (yesterday's priming row vs. today's backtest row disagreeing on RSI/momentum/EMA34-persistence/trend, unrelated to liquidity) | 1,097 | 7.6% | Not hindsight — priming only refreshes once/day off yesterday's close, so this is a real, separate, legitimate mismatch source. |
+| Liquidity floor (`MIN_TRADED_VALUE`) specifically | 497 | 3.4% | Matches the separate liquidity-ablation finding (same session) in magnitude, arrived at independently. |
+| Theta trap specifically | 0 | 0% | Never the deciding condition in this dataset — `checklist_pass` is checked earlier in `entry_signal()`'s own order, so a theta-trap-only case gets attributed to checklist_pass first when both fail together. Methodology note, not a claim it never matters. |
+| Freshness filter | 0 / N/A | — | Confirmed structurally zero — neither gate applies a freshness cutoff at all; freshness is a downstream research/ranking tool, never a live or backtest eligibility gate. |
+| 13:00 scan cutoff | not tested | — | Honest gap — the full 5-year history has no real intraday breach-hour data outside the ~93-day `intraday_cache` window, so this specific dimension can't be verified at full scale. |
+
+**Adopted governance, per critic response**: a clean three-gate naming — **Primed Gate** (`_passes_primed_checks`, everything knowable pre-entry, powers live IOC orders), **Entry Gate** (`entry_signal`, the exact backtest/performance-population gate), **Audit Gate** (`checklist_pass`/`reject_theta_trap`, post-close-only diagnostics/telemetry, never added to the live gate — doing so would reintroduce hindsight, confirmed directly by this audit since 90.3% of all mismatches are exactly this category behaving as designed). Also adopted: a standing "One Source of Truth" rule — no duplicate gate logic, no duplicate candidate definitions, extending the same discipline already used for `detect_entry`/`check_exit` to the priming/classification layer.
+
+**Not yet done**: turning `population_equivalence_audit.py` into an actual CI regression test (so a future edit to `live_checkpoint.py`/`daily_scan.py` that accidentally adds/removes a gate fails automatically) — script exists, not wired into anything automated yet.
+
+## RQ-48: liquidity floor bucket decomposition — and a real bug found in `concentration()` itself (2026-09-17)
+
+The queued liquidity-floor bucket decomposition (₹0-25cr/25-50cr/50-75cr/75-100cr/100cr+, checking whether the earlier MIN_TRADED_VALUE ablation's result — removing the floor improves every quality metric — was uniform across the range or concentrated in one bucket, per critic flag) surfaced something bigger than the liquidity question itself: **`concentration()` — independently redefined in 19 separate research scripts across this project's history, always identically — has a real bug.**
+
+**The bug**: `concentration()` always took the top **10 trades, a fixed count**, never a percentage of n. For a bucket of n=66-131, top-10 is ~8-15% of the population — a few winners naturally look "concentrated." For a combined n=576 population, that same fixed 10 trades is <2% of the population, so the ratio mechanically collapses even with the same big winners still inside it. Caught directly: the original two-bucket MIN_TRADED_VALUE ablation reported `>=50cr` combined concentration = 7.7% (reassuring), but splitting that same population into `50-75cr` alone and `75-100cr` alone gave 29.3% and 40.8% — a population's own subsets cannot legitimately look structurally riskier than the whole; the metric was lying, not the trades.
+
+**Fix**: `research/metrics.py` (new shared module — see below) introduces `concentration_v2`: top `max(10, 10% of n)` trades by `|pnl|`, scale-invariant. Verified: `>=50cr` combined 7.1%→26.7%, `50-75cr` 29.3%→27.4%, `75-100cr` 40.8%→27.5%, `100cr+` 8.3%→25.5% — the paradox disappears; everything converges to ~25-27% once measured fairly. **The current ₹100cr+ bucket's concentration was understated by every past ablation that quoted it (8.3% reported, ~25.5% real)**, including the original MIN_TRADED_VALUE test and RQ-47.
+
+**Governance adopted (critic, "Versioned Metrics")**: `concentration_v1` (old, fixed-top-10) kept only for reproducing historical reports exactly; `concentration_v2` (aliased `concentration`) is the new default. **Scope decision: fix forward only, spot-check 4 specific findings where concentration was part of the actual promotion decision (liquidity floor, OI buildup, SMA21 trail vs. baseline, stop-family Family C vs. baseline) — do not re-run all 19 scripts.** Frozen research (RVOL, exit architecture, etc.) stays frozen; re-litigating settled findings over a secondary diagnostic (win rate/median/expectancy — the four primary metrics — were never affected by this bug) is exactly the research debt this project's own practicality discipline warns against.
+
+**Liquidity floor result, with corrected concentration**:
+
+| Bucket | n | Swing win | med | exp | conc_v2 | conc_v2 90% bootstrap CI | Real ATM option availability |
+|---|---|---|---|---|---|---|---|
+| ₹0-25cr | 105 | 70.5% | +4.99% | +3.726% | 24.7% | 21.0-28.4 | 0% |
+| ₹25-50cr | 131 | 65.6% | +2.96% | +2.173% | 25.6% | 22.9-28.2 | 30% |
+| ₹50-75cr | 96 | 70.8% | +3.09% | +2.211% | 29.3% | 23.7-34.9 | 48% |
+| ₹75-100cr | 66 | 71.2% | +2.84% | +2.267% | **40.8%** | **35.4-45.2** | 58% |
+| ₹100cr+ (current) | 414 | 62.3% | +2.09% | +0.950% | 25.5% | 23.9-27.0 | 79% |
+
+Bootstrapped the 75-100cr concentration specifically (critic: "n=66 is exactly the kind of bucket where one regime can distort things") — its CI (35.4-45.2%) does not overlap any neighboring bucket's CI at all. **Genuinely the worst bucket, not sample-size noise; cause not yet investigated** (candidate hypotheses: sector composition, thin mid-cap options structurally clustering here, higher false-breakout rate — none tested).
+
+**Decision (signed off)**: production stays **₹100cr** — not because lower-liquidity swing trades perform worse (they don't, once concentration is measured fairly), but because **real options tradability is the binding constraint**, not backtest quality: ATM contract availability collapses from 79% (100cr+) to 58%/48%/30%/0% moving down through the buckets. One engine serves both stock and option recommendations, so the floor has to satisfy the harder constraint. Research populations remain unfloored (₹0+) for future ablations; a possible future refinement (not adopted yet) is splitting the floor by product — swing-only recommendations at ₹50cr+, option recommendations at ₹100cr+ — flagged as v32-scope, not acted on now.
+
+**OI buildup revival — promoted to Audit-Gate telemetry only, not a live gate**: re-tested `oi_buildup_bullish()` (rejected/deleted 2026-09-06) under current methodology, found the original rejection reversed (buildup-present now outperforms). The concentration-artifact fix removed the main residual doubt (present vs. absent are statistically indistinguishable on both `concentration_v2`, 27.1% vs 27.7% swing, and an independent Gini check, 0.399 vs 0.422 swing — two different sample-size-invariant methods agreeing). Final gate (critic): does OI buildup add incremental value beyond freshness alone, not just look clean?
+
+| Population | n | Swing win | Swing exp | ATM day1 win | ATM day1 exp |
+|---|---|---|---|---|---|
+| Freshness only | 2579 | 58.9% | +0.237% | 59.6% | +2.037% |
+| + OI buildup present | 686 | 60.9% | +0.715% | 61.9% | +2.779% |
+| + No buildup (absent) | 1893 | 58.1% | +0.064% | 58.6% | +1.706% |
+| + Top breadth (≥80) | 692 | 66.0% | +1.204% | 62.2% | +2.505% |
+| + OI present + breadth≥80 | 214 | 67.8% | +1.591% | 67.0% (n=194) | +5.023% |
+
+Real, positive incremental lift confirmed (+2.0pp win/+0.48pp exp swing, +2.3pp win/+0.74pp exp options over freshness-only) — matches the critic's own prediction ("+2-3pp win rate, slight expectancy lift") closely. Breadth alone is the stronger single conditioner; stacking OI+breadth adds a further, thinner-sample lift on top. **Since futures OI data is EOD-bhavcopy-only with no live/intraday feed (structurally confirmed), this can only ever be Audit-Gate-style telemetry — never wired into the live Primed/Entry gates.** Not yet done: deciding a concrete display/telemetry format for it (e.g. surfaced in `trader_dashboard.py`'s evening wrap-up alongside `checklist_pass`/theta-trap diagnostics), and not yet investigated why the original 2026-09-06 test's conclusion reversed (three things changed at once — population scope, options convention, stock exit mechanism — no decomposition done isolating which one mattered).
+
+**New shared module**: `research/metrics.py` — `expectancy()`, `win_rate()`, `concentration_v1`/`concentration_v2` (aliased `concentration`), `gini()`, `bootstrap_ci()`. New research scripts should import from here rather than pasting local helper defs (the exact duplication that let this bug go unnoticed in 19 places for weeks). `liquidity_bucket_decomposition.py` migrated as a worked example (verified byte-identical output before/after migration).
+
+### RQ-48 close-out: remaining 2 spot-checks, a real self-caught error, and a meta-finding (2026-09-17)
+
+**SMA21 trail vs. baseline — clean, re-verified with `concentration_v2`, decision unchanged.** Candidate still wins on expectancy and concentration, both populations (full pop: +4.972%/29.7%→+5.133%/28.6%; freshness≤0.40: +2.404%/27.9%→+2.473%/26.8%).
+
+**Family C vs. baseline — a real process error, caught and corrected, decision unchanged.** First attempt patched `stop_family_research.py` (a pre-SMA21/pre-`MAX_HOLD_DAYS` sweep script, never meant to be authoritative afterward) and reported the result as new information — it wasn't; the real question was already answered on 2026-09-14/15 using the actual production `check_exit()` on the correct freshness≤0.40 3-population bracket (see "Family C × SMA21 interaction" section above: daily 59.9%→60.6% win, 0.737%→0.811% exp, conc_v1 10.1%→9.2%; intraday and intraday+cutoff tied-to-slightly-worse). Caught by direct user question ("we only changed concentration — why did everything else change too?"). Confirmed the v1-vs-v2 question specifically: unlike the liquidity buckets (different-sized groups), baseline vs. Family C are always compared at *equal* n, so the dilution artifact mostly cancels — verified directly (same trades, filtered to freshness≤0.40: conc_v1 1.3% for both variants, conc_v2 27.6% baseline vs 29.3% Family C) — **the relative verdict is not flipped by the bug. Decision: keep Family C, unchanged** (real small edge, real small extra concentration cost ~+1.5-2pp under v2).
+
+**Meta-finding**: every v2 recomputation across this whole thread (liquidity buckets, OI buildup, SMA21, Family C) converges to roughly the same ~25-30% concentration regardless of which filter/mechanism is tested. **~25-30% is the honest baseline concentration for this project's swing populations, not a per-test result** — most "concentration checked clean" claims near 0% were an artifact of population size, not evidence of low risk. Record this as the reference range for future concentration checks, not the old "should be near 0%" intuition.
+
+**Process lesson (critic, from the Family C error)**: before trusting a research rerun, verify in this order — (1) population, (2) entry convention, (3) exit implementation, (4) production parameters, (5) only then metric implementation. The Family C error changed #5 deliberately but changed #1-3 unknowingly (wrong script, wrong population, stale exit mechanism) — that combination is exactly how a dramatic-looking "finding" gets manufactured by accident. No production code was touched before the error was caught, so no strategy damage resulted.
+
+**Freshness population-consistency caveat (parked, not chased)**: attempting a Fresh/Extended × OI-buildup 2×2 surfaced that an EOD/Entry-Gate daily population (`min_traded_value_0.csv`) shows Extended beating Fresh — the reverse of this project's most load-bearing finding — while the actual live/Primed-Gate intraday-breach population it was originally validated on (`runs/rsi_max_sweep_80.csv`) shows the correct direction. **Freshness is validated for the live/Primed-Gate intraday-breach population, not universally for every EOD-derived population** — a more precise statement than "fresh beats extended," and the reason two populations should never be casually mixed to build a cross-tabulation. Not chased further (would require a from-scratch intraday-breach OI-buildup rescan) — flagged as a real, separate research-integrity item, not production-blocking.
+
+**OI buildup, final documentation**: **EOD Audit Telemetry** — record whether qualifying OI buildup is present after the trade. Informational/audit telemetry only; does not participate in the live Primed Gate or Entry Gate.
+
+**Wired into production (2026-09-17)**: `oi_buildup_bullish(ticker, date)` restored into `option_backtest.py` (exact reconstruction, verified against the research script's own cached results — 5/5 spot-checked, byte-identical). Hooked into `trader_dashboard.py`'s `run_night()` via `_log_oi_buildup_for_new_entries()`, scoped only to real new entries (`open_positions.csv` rows with `entry_date == today`) — never the whole F&O universe, never re-touches older positions. Lazily fetches just that day's F&O bhavcopy (`fetch_stock_options.fetch_day(today)`, idempotent, ~5.4MB, skipped if already cached) rather than a standing nightly job — triggered by the night refresh you already run, not a new step, and can't be triggered from the intraday `--refresh-primed` step since NSE doesn't publish the day's bhavcopy until after close. Result appended to `trade_journal.csv` via the existing `journal_add()` mechanism (`tier="oi_buildup"`, notes = `present`/`absent`/`N/A (not F&O)`/`N/A (no futures data)`) — pure record-keeping, guarded against duplicate logging on same-day reruns. Never touches `classify_candidates()`, `_passes_primed_checks()`, or `entry_signal()`.
+
+**RQ-48 final state, all items closed**:
+
+| Item | Decision |
+|---|---|
+| Concentration bug | Fix-forward only; frozen studies not reopened wholesale |
+| True concentration baseline | ~25-30% for these swing populations |
+| Liquidity floor | ₹100cr stays in production |
+| OI buildup | Promoted to Audit telemetry (see above) |
+| SMA21−2% trail | Validated; keep |
+| Family C initial stop | Validated; keep |
+| Freshness gate mismatch | Parked research-integrity issue; not production-blocking |

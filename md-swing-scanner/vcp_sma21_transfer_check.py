@@ -32,6 +32,7 @@ import backtest
 from pivots import daily_pivots
 from vcp import base_pivot
 from live_checkpoint import _percentile_from_breaks, RSI_PCT_BREAKS, MOMENTUM_PCT_BREAKS
+from research.metrics import concentration_v1, concentration_v2
 
 TRIGGER_CLEARANCE = 1.005
 MAX_INITIAL_RISK_PCT = 0.08
@@ -49,13 +50,6 @@ def freshness(rsi14, mom20):
     if pd.isna(rsi14) or pd.isna(mom20):
         return None
     return 0.5 * _percentile_from_breaks(rsi14, RSI_PCT_BREAKS) + 0.5 * _percentile_from_breaks(mom20, MOMENTUM_PCT_BREAKS)
-
-
-def concentration(s):
-    total = s.sum()
-    if not total:
-        return float("nan")
-    return s.sort_values(ascending=False).head(10).sum() / total * 100
 
 
 def simulate(daily, i, trigger, structural_low_capped, mechanism):
@@ -126,7 +120,8 @@ def report(sub, label):
     wr = len(wins) / len(sub) * 100
     exp = (wr / 100) * (wins.mean() if len(wins) else 0) + (1 - wr / 100) * (losses.mean() if len(losses) else 0)
     print(f"  {label:<10} n={len(sub):<6} win={wr:5.1f}%  med={sub.pnl_pct.median():+.2f}%  exp={exp:+.3f}%  "
-          f"conc={concentration(sub.pnl_pct):.1f}%  hold(med/p90/max)={sub.hold_days.median():.0f}/"
+          f"conc_v1={concentration_v1(sub.pnl_pct):.1f}%  conc_v2={concentration_v2(sub.pnl_pct):.1f}%  "
+          f"hold(med/p90/max)={sub.hold_days.median():.0f}/"
           f"{sub.hold_days.quantile(0.9):.0f}/{sub.hold_days.max():.0f}")
 
 

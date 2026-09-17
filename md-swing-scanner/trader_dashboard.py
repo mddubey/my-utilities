@@ -48,6 +48,8 @@ from tomorrow_candidates import build_candidates, TOP_N as EVENING_TOP_N
 from live_checkpoint import classify_candidates, VELOCITY_LOOKBACK_MIN, fire_tier, vol_tier
 from monitor_positions import monitor as monitor_positions
 import breadth
+import fetch_stock_options
+import option_backtest
 
 JOURNAL_FILE = "trade_journal.csv"
 OPEN_POSITIONS_FILE = "open_positions.csv"
@@ -204,6 +206,42 @@ def run_morning(tickers, cutoff):
                 "current_price", "price", held)
 
 
+def _log_oi_buildup_for_new_entries(positions):
+    """EOD Audit Telemetry only (2026-09-17, see FINDINGS.md's "RQ-48 close-out") --
+    scoped to TODAY's real new entries only (never the whole F&O universe, and never
+    re-touches older positions -- this is a one-shot record, not a recurring check).
+    Lazily fetches just today's F&O bhavcopy (idempotent, ~5.4MB, skipped if already
+    cached) rather than a standing nightly job, since this is the first point in the
+    day the data even exists (NSE publishes it post-close). Never gates or ranks
+    anything -- purely appended to trade_journal.csv for later review, same as any
+    other journal entry."""
+    today = pd.Timestamp.now().normalize()
+    todays_entries = positions[positions.entry_date == today]
+    if todays_entries.empty:
+        return
+
+    try:
+        journal = pd.read_csv(JOURNAL_FILE)
+    except FileNotFoundError:
+        journal = pd.DataFrame(columns=["date", "ticker", "tier", "price", "notes"])
+    already_logged = set(journal[journal.tier == "oi_buildup"].ticker) if not journal.empty else set()
+
+    fo_tickers = _fo_tickers()
+    fetched = False
+    for pos in todays_entries.itertuples():
+        if pos.ticker in already_logged:
+            continue
+        if pos.ticker not in fo_tickers:
+            journal_add([pos.ticker, "oi_buildup", str(pos.entry_price), "N/A (not F&O)"])
+            continue
+        if not fetched:
+            fetch_stock_options.fetch_day(today)
+            fetched = True
+        buildup = option_backtest.oi_buildup_bullish(pos.ticker, today)
+        label = "N/A (no futures data)" if buildup is None else ("present" if buildup else "absent")
+        journal_add([pos.ticker, "oi_buildup", str(pos.entry_price), label])
+
+
 def run_night():
     try:
         positions = pd.read_csv(OPEN_POSITIONS_FILE, parse_dates=["entry_date"])
@@ -214,6 +252,7 @@ def run_night():
         print("no open positions logged")
         return
     monitor_positions(positions)
+    _log_oi_buildup_for_new_entries(positions)
 
 
 def journal_add(args):

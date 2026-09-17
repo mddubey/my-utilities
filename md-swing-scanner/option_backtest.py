@@ -89,6 +89,39 @@ def front_month_future(ticker, date):
     return row.iloc[0] if not row.empty else None
 
 
+OI_BUILDUP_WINDOW = 3  # trading days looked back for the buildup check below
+
+
+def oi_buildup_bullish(ticker, date):
+    """EOD Audit Telemetry only (2026-09-17 revival, see FINDINGS.md's "RQ-48 close-out" --
+    rejected/deleted 2026-09-06, re-tested and reversed once freshness-conditioning +
+    current-month-only options + the current stock exit mechanism were all applied).
+    Long buildup = both front-month futures price AND open interest rising over the
+    trailing OI_BUILDUP_WINDOW-day window ending on `date` -- reads as fresh long buying,
+    vs. a price-up/OI-flat-or-down move that's more likely short covering.
+
+    Returns True/False/None (None = no real futures data for this window, e.g. non-F&O
+    ticker or a pre-2024 bhavcopy gap -- NOT the same as "buildup absent", callers must
+    not conflate the two). Never call this before the entry date's own EOD bhavcopy is
+    fetched (see fetch_stock_options.fetch_day) -- futures OI is EOD-only, this can never
+    be part of the live Primed Gate or Entry Gate, only post-close record-keeping."""
+    days = [d for d in trading_days() if d <= date]
+    if len(days) < OI_BUILDUP_WINDOW:
+        return None
+    window = days[-OI_BUILDUP_WINDOW:]
+    net_oi_chg = 0
+    first_price = last_price = None
+    for d in window:
+        row = front_month_future(ticker, d)
+        if row is None:
+            return None
+        net_oi_chg += row.ChngInOpnIntrst
+        if first_price is None:
+            first_price = row.PrvsClsgPric
+        last_price = row.ClsPric
+    return last_price > first_price and net_oi_chg > 0
+
+
 MIN_LOTS_TRADED = 0       # testing (2026-09-02): additional floor on TtlTradgVol (already
                            # in lots/contracts, confirmed directly against real bhavcopy
                            # rows — values like 13-747 are plausible daily lot counts, not
