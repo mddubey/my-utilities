@@ -85,11 +85,12 @@ from datetime import datetime, timedelta, time as dtime
 import pandas as pd
 
 from backtest import load
-from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT, _load_primed_cache_if_fresh
+from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT, _load_primed_cache_if_fresh, _fo_tickers
 from sector_strength import sector_rs
 from vcp import stage2_trend_breakdown, base_pivot
 from signals import base_filters_pass
 import intraday_cache
+import option_backtest
 
 # Live volume checks (2026-09-07) -- see FINDINGS.md. Two checks, built and
 # validated against real data before wiring in: (1) fresh-breach volume vs a
@@ -432,9 +433,11 @@ def _fragility_quartile_bin(value, breaks):
 
 def _fragility_risk(freshness_score, body_atr):
     """Returns (label, estimated_fragile_pct) or (None, None) if neither input is
-    available. label in {"Low", "Medium", "High"} -- execution-risk framing, not a
-    win/loss call. Thresholds (16%/22%) split the ~12-26% real range roughly into
-    thirds around the population's own 16.5% base fragile rate."""
+    available. label in {"Robust", "Watch", "Precise"} -- execution-risk framing, not a
+    win/loss call (2026-09-17 rename, critic-proposed: "Precise" reads as "execute
+    carefully/don't FOMO the fill", not "bad trade" -- a fragile trade is still a real
+    winner, just execution-sensitive). Thresholds (16%/22%) split the ~12-26% real
+    range roughly into thirds around the population's own 16.5% base fragile rate."""
     f_bin = _fragility_quartile_bin(freshness_score, FRESHNESS_FRAGILE_BREAKS)
     b_bin = _fragility_quartile_bin(body_atr, BODY_ATR_FRAGILE_BREAKS)
     rates = []
@@ -445,8 +448,27 @@ def _fragility_risk(freshness_score, body_atr):
     if not rates:
         return None, None
     est_pct = sum(rates) / len(rates)
-    label = "Low" if est_pct < 16 else "High" if est_pct > 22 else "Medium"
+    label = "Robust" if est_pct < 16 else "Precise" if est_pct > 22 else "Watch"
     return label, est_pct
+
+
+def _oi_confidence(ticker, as_of_date, fo_tickers):
+    """OI buildup as a live 'Confidence' badge (2026-09-17, critic-clarified) -- futures
+    OI is EOD-only and does not update intraday, so this is "sticky telemetry": reads
+    whatever the most recent real EOD snapshot says (as_of_date -- the same frozen prior
+    trading day already used for freshness/RS elsewhere in this function), never
+    triggers a fetch, never recomputed differently across the day's repeated refreshes.
+    Returns True (bullish)/False (not bullish)/None (no data or not F&O) -- informational
+    only, never a gate. Cheap: local file read + functools.lru_cache, no network --
+    load_day_futures() already returns None gracefully (checks path.exists() itself)
+    if options_cache/ is missing entirely, so no exception handling needed here.
+    NEW deployment dependency, flagged: this makes classify_candidates() read
+    options_cache/, which README.md's Deployment section previously said only backtest
+    tools needed -- a lightweight server deployment without it now degrades to
+    every candidate showing no Confidence badge, not a crash, but worth knowing."""
+    if ticker not in fo_tickers:
+        return None
+    return option_backtest.oi_buildup_bullish(ticker, as_of_date)
 
 
 CONSOLIDATION_LOOKBACK = 20   # trading days
@@ -677,6 +699,11 @@ def classify_candidates(tickers, cutoff_ist=None):
         if bar_open is not None and bar_close is not None and pd.notna(row.get("atr14")) and row.atr14:
             body_atr_live = abs(bar_close - bar_open) / row.atr14
         fragility_label, fragility_est_pct = _fragility_risk(freshness_score, body_atr_live)
+        # OI Confidence badge (2026-09-17) -- "sticky telemetry", reads the same frozen
+        # prior-trading-day date already used for freshness/RS above, never today's
+        # date (which has no futures data yet intraday) and never recomputed
+        # differently across repeated refreshes the same day. True/False/None.
+        oi_confidence = _oi_confidence(t, feature_rows[t]["date"], _fo_tickers())
 
         common = dict(ticker=t, trigger_low=trigger_low, trigger_high=trigger_high,
                      quality_score=quality_score, sector=sector, sector_rs=sector_rs_pct,
@@ -688,7 +715,8 @@ def classify_candidates(tickers, cutoff_ist=None):
                      vcp_qualified=feature_rows[t]["vcp_qualified"], bc_qualified=feature_rows[t]["bc_qualified"],
                      sma_stack_ok=feature_rows[t]["sma_stack_ok"], rs_rating=feature_rows[t]["rs_rating"],
                      pct_to_52w_high=feature_rows[t]["pct_to_52w_high"],
-                     fragility_label=fragility_label, fragility_est_pct=fragility_est_pct)
+                     fragility_label=fragility_label, fragility_est_pct=fragility_est_pct,
+                     oi_confidence=oi_confidence)
 
         if bar["High"] >= trigger_low:
             pullback_pct = (bar["High"] - bar["Close"]) / bar["High"] * 100
@@ -808,8 +836,10 @@ def _print_tier(label, df, note, price_col, price_label):
         pct52 = f"  52wk={p52:.0f}%" if p52 is not None and pd.notna(p52) else ""
         flabel = r.get("fragility_label")
         fragility = f"  fragility={flabel}(~{r.get('fragility_est_pct'):.0f}%)" if flabel else ""
+        oic = r.get("oi_confidence")
+        confidence = f"  confidence={'n/a' if pd.isna(oic) else 'Bullish' if oic else 'Bearish'}"
         print(f"  {r.ticker:12s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{gate}{smastack}{rsrating}{pct52}{fragility}")
+              f"{price_label}={r[price_col]:9.2f}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{gate}{smastack}{rsrating}{pct52}{fragility}{confidence}")
 
 
 if __name__ == "__main__":

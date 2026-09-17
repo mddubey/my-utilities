@@ -15,6 +15,13 @@ two copies of "what counts as a signal" drifting apart over time is a real risk)
                "[ALREADY HOLDING]" instead of silently resurfacing as a fresh
                opportunity (a real gap noticed 2026-09-06 -- GLAND showed up as a
                fresh tier-1 pick on a day it was already a live position).
+               Default output (2026-09-17) is the "9:20 Trader Card" -- ticker/band/
+               price/freshness/fragility/pattern/confidence only, the execution
+               decision surface, not the full diagnostic view. Pass --full for the
+               old rich view (quality score, sector RS, distance/velocity, consolidation
+               days, raw body/atr, RS rating, 52wk% -- all still computed either way,
+               just hidden by default per FINDINGS.md's "v32 governance": ranking
+               complexity belongs to the engine, not the human at decision time).
   night     -- wraps monitor_positions.py's monitor() unchanged: current stop/target
                for every row in open_positions.csv, replayed fresh each run. Added
                2026-09-06 after a direct question ("why isn't this part of the
@@ -172,11 +179,60 @@ def _print_tier(label, df, note, price_col, price_label, held):
         # both-print-layers discipline as freshness/gate above, learned the hard way.
         flabel = r.get("fragility_label")
         fragility = f"  fragility={flabel}(~{r.get('fragility_est_pct'):.0f}%)" if flabel else ""
+        oic = r.get("oi_confidence")
+        confidence = f"  confidence={'n/a' if pd.isna(oic) else 'Bullish' if oic else 'Bearish'}"
         print(f"  {ticker_label:18s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
-              f"{price_label}={r[price_col]:9.2f}{clr}{pivot}{vol}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{ext}{held_tag}{gate}{smastack}{rsrating}{pct52}{fragility}")
+              f"{price_label}={r[price_col]:9.2f}{clr}{pivot}{vol}  {q}  {sec}{dist}{vel}{fire}{fresh}{consol}{body}{acc}{ext}{held_tag}{gate}{smastack}{rsrating}{pct52}{fragility}{confidence}")
 
 
-def run_morning(tickers, cutoff):
+def _freshness_label(fscore):
+    """High/Medium/Low quality label for the Trader Card (2026-09-17) -- "High" means
+    genuinely fresh/good (fscore near 0), matching plain-English intuition, even though
+    the underlying freshness_score itself is inverted (lower = fresher)."""
+    if fscore is None or pd.isna(fscore):
+        return "n/a"
+    if fscore <= 0.33:
+        return "High"
+    if fscore <= 0.67:
+        return "Medium"
+    return "Low"
+
+
+def _print_tier_card(label, df, note, price_col, price_label, held):
+    """The "9:20 Trader Card" (2026-09-17, critic-proposed) -- the live execution
+    decision surface, deliberately stripped down. Everything else this dashboard
+    computes (quality score, sector RS, distance/velocity/fire-rate, consolidation
+    days, raw body/atr, acceptance state, RS rating, 52wk%) either already fed the
+    ranking (the engine did that work so the human doesn't have to) or belongs to the
+    Audit gate (doesn't exist yet at decision time) -- see FINDINGS.md's "v32
+    governance" section. Use the old _print_tier() (--full) for the full diagnostic
+    view; this is what you actually trade off of."""
+    print()
+    print(f"=== {label} ({len(df)}) ===")
+    if note:
+        print(f"    {note}")
+    if df.empty:
+        print("  (none)")
+        return
+    for _, r in df.iterrows():
+        ticker_label = f"{r.ticker}(F/O)" if r.ticker in _fo_tickers() else r.ticker
+        held_tag = "  [ALREADY HOLDING]" if r.ticker in held else ""
+        fresh = f"  freshness={_freshness_label(r.get('freshness_score'))}"
+        flabel = r.get("fragility_label")
+        fragility = f"  fragility={flabel}" if flabel else "  fragility=n/a"
+        gates = []
+        if r.get("vcp_qualified"):
+            gates.append("VCP")
+        if r.get("bc_qualified"):
+            gates.append("BC")
+        pattern = f"  pattern=[{'+'.join(gates)}]" if gates else "  pattern=[none]"
+        oic = r.get("oi_confidence")
+        confidence = f"  confidence={'n/a' if pd.isna(oic) else 'Bullish' if oic else 'Bearish'}"
+        print(f"  {ticker_label:18s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
+              f"{price_label}={r[price_col]:9.2f}{fresh}{fragility}{pattern}{confidence}{held_tag}")
+
+
+def run_morning(tickers, cutoff, full=False):
     print(f"Checking as of {'now' if cutoff is None else cutoff} IST...")
     pulled_back, kept_going_near, watching, missed = classify_candidates(tickers, cutoff_ist=cutoff)
     held = _held_tickers()
@@ -196,18 +252,19 @@ def run_morning(tickers, cutoff):
     if held:
         print(f"      Already holding: {', '.join(sorted(held))} -- flagged inline, not dropped.")
 
-    _print_tier("TIER 1: PULLED BACK (best price, settled, no timing race)", pulled_back,
-                "sorted by closeness to the raw pivot, either side -- closest = best price",
-                "current_price", "price", held)
-    _print_tier("TIER 2: KEPT GOING, STILL NEAR TRIGGER (settled, no timing race)", kept_going_near,
-                "sorted by closeness to the raw pivot, either side", "current_price", "price", held)
-    _print_tier(f"TIER 3: WATCHING, not yet fired (top 10 of {len(watching)})", watching.head(10),
-                "ranked by distance blended 80/20 with closing-speed vs 10 min ago, "
-                "volume breaks near-ties",
-                "close", "close", held)
-    _print_tier("MISSED (fired, ran well past the band -- not actionable)", missed,
-                "if it settles back into tier 1/2 on a later run, it'll reappear there",
-                "current_price", "price", held)
+    printer = _print_tier if full else _print_tier_card
+    printer("TIER 1: PULLED BACK (best price, settled, no timing race)", pulled_back,
+            "sorted by closeness to the raw pivot, either side -- closest = best price",
+            "current_price", "price", held)
+    printer("TIER 2: KEPT GOING, STILL NEAR TRIGGER (settled, no timing race)", kept_going_near,
+            "sorted by closeness to the raw pivot, either side", "current_price", "price", held)
+    printer(f"TIER 3: WATCHING, not yet fired (top 10 of {len(watching)})", watching.head(10),
+            "ranked by distance blended 80/20 with closing-speed vs 10 min ago, "
+            "volume breaks near-ties",
+            "close", "close", held)
+    printer("MISSED (fired, ran well past the band -- not actionable)", missed,
+            "if it settles back into tier 1/2 on a later run, it'll reappear there",
+            "current_price", "price", held)
 
 
 def _log_oi_buildup_for_new_entries(positions):
@@ -296,9 +353,12 @@ if __name__ == "__main__":
         fo_tickers = set(pd.read_csv("fo_universe.csv", header=None)[0])
         run_evening(tickers, fo_tickers)
     elif mode == "morning":
-        cutoff = sys.argv[2] if len(sys.argv) > 2 else None
+        rest = sys.argv[2:]
+        full = "--full" in rest
+        rest = [a for a in rest if a != "--full"]
+        cutoff = rest[0] if rest else None
         tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
-        run_morning(tickers, cutoff)
+        run_morning(tickers, cutoff, full=full)
     elif mode == "night":
         run_night()
     elif mode == "journal":
