@@ -79,6 +79,16 @@ without relying on any single session's memory.
 - `nifty500_universe.csv` — the pure-swing universe (500 tickers, NSE's official NIFTY
   500 constituent list, fetched from `nsearchives.nseindia.com`). This IS committed
   (it's a small reference list, not generated output).
+- `extended_universe.csv` (2026-09-17) — **PARKED, not an active research population.**
+  195 tickers from StrykeX's large+mid-cap watchlists genuinely outside our NIFTY 500
+  universe (every symbol individually verified against NSE's full equity master list —
+  see `FINDINGS.md`'s "Extended universe" entry for the full duplicate/unresolved
+  breakdown). Built to test whether the RQ-48 liquidity-bucket pattern ("lower liquidity
+  = better raw swing numbers") holds on true small/mid-cap names, not just our existing
+  universe's lower-liquidity tail — **tested, came back negative-leaning** (n=30 real
+  production / n=96 observation-only, both negative expectancy, both sub-50% win rate,
+  zero VCP entries at all). Kept for reproducibility (file + fetched price history in
+  `data_cache/`), not part of the daily fetch/scan cycle, not being actively expanded.
 - `universe.py` — derives the F&O-eligible subset (`fo_universe.csv`, 210 tickers) from
   an NSE bhavcopy — used only by the options-specific layer.
 - `fetch_prices.py` — daily OHLCV per ticker into `data_cache/`. Incremental: a
