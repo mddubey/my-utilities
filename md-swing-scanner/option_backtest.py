@@ -106,6 +106,16 @@ def oi_buildup_bullish(ticker, date):
     fetched (see fetch_stock_options.fetch_day) -- futures OI is EOD-only, this can never
     be part of the live Primed Gate or Entry Gate, only post-close record-keeping."""
     days = [d for d in trading_days() if d <= date]
+    # 2026-09-17 fix: trading_days() is just the list of cached options_cache/ files --
+    # if that cache is stale (e.g. bulk backfill hasn't run since a recent date), every
+    # `d <= date` is trivially true and this would silently fall back to the LAST cached
+    # window regardless of how far in the past it actually is, for every date beyond the
+    # cache's real coverage. Caught live: DIVISLAB/OIL/LAURUSLABS (real Sept trades) all
+    # silently computed against the same stale 09-01/09-02/09-03 window instead of
+    # returning None. The window must genuinely END on `date` -- if today's own file
+    # isn't cached, this is undecidable and must say so, not substitute an older one.
+    if not days or days[-1] != date:
+        return None
     if len(days) < OI_BUILDUP_WINDOW:
         return None
     window = days[-OI_BUILDUP_WINDOW:]
