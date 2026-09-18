@@ -152,6 +152,18 @@ CLIMAX_MIN_GAIN_PCT = 1.15   # bug found by direct inspection (2026-08-30): with
 
 
 def _finish_load(df, pivot_fn):
+    # Real bug found 2026-09-18: some cached tickers carry bogus zero-volume rows
+    # (OHLC frozen at the prior close, Volume=0) on days the exchange was actually
+    # closed for that specific ticker -- e.g. LAURUSLABS/DIVISLAB both have one at
+    # 2026-09-14, a real trading Monday for the rest of the market (RELIANCE/TCS/
+    # HDFCBANK correctly have no row at all that day). Left unfiltered, any
+    # `daily_df.iloc[i+1]`-style "next trading day" lookup silently lands on this
+    # fake day instead of the real one. Confirmed small in aggregate (102 of 16,200
+    # real breaches project-wide, 0.63%) but corrupts individual lookups outright --
+    # this is exactly what made LAURUSLABS's real 2026-09-11 breach untraceable
+    # until checked by hand. Dropping before indicators run so every rolling/shift
+    # computation also skips the fake day, not just single-row lookups.
+    df = df[df.Volume > 0].copy()
     df = build_indicators(df)
     df = df.join(pivot_fn(df))
     df["corp_action_day"] = df.Close.pct_change().abs() > CORP_ACTION_MOVE_PCT
