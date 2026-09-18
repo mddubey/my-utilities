@@ -2530,3 +2530,32 @@ Both populations comfortably clear Research Integrity Rule #4's 500-trade minimu
 | 9 (current) | n=16,237, 60.7%/+0.995% — n=12,125, 57.0%/+0.513% | n=2,644, 68.3%/+3.730% — n=1,974, 93.6%/+2.800% | n=885, 56.7%/+0.165% — n=527, 60.5%/+0.627% |
 
 The real population stays adequately sized at every value tested (885-1,149, comfortably above Rule #4's 500-trade minimum — RQ-51's real population, by contrast, collapsed to n=1 then 0 by RSI_MIN=70). Swing expectancy improves monotonically across all three populations as the threshold shortens. **Added value=2 directly after the choppy-window sweep showed options peaking there rather than at 3 — it resolves cleanly: 2 is the best value on the real population for BOTH swing and options** (+0.385%/+0.663%, the best options number of any value tested, beating even 3's +0.640%), not just a choppy-window-specific quirk. **This is the first EMA34/RSI/momentum-style threshold lead this session that satisfies Research Integrity Rule #3's spirit as cleanly as this** — real, same-direction movement on a real, adequately-sized live-representative population, not just two large historical averages agreeing with each other. Still explicitly a lead pending critic review, not adopted — posed to the critic in full.
+
+## Critic response to Update 52, and three follow-ups: RQ-52A tested directly (hypothesis mostly refuted), a proposed "new" fakeout research question flagged as substantially already-rejected work, Fragility Margin calibration deferred (2026-09-18)
+
+**Critic's reply to Update 52** agreed the EMA34 finding is real but recommended NOT shipping `EMA34_RISING_DAYS_MIN=2` directly — proposing instead that the real issue is conflating two layers (market-level regime vs. stock-level trend persistence), and floated "Adaptive Persistence" (RQ-52A): vary the threshold by regime bucket — short (2-4) during a fresh recovery, keep long (7-9) during an established uptrend or a downtrend.
+
+**RQ-52A tested directly (`ema34_adaptive_persistence_check.py`) — the specific hypothesis mostly does NOT hold.** Same real-outcome mechanism as the lag investigation, bucketed by Nifty's own streak state at fire time (recovery = days 1-4 of an up-move, established = 5+ days, downtrend = any down day), full multi-year population, swept EMA34_RISING_DAYS_MIN 2/3/5/7/9:
+
+| Bucket | EMA34=2 (SWING/OPT) | EMA34=9 current (SWING/OPT) | Matches the hypothesis? |
+|---|---|---|---|
+| Recovery | n=10,633, 62.5%/+1.368% — n=8,119, 63.7%/+0.827% | n=8,316, 62.1%/+1.303% — n=6,322, 62.5%/+0.767% | Yes — shorter is better, as predicted |
+| Established | n=2,290, 62.0%/+1.180% — n=1,826, 62.0%/+0.865% | n=1,668, 61.9%/+0.932% — n=1,336, 60.0%/+0.692% | **No — shorter is still better** |
+| Downtrend | n=7,932, 58.4%/+0.592% — n=5,699, 49.5%/+0.186% | n=6,253, 58.4%/+0.601% — n=4,467, 48.3%/+0.099% | **No — swing flat/noise, options nearly DOUBLES with shorter (+0.099%→+0.186%)** |
+
+Every bucket improves or is flat-to-better with a shorter threshold, not just recovery. The mechanism reasoning behind Adaptive Persistence (persistence lags in both directions) was sound and already validated by the earlier lag-timing/outcome-quality work — but the specific prediction that established/downtrend regimes should *keep* the longer window doesn't survive contact with real data. **A single shorter global value (2-3, matching the earlier three-population result) appears to be the simpler, better-supported conclusion — a regime-conditional scheme adds complexity without adding benefit on this evidence.**
+
+**Critic's proposed "RQ-53: Acceptance Failure Window" flagged as substantially already-tested, not fresh research.** The critic (working only from the Update 52 write-up, without visibility into today's full RQ-53 closure) proposed a 4-rule fakeout-detection test that maps almost exactly onto mechanisms already built and rejected earlier today:
+
+| Critic's proposed rule | Already tested as | Result |
+|---|---|---|
+| "2 consecutive closes below trigger" | `FAILURE_THRESHOLD` + 2-bar confirm (`breakout_failure_confirmation_cost.py`) | Rejected — baseline (hold to day+1 open) beats every variant |
+| "15 continuous minutes below trigger" | 1/2/3-bar confirm windows (5/10/15 min) | Rejected at every window length |
+| "Pullback depth 0.3-1%" | MAE-anytime threshold sweep (`day0_exit_timing_check.py`) | Rejected — real mean-reversion-from-extreme mechanism found |
+| "Close back inside prior 10-day range" | The 2026-09-07 "close back below pivot" rule | Already rejected then (cuts 30-48% of eventual winners) |
+
+Also re-flagged the numbering collision — the critic has now proposed two different, unrelated ideas both labeled "RQ-53" in separate messages (this session's real RQ-53, "Breakout Failure Exit," is already closed; theirs would need a fresh number, e.g. RQ-54, if pursued at all — not recommended without a genuinely new mechanism, since a relabeled already-rejected idea isn't new research).
+
+**Fragility Margin calibration (critic's 3rd priority item) — deferred, not run.** This depends on accumulating real live/paper trades to calibrate against, which don't exist yet in sufficient number — consistent with the standing v32 plan ("live paper trading calibration, not another parameter sweep," 2026-09-17). Queued, not actionable today.
+
+Scripts: `ema34_adaptive_persistence_check.py`.
