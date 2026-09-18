@@ -44,7 +44,7 @@ def gather(tickers, fo, verbose=False):
                 df = backtest.load(t, daily_pivots).reset_index()
             except FileNotFoundError:
                 continue
-            for i in range(len(df) - 1):
+            for i in range(1, len(df) - 1):
                 row = df.iloc[i]
                 if row.corp_action_day or pd.isna(row.high10_prior):
                     continue
@@ -54,7 +54,10 @@ def gather(tickers, fo, verbose=False):
                 if row.High < trigger:
                     continue
                 group = "Common" if row.ema34_rising10 >= 9 else "Delta"
-                fresh = _freshness_score(row)
+                # 2026-09-18 fix: freshness must use the PRIOR day's row, not the breach
+                # day's own row -- the same look-ahead bias already found and fixed in
+                # min_traded_value_ablation.py, silently reintroduced here. See FINDINGS.md.
+                fresh = _freshness_score(df.iloc[i - 1])
                 rows.append(dict(
                     ticker=t, date=row.Date, group=group, ema34_rising10=row.ema34_rising10,
                     fresh=(fresh is not None and fresh <= 0.40),

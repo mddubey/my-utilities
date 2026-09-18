@@ -2585,6 +2585,8 @@ Scripts: `ema34_adaptive_persistence_check.py`.
 
 **Not yet done — the remaining items on the critic's Evidence Checklist**: P2 (Fragility by EMA34 bucket — partially covered above via the winners-only fragility split, but not the full bucketed comparison the critic specified), P3 (Freshness overlap matrix — partially covered above), P4 (daily candidate-count distribution: avg/P95/max, days >15 candidates — only the average is reported here), P5 (transition latency), and the time-of-day interaction test (Evidence 7). Posed to the critic with what's done so far; the remaining items are queued, not run.
 
+**[2026-09-18 CORRECTION, caught by direct user question ("why do we even care about the overall population... how can two different checks both be correct") — the "% already Fresh" row above is WRONG, a real bug, not a data quirk.** All of today's later EMA34 scripts (`ema34_delta_population_audit.py`, `ema2_freshness_reaudit.py`) computed `freshness_score` from the breach day's OWN row instead of the PRIOR day's row — the exact look-ahead bias already found and fixed earlier this session in `min_traded_value_ablation.py`, silently reintroduced here. Recomputed correctly (prior-day row): **Delta's real freshness overlap is 72.7% (3,359/4,620), not 50.3%.** The critic's prediction ("~70-80% of Delta will already be Fresh") was actually **correct** — the "Wrong" verdict in the table above is itself wrong, caused by this bug. See the full corrected P3 table and mechanism-level correction below; this also means the "half of Delta's winners are trades freshness alone would not have flagged" claim in this section's own concluding paragraph is not supported — freshness overlap is high, not ~50/50.
+
 ## RQ-52A Evidence Checklist, P2/P3/P4/P5 — real, informative results on three; the fourth (transition latency) is a dead end by definition, not a real finding (2026-09-18)
 
 **P2 — Fragility Margin size, not just discrete labels (`ema34_evidence_checklist_p2_p5.py`).** Delta winners show consistently larger margins across the whole distribution, not just a better Fragile/Medium/Robust label mix: mean +2.134% vs Common's +1.886%, median +1.501% vs +1.179%, even at the bottom of the distribution (p10: +0.257% vs +0.189%). Reinforces P1 — Delta trades aren't just less-often-fragile, their typical safety margin is bigger too.
@@ -2599,6 +2601,17 @@ Scripts: `ema34_adaptive_persistence_check.py`.
 | Delta | Not Fresh | 2,296 | 64.4% / +2.205% | 70.5% / **+1.616%** |
 
 Within both groups, "Not Fresh" beats "Fresh" — this reproduces the same unresolved tension already flagged in the 2026-09-17 RSI_MIN/momentum threshold audit (a stock with a long EMA34-rising streak that's *also* not extended on RSI/momentum is a narrow, oddly-shaped combination that underperforms). Not a new problem, but it explains why Delta performs so well overall — its best cell (Not Fresh, 70.5% options win) is a genuinely strong, distinct population: a short EMA34-persistence, moderately-extended momentum name, different from what freshness alone would surface.
+
+**[2026-09-18 CORRECTION — this whole P3 table is WRONG, a real bug, not a real finding.** `_freshness_score()` was computed from the breach day's own row instead of the prior day's — the same look-ahead bias found and fixed earlier this session, silently reintroduced. My own reasoning compounded the error: I called this "not new, already documented" by comparing it to the RSI_MIN audit's freshness-distribution check — but I never verified that older check used the corrected (prior-day) convention either, and the two results "agreeing" was worthless as confirmation since I hadn't established they were independent. Caught by a direct user question ("this one is also correct, how can it be?") pointing out that two checks agreeing means nothing if they share the same bug. **Corrected P3 (prior-day freshness, no look-ahead):**
+
+| Group | Freshness | n | SWING win/exp | OPT win/exp |
+|---|---|---|---|---|
+| Common | Fresh | 5,287 | 60.7% / +0.847% | **63.8% / +0.740%** |
+| Common | Not Fresh | 10,951 | 60.8% / +1.088% | 53.2% / +0.387% |
+| Delta | Fresh | 3,359 | 62.8% / +1.386% | **67.1% / +1.021%** |
+| Delta | Not Fresh | 1,261 | 58.9% / +0.922% | 49.9% / +0.470% |
+
+**Fresh clearly beats Not Fresh on options in both groups (63.8% vs 53.2% Common; 67.1% vs 49.9% Delta)** — the corrected direction matches the established, validated Freshness signal instead of contradicting it. Swing is close either way, options is where the real, large gap is — consistent with the user's own repeated point that options is where freshness/execution quality matters most. This also corrects Delta's real freshness overlap to 72.7% (see the P1 correction above) — freshness is NOT a mostly-independent signal from EMA34=2 after all; it's real, valid, and still applies within the Delta population the same way it always has.
 
 **P4 — Daily candidate distribution, last 90 real trading days — the one result here that should give real pause, independent of the EMA34 question.**
 
@@ -2685,5 +2698,16 @@ Aggregate win/exp is nearly flat across the whole range (consistent with RQ-48's
 | Entry Gate — Extended | n=2,227, 69.6% win / +4.277% exp | n=2,751, 70.3% win / +4.529% exp |
 
 Extended beats Fresh on both Gates at both EMA34 values — nothing flips. This is the already-documented tension from the RSI_MIN threshold audit (within an already-`base_filters_pass()`-qualifying population, the remaining Fresh subset skews toward a narrow, underperforming corner — different from freshness's pure, unconditioned effect on the raw trigger population). Not a new surprise; what matters is the shape is identical whether EMA34 requires 9 days or 2. Real bonus: EMA34=2 nearly doubles the Entry-Gate-Fresh sample (417→773), a better-powered read on the same relationship. **Verdict: Outcome A (per the critic's own A/B/C framework) — the Freshness relationship survives. EMA34=2 changes the persistence dimension without invalidating the established Freshness signal.**
+
+**[2026-09-18 CORRECTION — same look-ahead bias bug as the P1/P3 corrections above.** `ema2_freshness_reaudit.py` also computed `_freshness_score()` from the breach day's own row instead of the prior day's. **Corrected Primed-Gate numbers** (recomputed, prior-day freshness):
+
+| | Fresh | Extended |
+|---|---|---|
+| EMA34=2 SWING win/exp | 61.5% / +1.056% | 60.6% / +1.071% |
+| EMA34=2 OPT win/exp | **65.1% / +0.848%** | 52.9% / +0.395% |
+| EMA34=9 SWING win/exp | 60.7% / +0.847% | 60.8% / +1.088% |
+| EMA34=9 OPT win/exp | **63.8% / +0.740%** | 53.2% / +0.387% |
+
+Swing is close either way at both EMA34 values; **options clearly favors Fresh over Extended, by a large margin (12+ win-rate points), at both EMA34 values.** This is the corrected direction — matching, not contradicting, the established Freshness signal. **The Entry-Gate numbers in the table above have NOT yet been recomputed with the prior-day fix** — given the same bug affects that code path too, they should be treated as unverified until redone, not relied upon. **Revised verdict: still Outcome A (the relationship survives identically at both EMA34 values) — but the relationship itself is "Fresh beats Extended on options," not "Extended beats Fresh on everything" as originally, incorrectly reported.** Caught by direct user pushback (not by internal review) — see the standing methodology lesson at the end of this file's now-updated self-audit: apparent agreement between two calculations is not confirmation if they share the same underlying bug.
 
 **Weekend threshold re-audit closed out.** All four legs done (RSI_MIN, MOMENTUM_20D_MIN, MIN_TRADED_VALUE, Freshness) — every current production value sits correctly calibrated for the EMA34=2 population, no thresholds need to change. The real, durable finding isn't a retune, it's a now-quantified reason the "raise RSI_MIN/momentum for headroom" idea must stay dead, and confirmation that EMA34=2's promotion doesn't require touching anything else in `base_filters_pass()`.

@@ -34,7 +34,7 @@ def primed_gate(tickers, ema34_min, fo, verbose=False):
                 df = backtest.load(t, daily_pivots).reset_index()
             except FileNotFoundError:
                 continue
-            for i in range(len(df) - 1):
+            for i in range(1, len(df) - 1):
                 row = df.iloc[i]
                 if row.corp_action_day or pd.isna(row.high10_prior):
                     continue
@@ -43,7 +43,8 @@ def primed_gate(tickers, ema34_min, fo, verbose=False):
                 trigger = row.high10_prior * TRIGGER_CLEARANCE
                 if row.High < trigger:
                     continue
-                fresh = _freshness_score(row)
+                # 2026-09-18 fix: prior day's row, not the breach day's own -- see FINDINGS.md
+                fresh = _freshness_score(df.iloc[i - 1])
                 rows.append(dict(
                     fresh=(fresh is not None and fresh <= FRESH_CUTOFF),
                     swing_pnl=simulate_swing(df, i, trigger),
@@ -66,7 +67,7 @@ def entry_gate(tickers, ema34_min, fo, verbose=False):
                 df = backtest.load(t, daily_pivots).reset_index()
             except FileNotFoundError:
                 continue
-            for i in range(len(df) - 1):
+            for i in range(1, len(df) - 1):
                 row = df.iloc[i]
                 if row.corp_action_day or pd.isna(row.high10_prior):
                     continue
@@ -74,7 +75,8 @@ def entry_gate(tickers, ema34_min, fo, verbose=False):
                 if candidate is None or candidate[0] != "breakout_cont":
                     continue
                 trigger = row.high10_prior * TRIGGER_CLEARANCE
-                fresh = _freshness_score(row)
+                # 2026-09-18 fix: prior day's row, not the breach day's own -- see FINDINGS.md
+                fresh = _freshness_score(df.iloc[i - 1])
                 rows.append(dict(
                     fresh=(fresh is not None and fresh <= FRESH_CUTOFF),
                     swing_pnl=simulate_swing(df, i, trigger),
