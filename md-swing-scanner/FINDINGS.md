@@ -2584,3 +2584,31 @@ Scripts: `ema34_adaptive_persistence_check.py`.
 **This clears the critic's own explicit, pre-registered bar**: *"if Delta trades have similar fragility + similar freshness + materially better expectancy, I'd be ready to seriously consider EMA34=2 for v32."* The result exceeds that bar on two of three counts — fragility isn't just similar, it's **better** (more Robust, less Fragile); freshness overlap isn't near-total redundancy (95%+ would mean "adds nothing"), it's a genuine ~50/50 split, meaning roughly half of Delta's winners are trades freshness alone would *not* have flagged — real, partially independent information, not EMA34 rediscovering freshness under a different name. Expectancy is materially better on both legs, options especially (+0.378pp, with a cleaner concentration too: 35.5% vs 37.3%). Real, operational cost confirmed as predicted: +25.2% more candidates/day.
 
 **Not yet done — the remaining items on the critic's Evidence Checklist**: P2 (Fragility by EMA34 bucket — partially covered above via the winners-only fragility split, but not the full bucketed comparison the critic specified), P3 (Freshness overlap matrix — partially covered above), P4 (daily candidate-count distribution: avg/P95/max, days >15 candidates — only the average is reported here), P5 (transition latency), and the time-of-day interaction test (Evidence 7). Posed to the critic with what's done so far; the remaining items are queued, not run.
+
+## RQ-52A Evidence Checklist, P2/P3/P4/P5 — real, informative results on three; the fourth (transition latency) is a dead end by definition, not a real finding (2026-09-18)
+
+**P2 — Fragility Margin size, not just discrete labels (`ema34_evidence_checklist_p2_p5.py`).** Delta winners show consistently larger margins across the whole distribution, not just a better Fragile/Medium/Robust label mix: mean +2.134% vs Common's +1.886%, median +1.501% vs +1.179%, even at the bottom of the distribution (p10: +0.257% vs +0.189%). Reinforces P1 — Delta trades aren't just less-often-fragile, their typical safety margin is bigger too.
+
+**P3 — Freshness overlap matrix, and it surfaces something real worth flagging honestly, not just a confirmation.**
+
+| Group | Freshness | n | SWING win/exp | OPT win/exp |
+|---|---|---|---|---|
+| Common | Fresh | 2,879 | 54.2% / **−0.616%** | 42.8% / **−0.383%** |
+| Common | Not Fresh | 13,358 | 62.1% / +1.342% | 60.5% / +0.733% |
+| Delta | Fresh | 2,322 | 59.0% / +0.315% | 56.8% / +0.294% |
+| Delta | Not Fresh | 2,296 | 64.4% / +2.205% | 70.5% / **+1.616%** |
+
+Within both groups, "Not Fresh" beats "Fresh" — this reproduces the same unresolved tension already flagged in the 2026-09-17 RSI_MIN/momentum threshold audit (a stock with a long EMA34-rising streak that's *also* not extended on RSI/momentum is a narrow, oddly-shaped combination that underperforms). Not a new problem, but it explains why Delta performs so well overall — its best cell (Not Fresh, 70.5% options win) is a genuinely strong, distinct population: a short EMA34-persistence, moderately-extended momentum name, different from what freshness alone would surface.
+
+**P4 — Daily candidate distribution, last 90 real trading days — the one result here that should give real pause, independent of the EMA34 question.**
+
+| | avg/day | P95 | max | days >15 candidates |
+|---|---|---|---|---|
+| EMA34=9 (current) | 16.27 | 32.1 | 49 | **40/90 (44%)** |
+| EMA34=2 | 20.44 | 41.0 | 60 | **52/90 (58%)** |
+
+**The dashboard is already overloaded almost half the time under current production settings** — 44% of days already exceed 15 candidates before touching EMA34 at all. EMA34=2 makes this worse but not dramatically (+13pp more high-candidate days, max climbing 49→60). This is a real, pre-existing operational problem, not something EMA34=2 creates — worth its own investigation regardless of the EMA34 decision.
+
+**P5 — Transition latency: the metric as specified doesn't work at this scale, not a real finding.** Defined as "trading days from a real Nifty recovery start to the first fire, any ticker" — came back median 0.0 for both EMA34=9 and EMA34=2 (mean 0.12/0.06 days). With a 500-ticker universe, *some* stock fires almost every single day regardless of Nifty's regime, so "any ticker fires anywhere" is nearly always zero — this is a definition problem, not evidence the lag doesn't matter. The pain being measured isn't "zero fires," it's "fewer fires than usual," which the earlier days-into-a-move fire-count table already captures correctly (12.71 fires on day 1 of a rally vs 21.91 by day 5, at EMA34=9). Dropped as a metric rather than reported as a misleadingly precise non-result.
+
+Scripts: `ema34_evidence_checklist_p2_p5.py`.
