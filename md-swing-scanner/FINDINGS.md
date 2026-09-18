@@ -2612,3 +2612,16 @@ Within both groups, "Not Fresh" beats "Fresh" — this reproduces the same unres
 **P5 — Transition latency: the metric as specified doesn't work at this scale, not a real finding.** Defined as "trading days from a real Nifty recovery start to the first fire, any ticker" — came back median 0.0 for both EMA34=9 and EMA34=2 (mean 0.12/0.06 days). With a 500-ticker universe, *some* stock fires almost every single day regardless of Nifty's regime, so "any ticker fires anywhere" is nearly always zero — this is a definition problem, not evidence the lag doesn't matter. The pain being measured isn't "zero fires," it's "fewer fires than usual," which the earlier days-into-a-move fire-count table already captures correctly (12.71 fires on day 1 of a rally vs 21.91 by day 5, at EMA34=9). Dropped as a metric rather than reported as a misleadingly precise non-result.
 
 Scripts: `ema34_evidence_checklist_p2_p5.py`.
+
+## RQ-56: EMA34=2 uniqueness test — clean, decisive pass, real trades not earlier entries into the same ones (2026-09-18)
+
+**Critic's final falsification before considering promotion**: does `EMA34_RISING_DAYS_MIN=2` discover genuinely new trades, or does it just enter the same trades a day or two earlier than 9 would have anyway? For every Delta trade, checked whether EMA34≥9 also fires on the SAME ticker within the next 3 *trading* days (not calendar days, using the real daily-bar index — `ema34_rq56_uniqueness_test.py`). "Early version" = EMA34≥9 fires there in that window (same trade, found sooner); "Unique" = it never does.
+
+**82.7% of Delta trades are genuinely Unique** (n=3,819 of 4,618) — not earlier entries into trades EMA34=9 would have caught anyway. Only 17.3% (n=799) are Early version.
+
+| | n | SWING win/exp | OPT win/exp |
+|---|---|---|---|
+| Early version | 799 | 78.3% / +4.317% | 62.0% / +0.879% |
+| Unique | 3,819 | 58.2% / +0.614% | **63.2% / +0.893%** |
+
+Both groups are real and good — Early version is even stronger (entering a confirmed-strong move slightly ahead of EMA34=9 captures extra upside, makes sense) — but Unique is the group that matters for the uniqueness question, and its options number (63.2% win) is the best in the table, not a marginal tail. **Critic's promotion rule (≥30% of ALL Delta trades must be unique AND profitable): actual result is 48.1%** — clears the bar by a wide margin, not a borderline pass. Script: `ema34_rq56_uniqueness_test.py`.
