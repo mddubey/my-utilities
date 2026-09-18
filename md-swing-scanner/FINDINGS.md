@@ -2559,3 +2559,28 @@ Also re-flagged the numbering collision — the critic has now proposed two diff
 **Fragility Margin calibration (critic's 3rd priority item) — deferred, not run.** This depends on accumulating real live/paper trades to calibrate against, which don't exist yet in sufficient number — consistent with the standing v32 plan ("live paper trading calibration, not another parameter sweep," 2026-09-17). Queued, not actionable today.
 
 Scripts: `ema34_adaptive_persistence_check.py`.
+
+## RQ-52A Evidence Checklist, Test P1 — Delta Population Audit: EMA34=2's new trades are real, good trades, not noise, and clear the critic's own pre-registered bar (2026-09-18)
+
+**Critic's framing, adopted directly**: don't ask "is EMA34=2 better on average," ask "what NEW trades does EMA34=2 admit, and are those trades genuinely good?" Isolated the real "Delta" population (`ema34_delta_population_audit.py`) — passes `base_filters_pass()` with `EMA34_RISING_DAYS_MIN` relaxed to 2, but would fail at the current production value of 9 (`ema34_rising10 < 9`) — against "Common" (passes at both), full multi-year history, one pass (the real `ema34_rising10` column already exists, no need to re-scan per threshold).
+
+**Critic's timestamped prediction, scored against the real result:**
+
+| Prediction | Actual | Verdict |
+|---|---|---|
+| Swing exp better, but by <0.2% | Delta +1.255% vs Common +0.995% (+0.260pp) | Right direction, bigger than predicted |
+| Options exp meaningfully better (+0.2-0.4%) | Delta +0.891% vs Common +0.513% (+0.378pp) | Correct, top of range |
+| Fragility slightly *higher* in Delta | Delta 15.8% Fragile/70.5% Robust vs Common 20.2%/62.8% — Delta is LESS fragile | **Wrong — a positive surprise** |
+| ~70-80% of Delta already Fresh | 50.3% already Fresh | **Wrong — meaningfully lower, real independent signal, not full redundancy with freshness** |
+| ~20-25% more candidates/day | +25.2% | Correct, top of range |
+
+**Full numbers:**
+
+| | n | SWING win/exp/median/conc | OPT win/exp/median/conc | % already Fresh | Fragility (winners) |
+|---|---|---|---|---|---|
+| Common (EMA34≥9, current) | 16,237 | 60.7% / +0.995% / +1.629% / 30.4% | n=12,125, 57.0% / +0.513% / +0.237% / 37.3% | 17.7% | 20.2% Fragile / 17.0% Medium / 62.8% Robust |
+| Delta (EMA34=2 only, new) | 4,618 | 61.7% / +1.255% / +1.983% / 29.2% | n=3,519, 63.0% / +0.891% / +0.534% / 35.5% | 50.3% | 15.8% Fragile / 13.8% Medium / **70.5% Robust** |
+
+**This clears the critic's own explicit, pre-registered bar**: *"if Delta trades have similar fragility + similar freshness + materially better expectancy, I'd be ready to seriously consider EMA34=2 for v32."* The result exceeds that bar on two of three counts — fragility isn't just similar, it's **better** (more Robust, less Fragile); freshness overlap isn't near-total redundancy (95%+ would mean "adds nothing"), it's a genuine ~50/50 split, meaning roughly half of Delta's winners are trades freshness alone would *not* have flagged — real, partially independent information, not EMA34 rediscovering freshness under a different name. Expectancy is materially better on both legs, options especially (+0.378pp, with a cleaner concentration too: 35.5% vs 37.3%). Real, operational cost confirmed as predicted: +25.2% more candidates/day.
+
+**Not yet done — the remaining items on the critic's Evidence Checklist**: P2 (Fragility by EMA34 bucket — partially covered above via the winners-only fragility split, but not the full bucketed comparison the critic specified), P3 (Freshness overlap matrix — partially covered above), P4 (daily candidate-count distribution: avg/P95/max, days >15 candidates — only the average is reported here), P5 (transition latency), and the time-of-day interaction test (Evidence 7). Posed to the critic with what's done so far; the remaining items are queued, not run.
