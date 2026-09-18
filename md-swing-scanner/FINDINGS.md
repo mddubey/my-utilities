@@ -2625,3 +2625,52 @@ Scripts: `ema34_evidence_checklist_p2_p5.py`.
 | Unique | 3,819 | 58.2% / +0.614% | **63.2% / +0.893%** |
 
 Both groups are real and good — Early version is even stronger (entering a confirmed-strong move slightly ahead of EMA34=9 captures extra upside, makes sense) — but Unique is the group that matters for the uniqueness question, and its options number (63.2% win) is the best in the table, not a marginal tail. **Critic's promotion rule (≥30% of ALL Delta trades must be unique AND profitable): actual result is 48.1%** — clears the bar by a wide margin, not a borderline pass. Script: `ema34_rq56_uniqueness_test.py`.
+
+**EMA34=2 promoted from Tier A Research to Tier A Candidate** (not production) — RQ-56's falsification survived. Two governance items resolved, kept as separate things rather than forced into one numbering:
+
+- **Research Integrity Rule #4 (Candidate vs Executable Portfolio)**: a candidate-level improvement is insufficient for production promotion when a feature materially changes candidate volume or selection — its effect on *executable* opportunities must also be established, not just the candidate population's own stats.
+- **Tier-A Candidate Promotion Checklist** (a checklist, not a numbered Research Integrity Rule): (1) multi-year Primed-population improvement, (2) Entry-Gate consistency, (3) independence/uniqueness falsification, (4) operational-capacity validation. EMA34=2 has cleared 1-3; RQ-57 is the remaining box.
+
+**A real methodology near-miss caught and corrected before building anything**: RQ-57 was initially specified against `portfolio.py`'s cash-constrained allocator, until direct verification showed `simulate_lots()` has no ranking mechanism at all (pure chronological + cash-affordability) and its only real input is a static v28-era CSV (`runs/opt_v28_itm_next.csv`) with no connection to the Primed-Gate/EMA34 candidate-generation logic this whole investigation has used. Building the "connecting pipeline" (EMA34 candidates → real option contracts → that allocator) would have been a genuine new build disguised as a replay — correctly rejected. **Final RQ-57 spec**: use the real intraday cache and the actual live 9:20 ranking mechanism (`live_checkpoint.py`'s distance-to-trigger/closing-speed ranking) directly — no portfolio allocator, no v28 artifact, no new option-contract pipeline. Question: does EMA34=2 create opportunities that survive the real Top-5 selection bottleneck a human actually faces at 9:20, not just the candidate population in the abstract.
+
+**RQ-57 result (`ema34_rq57_capacity_test.py`, real 70-day intraday window, real live_checkpoint.py-style combo_rank = 0.8×dist_rank + 0.2×velocity_rank)**: Top-5 composition differs on 46 of 70 days (65.7%) — a routine, not rare, change to what a human would actually see. Swing: a real flip from negative to positive expectancy (EMA34≥9's Top-5 was −0.192% exp/56.8% win; EMA34=2's Top-5 is +0.290% exp/59.9% win), and a higher fire-through rate (49.1% vs 44.3% of Top-5 slots actually becoming real trades). Options: an honest wrinkle, not smoothed over — win rate and expectancy are both slightly *lower* for EMA34=2 (58.3%/+0.360% vs 60.6%/+0.458%), on a larger sample (120 vs 104 trades). Swing clearly clears the promotion bar; options doesn't cleanly satisfy either half of the critic's rule (not better, not "same with more"). Sample sizes are real but modest (104-172 options trades over 70 days) — trust the direction, not the exact magnitude.
+
+**Direct pushback from the user, correctly redirecting the whole thread**: "this is not the way to solve the problem... it really has good trades, then why the [hesitate]... we should be solving it by tightening other filters which probably will need to be revisited because the population has changed." Five rounds of EMA34-in-isolation falsification (RQ-52A/55/56/57) all passed — running a sixth wouldn't change that answer. The real open question reframed: with EMA34=2 as the baseline, are `RSI_MIN`/`MOMENTUM_20D_MIN`/`MIN_TRADED_VALUE` (all tuned against the EMA34≥9 population) still calibrated for the population they now filter, or were they implicitly compensating for EMA34≥9's narrower population? Critic agreed, explicitly cautioned against a joint/multidimensional sweep (can't attribute a joint optimum to any one cause) in favor of one-at-a-time re-sweeps, each reporting: old value, response/plateau shape, and — the critical new metric — % of the RQ-56 "Delta" population (4,618 EMA34=2-unique trades) retained at each threshold value.
+
+## Weekend threshold re-audit with EMA34=2 fixed — found exactly the interaction the critic was hoping to surface, and it's dramatic (2026-09-18)
+
+**`RSI_MIN` and `MOMENTUM_20D_MIN` both directly gut the Delta population as they rise past their current production values — a sharp, real interaction, not a subtle one** (`ema2_threshold_reaudit.py`, EMA34_RISING_DAYS_MIN=2 fixed, full multi-year population):
+
+| RSI_MIN | n | SWING win/exp | OPT win/exp | Delta retained |
+|---|---|---|---|---|
+| 55 (current) | 20,858 | 61.0% / +1.065% | 58.3% / +0.598% | **100.0%** |
+| 60 | 19,934 | 61.5% / +1.162% | 59.8% / +0.680% | 88.2% |
+| 65 | 16,297 | 62.5% / +1.440% | 62.5% / +0.867% | 54.2% |
+| 70 | 10,503 | 64.6% / +1.984% | 65.7% / +1.147% | 24.4% |
+| 75 | 5,260 | 66.1% / +2.583% | 68.7% / +1.545% | 7.8% |
+| 80 | 2,044 | 70.0% / +3.752% | 72.0% / +2.113% | 1.8% |
+
+| MOMENTUM_20D_MIN | n | SWING win/exp | OPT win/exp | Delta retained |
+|---|---|---|---|---|
+| 1.05 (current) | 20,858 | 61.0% / +1.065% | 58.3% / +0.598% | **100.0%** |
+| 1.10 | 14,212 | 62.1% / +1.517% | 60.3% / +0.814% | 47.2% |
+| 1.15 | 8,750 | 62.4% / +1.949% | 61.7% / +1.084% | 20.1% |
+| 1.20 | 5,254 | 61.7% / +2.254% | 63.9% / +1.426% | 9.1% |
+| 1.30 | 2,050 | 61.9% / +2.791% | 65.6% / +2.059% | 1.9% |
+
+**Both current production values sit exactly at 100% Delta retention — no accidental over-filtering exists today.** But this decisively confirms, for a third and clearest reason, why the already-parked "raise RSI_MIN/momentum for headroom" idea (rejected earlier via the freshness conflict and RQ-51's real-population collapse) must stay rejected: raising either threshold even modestly now directly and disproportionately destroys the population that justifies EMA34=2. At RSI_MIN=65, over half of Delta is already gone; at MOMENTUM_20D_MIN=1.10, over half is gone too. The aggregate win-rate/expectancy climb visible as these thresholds rise isn't new quality being found — it's the same historical extended-population effect already documented, now shown to be directly, quantifiably incompatible with the Tier-A candidate.
+
+**`MIN_TRADED_VALUE` (liquidity floor) shows the same qualitative shape but far more gently — a real, but much less entangled, interaction:**
+
+| MIN_TRADED_VALUE | n | SWING win/exp | OPT win/exp | Delta retained |
+|---|---|---|---|---|
+| ₹25cr | 36,538 | 61.0% / +1.203% | 58.4% / +0.607% | 100.0% |
+| ₹50cr | 29,560 | 60.9% / +1.138% | 58.4% / +0.602% | 100.0% |
+| ₹75cr | 24,628 | 60.8% / +1.050% | 58.3% / +0.594% | 100.0% |
+| ₹100cr (current) | 20,858 | 61.0% / +1.065% | 58.3% / +0.598% | **100.0%** |
+| ₹150cr | 15,388 | 61.2% / +1.039% | 58.1% / +0.609% | 71.2% |
+| ₹200cr | 11,637 | 61.7% / +1.109% | 58.2% / +0.657% | 52.4% |
+
+Aggregate win/exp is nearly flat across the whole range (consistent with RQ-48's finding that liquidity affects contract *availability*, not swing/stock-proxy quality) — the current ₹100cr floor retains 100% of Delta, and even raising it (which RQ-48 already rejected for unrelated options-availability reasons) costs Delta trades far more gradually than RSI_MIN/momentum's sharp cliffs (71.2% retained at ₹150cr vs. RSI_MIN=60's 88.2% or MOMENTUM=1.10's 47.2%).
+
+**Conclusion**: current `base_filters_pass()` thresholds are correctly calibrated for the EMA34=2 population as they stand — nothing needs to change today. The value of this re-audit isn't a threshold change, it's closing off, with direct quantitative evidence, any future temptation to "improve" RSI_MIN/momentum in isolation without checking what it costs the newly-adopted population. Not yet done: the "freshness cutoff" leg of the critic's requested audit (freshness isn't a hard `base_filters_pass()` gate in production, so this needs a different framing than a threshold sweep — re-verifying freshness's own Primed-Gate-vs-Entry-Gate edge specifically within the EMA34=2 population, not sweeping a threshold that doesn't exist as a gate). Scripts: `ema2_threshold_reaudit.py`.
