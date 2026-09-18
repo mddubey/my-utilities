@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     original = signals.EMA34_RISING_DAYS_MIN
     try:
-        for v in [5, 6, 7, 8, 9, 10]:
+        for v in [2, 3, 4, 5, 6, 7, 8, 9, 10]:
             signals.EMA34_RISING_DAYS_MIN = v
             label = f"{v}" + (" (current)" if v == 9 else "")
             run_one(tickers, min_date, fo, label)

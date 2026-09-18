@@ -2504,10 +2504,13 @@ Up-move side is a different shape: the rare fires that manage to happen early de
 
 **Honest methodology self-audit, before anything gets proposed as a change**: (1) the small-n down/6+ bucket flagged above. (2) A shorter `EMA34_RISING_DAYS_MIN` was checked for aggregate quality (full history, flat/no cost) and fire-timing shape (choppy window, barely changes) — but **never checked for real win/expectancy specifically within the choppy window itself**, which is the actual question a promotion decision would need answered, and Research Integrity Rule #3 (live-representative population, not just a big historical average) applies directly here. Not yet run at the time of the first write-up.
 
-**Gap closed (`ema34_choppy_window_check.py`) — real, well-powered, and a meaningfully stronger result than "free on the full history."** Same population mechanism, restricted to the last 180 real Nifty trading days (the same window already characterized as choppy: median 1-day streaks, 98.9% ≤5 days), swept `EMA34_RISING_DAYS_MIN` 5-10, real swing and options outcomes:
+**Gap closed (`ema34_choppy_window_check.py`) — real, well-powered, and a meaningfully stronger result than "free on the full history."** Same population mechanism, restricted to the last 180 real Nifty trading days (the same window already characterized as choppy: median 1-day streaks, 98.9% ≤5 days), swept `EMA34_RISING_DAYS_MIN` across the full 2-10 range (not just 5-10), real swing and options outcomes:
 
 | EMA34_RISING_DAYS_MIN | n (swing/opt) | SWING win/exp | OPT win/exp | conc (swing/opt) |
 |---|---|---|---|---|
+| 2 | 3,642 / 2,390 | 57.2% / +0.360% | 57.4% / **+0.440% (peak)** | 27.4% / 32.6% |
+| 3 | 3,618 / 2,375 | 57.4% / **+0.376% (peak)** | 57.3% / +0.426% | 27.4% / 32.5% |
+| 4 | 3,536 / 2,320 | 57.2% / +0.355% | 56.9% / +0.404% | 27.5% / 32.5% |
 | 5 | 3,427 / 2,241 | 57.0% / +0.316% | 56.9% / +0.398% | 27.5% / 32.4% |
 | 6 | 3,295 / 2,138 | 56.5% / +0.231% | 56.3% / +0.368% | 27.4% / 32.2% |
 | 7 | 3,106 / 1,997 | 55.9% / +0.076% | 56.3% / +0.348% | 27.4% / 32.2% |
@@ -2515,4 +2518,4 @@ Up-move side is a different shape: the rare fires that manage to happen early de
 | 9 (current) | 2,686 / 1,713 | 55.0% / **−0.090%** | 56.7% / +0.354% | 27.5% / 32.6% |
 | 10 | 2,328 / 1,484 | 55.1% / −0.138% | 55.3% / +0.304% | 27.6% / 32.5% |
 
-Both populations comfortably clear Research Integrity Rule #4's 500-trade minimum at every threshold tested. **The current production value (9) sits in genuinely negative swing expectancy in this specific, live-representative window** — a real, monotonic decline from +0.316% (at 5) down to −0.090% (at 9), crossing from profitable to unprofitable. Options shows the same direction, more modestly (+0.398% at 5 vs +0.354% at 9). Concentration flat and sane throughout (27.4-27.6%/32.2-32.6%, within this project's own ~25-30% honest baseline) — not an outlier artifact. This is now a real, gap-closed, live-representative finding, not just a full-history-neutral one. Posed to the critic in full, still explicitly flagged as a lead pending their review, not yet adopted.
+Both populations comfortably clear Research Integrity Rule #4's 500-trade minimum at every threshold tested. **Not a straight monotonic "lower is always better" — there's a real plateau/peak at 2-4** (swing peaks at 3, options peaks at 2), declining steadily from there through 6-10. **The current production value (9) sits in genuinely negative swing expectancy in this specific, live-representative window** (−0.090%, vs the peak's +0.376% at 3) — a real, substantial gap, not noise. Options shows the same direction, more modestly (+0.440% at 2 vs +0.354% at 9). Concentration flat and sane across the entire 2-10 range (27.4-27.6%/32.2-32.6%, within this project's own ~25-30% honest baseline) — not an outlier artifact anywhere in the range. No data below 2 — whether the pattern continues improving or reverses further down is untested. This is now a real, gap-closed, live-representative finding, not just a full-history-neutral one. Posed to the critic in full, still explicitly flagged as a lead pending their review, not yet adopted.
