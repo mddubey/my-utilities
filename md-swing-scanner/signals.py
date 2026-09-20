@@ -93,7 +93,22 @@ RSI_MAX = 90  # ADOPTED (2026-09-13, was 80). RQ-34 "Validation Population Drift
               # slot before the later VCP setup could ever form) — these actually skew
               # favorable, 84.6% win for the earlier BC entry vs a hypothetical 57.7% for the
               # VCP setup it displaced.
-EMA34_RISING_DAYS_MIN = 9      # out of the trailing 10 — persistent trend, not just "currently above"
+EMA34_RISING_DAYS_MIN = 2      # (2026-09-20) promoted to the live default — critic sign-off 2026-09-18
+                                # ("ready to move from research validation into v31.1 implementation and
+                                # live/paper validation"): captures a large, genuinely distinct population
+                                # (82.7% of Delta, n=3,819, RQ-56) with real, non-noise trades (RQ-52A),
+                                # survives fragility/capacity checks, and every base-filter threshold
+                                # re-audit under it found no other change warranted. Was left un-flipped
+                                # in this file after sign-off -- caught 2026-09-20 alongside the ATR0/
+                                # target/trail production-gap fix, same category of "validated but never
+                                # actually wired in" gap. Every research script this weekend had been
+                                # setting this to 2 temporarily and resetting it to 9 afterward -- that
+                                # reset now restores the WRONG value; those scripts should be updated to
+                                # restore 2, not 9, next time they're touched. Critic's own next step:
+                                # collect the first 30-50 live/paper trades under this to confirm the
+                                # production population matches the research population, not to re-prove
+                                # the finding itself. Out of trailing 10 days -- persistent trend, not
+                                # just "currently above."
 MIN_TRADED_VALUE = 1_000_000_000  # Rs.100cr, 20-day avg Close*Volume — liquidity floor
 MOMENTUM_20D_MIN = 1.05        # close must be >=5% above its level 20 trading days ago
 
