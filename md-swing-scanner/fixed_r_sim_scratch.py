@@ -1,10 +1,11 @@
 import pandas as pd
-from backtest import (detect_entry, current_stop_level, MAX_INITIAL_RISK_PCT,
+from backtest import (detect_entry, current_stop_level, MAX_INITIAL_RISK_PCT, MAX_HOLD_DAYS,
                        CLIMAX_MIN_GAIN_PCT, CLIMAX_WEAK_CLOSE_PCT, load, daily_pivots)
 
 
 def check_exit_fixed_target(pattern, state, row, fixed_target):
     state = dict(state)
+    state["days_held"] = state.get("days_held", 0) + 1
     made_new_high = row.High > state["peak_high"]
     state["peak_close"] = max(state["peak_close"], row.Close)
     state["peak_high"] = max(state["peak_high"], row.High)
@@ -18,14 +19,15 @@ def check_exit_fixed_target(pattern, state, row, fixed_target):
     hit_climax = (already_extended and made_new_high and climax_volume and close_pos <= CLIMAX_WEAK_CLOSE_PCT)
 
     hit_stop = row.Close < current_stop_level(pattern, state, row)
+    hit_max_hold = state["days_held"] >= MAX_HOLD_DAYS
 
-    if hit_target or hit_stop or hit_climax:
-        reason = "target_R" if hit_target else "climax" if hit_climax else "stop"
+    if hit_target or hit_stop or hit_climax or hit_max_hold:
+        reason = "target_R" if hit_target else "climax" if hit_climax else "stop" if hit_stop else "max_hold_cap"
         return reason, state
     return None, state
 
 
-def simulate_ticker_fixed_r(ticker, df, r_multiple_target=3.0, require_regime=True):
+def simulate_ticker_fixed_r(ticker, df, r_multiple_target=3.0, require_regime=True, atr_mult=1.0):
     trades = []
     in_position = False
     entry_date = pattern = None
@@ -56,7 +58,8 @@ def simulate_ticker_fixed_r(ticker, df, r_multiple_target=3.0, require_regime=Tr
                     structural_low = max(structural_low, entry_price * (1 - MAX_INITIAL_RISK_PCT))
                 pattern = pattern_candidate
                 state = dict(entry_price=entry_price, peak_close=entry_price,
-                             peak_high=row.High, structural_low=structural_low, target=None)
+                             peak_high=row.High, structural_low=structural_low, target=None,
+                             days_held=0, atr_entry=row.atr14 * atr_mult)
                 initial_stop = current_stop_level(pattern, state, row)
                 initial_risk = entry_price - initial_stop
                 fixed_target = entry_price + r_multiple_target * initial_risk

@@ -1411,6 +1411,14 @@ Fixed-3 slightly beats even the existing reactive 3-day-stall's own return/day (
 
 Much closer to a coin flip than options (max ~2.5pp gap either direction at intermediate capital, vs options' consistent 4-15pp loss) — but at the uncapped level, where capital constraints stop mattering entirely, baseline is still slightly ahead, consistent with the already-disclosed fact that fixed-3's raw median (+3.94%) sits slightly below baseline's (+4.07%). **No capital level or leg shows a real benefit for this rule** — a clean, complete "do not adopt," not just for options.
 
+## Standing methodology caveat (2026-09-20, retroactive): `portfolio.py`/`simulate_lots()` assumes perfect chronological capture of every affordable candidate, with no realistic visibility/execution constraint — every capital-constrained CAGR conclusion built on it should be treated as provisional, not decisive
+
+Surfaced revisiting whether "Opportunity Cost Exit" (below) should be trusted enough to extend to swing/EMA34=2. `simulate_lots()` (used for the fixed-3-days-after-arming rejection immediately above, and for the original reactive-3-day-stall re-check right after this note) sorts every candidate trade by `entry_date` and admits it purely on cash-affordability — it has no ranking mechanism and assumes the trader is simultaneously aware of and can act on every single affordable candidate the moment it appears, with no missed signals, no execution failures, no "I wasn't watching" real-world risk. This exact limitation was independently found and named while building RQ-57 (2026-09-18, months later) — `simulate_lots()` "has no ranking mechanism at all... no connection to the Primed-Gate/EMA34 candidate-generation logic," leading RQ-57 to abandon `portfolio.py` entirely in favor of the real intraday cache + live 9:20 Top-5 ranking mechanism — but that conclusion was never generalized into a standing rule at the time, so the fixed-3-day-exit rejection immediately above (and the reactive-3-day-stall re-check below), both from 2026-09-06, predate that fix and rest on the same unrealistic assumption.
+
+**A sharper, related point raised directly by the user, more fundamental than the ranking-mechanism gap**: even a "realistic" Top-5-ranking-based simulation still assumes the trader successfully allocates to the ranked-good trade every time it's available — real life doesn't guarantee that (not watching at the right moment, execution failure, any real-world reason a good signal gets missed while a bad one gets taken instead). No portfolio-level simulation, however realistic its candidate-selection model, can fully eliminate this irreducible execution/luck risk, because it's about the trader's own real-time reliability, not which signals exist. **This is the actual theoretical justification for asymmetric risk:reward (e.g., 1:3 R-multiples) as a design philosophy, separate from whatever a capital-constrained CAGR backtest says**: instead of trying to guarantee you correctly catch the best available trade at the right time (which no simulation can promise reflects reality), size wins to be big enough relative to losses that the system stays profitable even under realistic execution variance — you don't need to always get the "right" trade, you need whichever trades you do get to be safely asymmetric. Worth deciding explicitly: is a proposed exit/rotation rule being evaluated on raw backtest CAGR (vulnerable to this whole class of unrealistic-capture assumptions), or on distributional robustness (win/loss size ratio, tail risk) — these are different criteria and can disagree.
+
+**Practical implication for tonight's abandoned line of work**: do not reuse `portfolio.py` to test "Opportunity Cost Exit" on swing/EMA34=2 — it would inherit the same flaw. If a capital-constrained answer is wanted, it needs RQ-57's real approach (intraday cache + live 9:20 ranking), not a portfolio allocator. The fixed-R-multiple test run earlier tonight (1R/2R/3R vs baseline, EMA34=2, real `detect_entry()`/`check_exit()`) showed mean expectancy rising while win rate and median both fell (baseline 64.2%win/+1.720%exp/+2.421%median → 3R 56.3%win/+2.232%exp/+1.345%median) — flagged in the moment as needing a concentration/outlier check before trusting the higher mean, **still unresolved, not yet checked**.
+
 ## Same capital-constrained test run on the ORIGINAL, already-live reactive 3-day-stall — mixed, and worth flagging since it questions something already in production (2026-09-06)
 
 Direct follow-up question: if the fixed-N-day rule's per-trade improvement didn't survive a real capital-constrained test, does the rule *actually currently live* for options survive it? This had never been checked — the original stall was only ever validated on per-trade aggregate stats (win/median/ret-per-day), never run through a real sequential portfolio simulation. Reused the existing `stall_pool.csv` (baseline vs reactive-stall stock exits, 679 trades, 181 changed), re-simulated both ATM+current and ITM+next option prices, ran through `portfolio.py`'s simulator at the same capital levels — using only ₹7.5L-10L as trustworthy (lower levels showed the same scheduling-fragility noise as before, with meaningfully different trade counts taken between the two rules):
@@ -2725,3 +2733,1454 @@ RQ-56 established that EMA34=2 captures a large, genuinely distinct population (
 **No threshold changes are warranted from the weekend audit.** EMA34_RISING_DAYS_MIN=2, RSI_MIN=55, MOMENTUM_20D_MIN=1.05, MIN_TRADED_VALUE=₹100cr all frozen as-is; Freshness remains ranking/telemetry, not a new hard gate. The corrected freshness numbers change interpretation, not conclusion — RQ-56's uniqueness result is unaffected (ticker/date/EMA34-condition based, never touched `freshness_score`), and Update 61's RSI/Momentum/liquidity re-audit is unaffected (never touches `freshness_score` either). A correction to interpretation, not a collapse of the evidence chain.
 
 **EMA34=2 is ready to move from research validation into v31.1 implementation and live/paper validation** — not "production-proven in every possible sense," but research-promotion-complete, an implementation candidate. Explicit critic guidance: stop researching EMA34 in isolation; the next question is not "can we find another reason it shouldn't ship" but "what happens when EMA34=2 becomes part of the actual system" — an integration-validation question, not a feature-validation one. The Entry-Gate half of the Freshness leg (not yet recomputed with the look-ahead fix) is a documentation/completeness item, explicitly not a promotion blocker. Next phase: collect the first 30-50 live/paper trades under EMA34=2 (candidate count, Delta/Common split, freshness, fragility, trigger distance, real slippage, outcome, options behavior) — not to re-prove EMA34, but to confirm the production implementation matches the research population.
+
+## RQ-64 + correction: RQ-56's 3-day window undercounted Unique — the honest number is 40.8%, not 82.7%, and true-Unique is a real swing loser (2026-09-18)
+
+**RQ-56's "Early vs Unique" split used an arbitrary, never-sensitivity-tested 3-trading-day lookahead window** (critic-proposed, adopted without question). Direct user mechanical challenge — "EMA=2 vs EMA=9 there is a 1-week gap, how would you find it in 3 days?" — prompted testing the same classification at N=3/5/7/10/15 trading days. Result: **Early% grows monotonically with window length as the window gives EMA34≥9 more time to "catch up"** on the same ticker:
+
+| Lookahead window (N trading days) | Early % of Delta | Unique % of Delta |
+|---|---|---|
+| 3 (RQ-56's original) | 17.3% | 82.7% |
+| 5 | 29.9% | 70.1% |
+| 7 | 40.5% | 59.5% |
+| 10 | 49.2% | 50.8% |
+| 15 (= `MAX_HOLD_DAYS`, the real swing hold period) | **59.2%** | **40.8%** |
+
+A trade only truly deserves the "Unique" label if EMA34≥9 *never* catches up within the period that actually matters — the real swing hold. N=3 was simply too short a leash: many trades it called "Unique" were really "Early, just not caught up yet by day 3," reclassified correctly once the window is widened enough to see the eventual EMA34≥9 fire (or its genuine absence). **N=15 is the honest, non-arbitrary number** — it uses the same horizon the strategy itself already holds for, not an unrelated 3-day cutoff nobody chose for a reason.
+
+**RQ-64 (`rq64_holding_trajectory.py`, critic-revised scope — holding-period trajectory comparison, not breach/acceptance anatomy) then re-ran Early/Unique's SWING outcome at the honest N=15 window, and the result changes materially:**
+
+| | n | SWING win/exp (N=15, honest) | SWING win/exp (N=3, as originally reported) |
+|---|---|---|---|
+| Early (N=15) | — | 84.0% / **+4.700%** | 78.3% / +4.317% (N=3 Early) |
+| Unique (N=15) | 1,883 | **29.5% / −3.743%** | 58.2% / +0.614% (N=3 Unique) |
+
+**True-Unique (N=15) is a real swing loser, not a modest winner as originally reported.** Options are essentially unaffected by the window choice (Early(15d) 63.7%/+0.953%, Unique(15d) 62.0%/+0.795% — both still fine), because the options exit resolves at day+1-open, long before the Early/Unique label can even change.
+
+**Day-by-day trajectory on Unique(15d) confirms a genuine fade-and-crash, not just a fizzle** (mean close vs trigger, and % still profitable): Day0 +0.631%/54.5% profitable → Day1 +0.281%/49.8% → Day2 −0.362%/42.4% → Day3 −0.975%/36.6% → Day5 −2.113%/28.8% → Day10 −4.100%/21.2%. Mean MFE (+4.367%) is much smaller than mean MAE (−9.254%) — a real spike-then-reversal shape, returns peak at Day0 and decline every day after.
+
+**Tested and REFUTED: is this a choppy-market artifact rather than an intrinsic property?** Split Unique(15d) by Nifty's own per-day streak-length regime across the full 5-year history (choppy: streak≤3, n=1,433; trending: streak≥6, n=148). The fade-and-crash pattern occurs equally in both regimes (Day10 −4.661% trending vs −4.169% choppy) — slightly *worse* in trending, if anything. This makes the finding more durable, not an artifact of the currently unusually choppy market.
+
+**Tested: can a trade's own day+1/day+2 price action serve as a live-observable proxy for exit-early decisions (since the Early/Unique label itself needs up to 15 days of future data and can't be used live)?** Checked on the only real-time-knowable population — the full EMA34=2 Delta population (Common+Delta both, and Delta alone), not the hindsight Unique label:
+
+| Check-in day | Baseline SWING (hold to real exit) | Modified (cut immediately if trade is negative vs. trigger at that day's close) |
+|---|---|---|
+| Day+1 (full population, n=20,858) | 61.0% / +1.065% | 35.9% / +0.725% |
+| Day+2 (full population, n=20,858) | 61.0% / +1.065% | 38.0% / +0.699% |
+
+**Complete wash on swing — cutting early on a negative day+1/2 signal is slightly worse than just holding**, because the existing structural-stop/target mechanism already extracts more from names that dip early and later recover than a hard day+1/2 cut would. (Within the hindsight-only true-Unique subset specifically, cutting early *would* have helped — roughly halves the loss, −3.743%→−1.98/−2.09% — but that's not a usable live rule, since you can't tell live whether a given Delta fire is Early or Unique until up to 15 days later; applying the rule blindly to the whole live-knowable Delta population is what produced the wash above.) The idea is closed as tested — no live edge found.
+
+**Options genuinely improve at the whole-population level, not just in a blended-average sense** (`ema2_overall_early_price_proxy.csv`, full multi-year population, no lookahead classification involved at all):
+
+| | n | SWING win/exp | OPT win/exp |
+|---|---|---|---|
+| Common only (EMA34≥9, current production) | 16,238 | 60.8% / +1.010% | 57.0% / +0.513% |
+| Delta only (EMA34 2-8, new) | 4,620 | 61.8% / +1.259% | **63.0% / +0.891%** |
+| Overall EMA34=2 (Common+Delta) | 20,858 | 61.0% / +1.065% | **58.3% / +0.598%** |
+
+Options lift from 57.0%/+0.513% (current production) to 58.3%/+0.598% (EMA34=2) is real and majority-driven (Delta's own 63.0%/+0.891% genuinely beats Common, not a small-slice blend artifact) — consistent with RQ-56's original options finding, which is untouched by the window-sensitivity correction above (options resolves at day+1-open, before the Early/Unique label — computed over any window — is even relevant).
+
+**Net correction to the promotion case**: EMA34=2's promotion to Tier A Candidate stands cleanly on **options**, at both the Delta-only and whole-population level. On **swing**, the picture is genuinely mixed, not uniformly positive as originally reported: Common(60.8%/+1.010%) + Early(15d)(84.0%/+4.700%) are both good, but true-Unique(15d) — 40.8% of Delta, a large, non-trivial chunk — is a real loser (29.5%/−3.743%) on swing specifically, driven by an intrinsic (not choppy-market-artifact) fade-and-crash mechanism. No live-observable proxy (day+1/2 price action) rescues this; the existing exit mechanism already handles it about as well as a live rule could. **This does not reopen the EMA34=2 promotion decision** (options case is untouched and sufficient on its own, per the critic's own priority framing that options was always the stronger leg) — but the swing-side "Delta is better than Common" claim should be understood as options-driven, not a broad swing improvement, going forward. Scripts: `rq64_holding_trajectory.py` (never previously logged to this file), plus ad-hoc window-sensitivity/choppy-split/price-action-proxy computations run inline (not yet saved as standalone scripts — a documentation gap to close if this line is revisited).
+
+**Reconciliation, worth stating plainly**: Delta's own blended swing number (61.8% win / +1.259% exp) is invariant to the Early/Unique window choice — it's the same fixed 4,620 trades regardless of labeling. Decomposed at the honest N=15 split: 0.592×4.700 (Early) + 0.408×(−3.743) (Unique) = +1.255%, matching Delta's actual +1.259% almost exactly — confirming this is a real decomposition, not a statistical illusion from overlapping populations. The mechanism: **EMA34=2's genuine unlock is Early(15d)** — entering 1-15 days ahead of EMA34≥9's eventual confirmation on a move that was always going to work, capturing far more of it (+4.700% exp, 84% win, ~5x Common's average). The unavoidable cost of chasing that early entry is **true-Unique(15d)** — trades EMA34≥9 never confirms, 40.8% of Delta, a real fade-and-crash loser. Since there's no live way to separate the two before entry (established above), adopting EMA34=2 for swing means accepting both in the same blended package — a large real win more than offsetting a large real loss in aggregate expectancy, while carrying concentrated downside risk in the 40.8% tail.
+
+## RQ-66: searching for a breach-time (pre-day+1) predictor of the Unique/Immediate-Fade tail — daily-bar Stage 1 exhausted, a real measurement-artifact caught along the way (2026-09-19)
+
+Since Early/Unique isn't separable live, and day+1/2 price action was already ruled out as a live rule, the next question (critic-proposed as RQ-66, refined through discussion into RQ-66A "Immediate Fade" and RQ-66B "immediate weakness at breach"): can any feature knowable **at breach time** predict which Delta trades are about to fade, before you'd ever need day+1 information? Target label for this stage: **Immediate Fade** = `close_d1<0 AND close_d2<close_d1 AND close_d3<close_d2` (monotonically worsening through day+3, a sharper, more direct target than the 15-day maturity label — a True-Unique trade can still be a fine swing that just never trips EMA34≥9, and an Early trade can dip before recovering, so True-Unique is an imperfect proxy for "bad trade").
+
+**A real measurement-artifact caught before reporting (Research Integrity Rule #6 in action)**: `simulate_swing()`/`simulate_day1()` (used for every trade-outcome number all session) measure pnl relative to `trigger_price`, not the real production entry price (`detect_entry()` actually enters at the breach day's own `Close` — a backtest necessity given no full-history intraday data, not a claim that Close is the "true" price; the live system fires nearer the trigger intraday, so trigger remains the right convention for dollar-PnL reporting and nothing above needs revisiting). The issue is narrower and specific to **feature-predicts-outcome tests**: three candidate features (`vol_zscore`, `body_atr_daily`, `dist_to_trigger_pct`) showed a dramatic, clean-looking separation in swing/options outcome when bucketed — until re-tested against returns anchored to the breach day's own Close instead of trigger, at which point the effect **completely vanished** (e.g. `dist_to_trigger_pct`'s day+3-from-own-Close return was flat at +0.01–0.13% in every bucket, vs. an apparent −1.31%→+4.75% swing-exp spread under trigger-anchoring). Root cause: `dist_to_trigger_pct` is *defined* as `(Close/trigger−1)`, so trigger-anchored forward returns carry that exact gap as a built-in constant offset in every subsequent day — any feature correlated with how far Close ends up from trigger (volume surge and candle body both are) inherits a fake predictive-looking signal purely by construction, regardless of what the stock does afterward.
+
+**New standing rule (sibling to Rule #6)**: any test of "does a breach-time feature predict future price action" must measure the outcome from a reference point that has no definitional or correlational overlap with the feature itself — concretely, anchor forward returns to the breach day's own Close, not trigger, when testing feature predictiveness (trigger-anchored pnl remains correct and unaffected for reporting realized dollar outcomes of already-decided trades/populations, e.g. every Common/Delta/Fresh/Extended comparison earlier in this file, none of which are defined by the Close-vs-trigger gap).
+
+**Six daily-bar, large-sample (~4,616-4,620 trade) candidates tested, properly (Close-anchored), all daily-bar-only so applicable to the full 5-year history — none produce a usable classifier**:
+
+| Feature | Trigger-anchored result (looked strong) | Close-anchored (honest) result |
+|---|---|---|
+| `vol_zscore` (production Breakout Volume Z-score) | exp +0.38%→+3.18% swing across quartiles | **Void** — flat/noisy, no trend |
+| `body_atr_daily` (\|Close−Open\|/ATR14, breach day) | exp +0.15%→+3.50% swing | **Void** — flat/noisy, no trend |
+| `dist_to_trigger_pct` ((Close/trigger−1) on breach day) | exp −1.31%→+4.75% swing (huge) | **Void** — completely flat (+0.01% to +0.13%) |
+| `consolidation_days` (production formula, `live_checkpoint._consolidation_days`) | weak already | Weak/flat, no clean trend |
+| `freshness_score` (production formula, prior-day row per the established convention) | fade rate 6.5%→13.5%, swing/options both cleanly better in the freshest bucket | Flat (d3/d15 both ~flat across buckets) — matches, doesn't add to, the already-established options-specific Freshness edge; no new Immediate-Fade classifier value |
+| `pullback_depth_pct` ((20-day High−Low)/20-day High before breach) | fade rate noisy, no clean trend | Noisy and internally inconsistent — the deepest-pullback bucket has both the *highest* fade rate and the *best* d15 return, consistent with a general volatility confound rather than a real signal |
+
+**Conclusion: RQ-66 Stage 1 (daily-bar-only, breach-day and pre-breach features) is exhausted without finding a usable predictor.** This isn't a wasted effort — it rules out the cheap, large-sample options and confirms (per the critic's own escalation path, and matching the user's own instinct toward "within a few hours of breach, not day+1") that if a live-usable predictor of the Unique/Immediate-Fade tail exists, it likely requires intraday (first-hours-post-breach) information not present in the daily bar — RQ-66B, real intraday cache (~70-90 days, small sample), next. Script: `rq66_immediate_fade_check.py` (daily-bar Stage 1, `FEATURES` list); freshness/pullback-depth tested via an ad-hoc follow-up run, not yet saved as a standalone script.
+
+**RQ-66B (`rq66b_intraday_breach_check.py`): first-hours-post-breach intraday features, real cache (~71 real days, 500 tickers) — inconclusive, sample too small to confirm or rule out.** Three deliberately non-price-ratio features (to avoid the same trigger-artifact as Stage 1): `time_of_breach_minutes` (since 9:15), `pullback_from_high_pct` (post-breach intraday high vs. EOD Close — shape of the move, not its level), `intraday_vol_ratio` (cumulative volume to breach vs. expected-by-that-time-of-day). Sample: n=303 Delta breaches with intraday coverage, split into buckets as small as 31-76 trades:
+
+| Feature | Trigger-anchored fade-rate trend | Close-anchored sanity check |
+|---|---|---|
+| `time_of_breach_minutes` | 11.0%→6.3%→13.2% — no clean trend | Noisy, no clear pattern |
+| `pullback_from_high_pct` | 6.6%→11.8%→10.7%→13.2% — a suggestive, intuitive-direction trend (more intraday give-back → more fade) | Does not confirm — d15-from-own-Close bounces non-monotonically across buckets |
+| `intraday_vol_ratio` | 10.5%→8.0%→13.2% — no clean trend | Noisy, no clear pattern |
+
+`pullback_from_high_pct` is the only one that even looks directionally sensible, but doesn't survive the Close-anchored check cleanly — could be a real, weak effect this sample (n≈75/bucket) is too small to resolve, or could be noise. Reporting as inconclusive rather than either confirming or rejecting it.
+
+**RQ-66 overall conclusion (2026-09-19): nothing tried across day+1/2 live-proxy testing, 6 daily-bar breach-time features, and 3 intraday first-hours features produces a confirmed, live-usable predictor of the Unique(15d)/Immediate-Fade tail.** This is a real, if unsatisfying, result — logged as-is rather than continuing to fish for a signal without a new hypothesis. The practical implication for v31.1: per the critic's own framing, ship EMA34=2 for options now (clean, unaffected by any of this), and ship it for swing with an explicit note that ~41% of Delta is a high-risk tail current research cannot distinguish live — collect telemetry (not a new filter) on Early-vs-Unique outcomes as real trades accumulate, rather than continuing to search for a pre-entry classifier without a fresh idea.
+
+## "Cut it faster" — four live-actionable early-exit variants tested on the full EMA34=2 population, all fail identically (2026-09-19)
+
+Direct user pushback on the RQ-66 conclusion: "we are not even able to cut it... I am not fine with holding it for 1/2/3 days when the drawdown is already 3% down." Tested the actual, sharper version of this — not a single-bad-day check, but genuinely confirmed, worsening trends — on the only real-time-knowable population (full EMA34=2, Common+Delta, n≈20,853):
+
+| Rule | Trigger rate | Baseline exp | Modified exp |
+|---|---|---|---|
+| Cut at day+2 if confirmed 2-day worsening (d1<0 AND d2<d1) | 24.6% | +1.066% | +0.892% (worse) |
+| Cut at day+3 if confirmed 3-day worsening (matches "Immediate Fade" label) | 11.7% | +1.066% | +0.994% (worse) |
+| Cut at day+1's gap-open if no gap-up (known at 9:16am next session — the earliest, cleanest signal found all weekend) | 32.4% no-gap | +1.066% | +0.974% (worse) |
+| Two red candles immediately after breach (day+1 AND day+2 both red) | 30.8% | +1.066% | +0.827% (worse) |
+
+Every variant, however early or however strictly confirmed, comes out worse than holding. The mechanism, checked directly on the day+2/day+3-confirmed-worsening group: the REAL exit (structural stop, anchored to actual chart structure) averages *less negative* than a hard cut at that day's close (e.g. day+3 group: real exit −4.701% vs cut-there −5.318%) — a same-day price during an active decline tends to sit near a local low, while the structural stop is set off support levels that sometimes let a name breathe past a bad stretch before either recovering or getting stopped at a genuinely better level. Four independent trigger definitions, same shape every time — this closes the "cut it faster" line as thoroughly as RQ-66 closed the "predict it in advance" line. The real, unresolved cost is behavioral (sitting through a visible drawdown), not a math problem the existing exit mechanism is failing to solve.
+
+## Full weekend fakeout-detection catalog re-verified on EMA34=2/Delta — every one of 8 previously-tested mechanisms reproduces its original verdict exactly (2026-09-19)
+
+Direct user request, after the above: audit and re-run *every* fakeout/early-warning mechanism this project has ever built against the new EMA34=2/Delta population, not just today's new ideas — "we have two days, go ahead with everything." Re-ran each original script (not re-derived) with `signals.EMA34_RISING_DAYS_MIN=2`:
+
+| Mechanism (original source) | Original verdict | EMA34=2/Delta result |
+|---|---|---|
+| Gap-sustain/fade (`gap_sustain_check.py`, RQ-53) | Real, informative, not adopted | Reproduces almost identically: 67.6% gap-up (vs 68.6% original), 87.7% fade-within-10min (vs 87.5%) |
+| Acceptance/streak-confirmation as entry-timing delay (RQ-37) | Rejected — delay erases the edge | Reproduces — delayed entry (streak≥2/3/5) worse than immediate on every threshold, both full-population and Delta-only (e.g. Delta immediate opt exp +0.759% vs delayed +0.513-0.589%) |
+| RVOL@Trigger (`rvol_trigger_audit.py`, corrected production-baseline version) | Rejected — no clean, monotonic signal | Reproduces — same non-monotonic bounce on both populations (Delta n=157 too small/noisy: Q3 spikes then Q4 crashes) |
+| Velocity (closing speed into trigger) | Weak lead, not validated | Reproduces — fastest-approach quartile still worst on swing in both populations (Full Q4 exp −1.054% vs +0.25/+1.06% elsewhere; Delta Q4 −0.251% vs +0.91/+2.24%) |
+| Volume+displacement gated exit (`breakout_failure_volume_displacement.py`, RQ-53's "fourth attempt", SMC/ICT-motivated) | Rejected — gate makes things worse, weak discriminating power | Reproduces — vol_ratio corr +0.093/−0.034 with confirmed-label, gated exit exp −0.681% vs baseline −0.339% (worse) |
+| Price+time confirmation, immediate/2-bar-confirm exit (`breakout_failure_confirmation_cost.py`, RQ-53 original) | Rejected — do-nothing beats every early-exit variant | Reproduces exactly — portfolio-level: do-nothing −0.396% beats exit-immediately −0.753% and 2-bar-confirm −0.472%; options side exit-immediately gives **0.0% win rate** vs do-nothing's 37.7% |
+
+**Zero of eight independently-built, previously-tested-and-rejected fakeout-detection mechanisms flip verdict under EMA34=2.** This is the most thorough negative-result confirmation of the whole weekend — not a quick sanity check, a full re-run of this project's entire historical fakeout-research effort (including a dedicated full day's investigation, RQ-53, that itself did web research on mainstream TA/SMC-ICT theory before building anything) against the new population. Combined with RQ-66's from-scratch search and the four "cut it faster" variants above, this closes the entire "detect and avoid/exit the bad tail" research direction for now — the ~41% true-Unique tail is a real, accepted cost of the strategy (matching the well-documented 40-45% industry-standard false-breakout rate on daily charts), not a solvable filtering problem with current data. Scripts reused as-is: `gap_sustain_check.py`, `rvol_trigger_audit.py` (production-baseline logic reimplemented inline via `live_checkpoint._normal_day_volume_baseline`/`_clock_time_volume_fraction`), `breakout_failure_volume_displacement.py`, `breakout_failure_confirmation_cost.py`; acceptance-delay and velocity re-implemented inline (original `research_archive/` versions depend on a static, pre-EMA34=2 candidate pool file and couldn't be reused directly).
+
+## Research Population Convention v31.1 (2026-09-20, critic-proposed, adopted): Freshness≤0.40 is the standing EMA34=2 research population
+
+**Unless explicitly stated otherwise, EMA34=2 research uses Freshness≤0.40 going forward** — this project's existing, already-established Fresh/Extended cutoff, not a new number. Every EMA34=2 test through this whole weekend (RQ-56/64/65/66/67, the cut-it-faster tests, the full fakeout re-verification) ran on the raw, unconditioned population instead — not a bug (Freshness is ranking/telemetry, never a gate, so testing the unfiltered population was a fair first question), but not sustainable to keep re-deciding per test. This is explicitly a **backtest population convention, not a live gate** — a candidate with freshness_score>0.40 still fires and can still be taken live; Freshness stays priority/ranking information on the dashboard exactly as before. The real trade-off curve behind this choice, computed on Delta (n=4,618):
+
+| Cutoff | Keeps | Swing win/exp | Options win/exp |
+|---|---|---|---|
+| None | 100% | 61.8% / +1.259% | 63.0% / +0.893% |
+| **≤0.40 (adopted convention)** | 72.7% | 62.8% / +1.386% | 67.1% / +1.021% |
+| ≤0.18 (~freshest 40% by rank) | 40% | 64.3% / +1.587% | 73.5% / +1.321% |
+| ≤0.10 (~freshest 25% by rank) | 25% | 66.8% / +2.085% | 77.6% / +1.540% |
+
+**A percentile-rank cutoff ("freshest N%") is the wrong shape for a live rule and was never proposed as one** — it only means something relative to a population, and a live day's candidate count (0 to ~15) is too small and too variable in its own distribution shape to rank against meaningfully. The percentile framing is a backtest-exploration tool only; any adopted cutoff must be a fixed, absolute `freshness_score` value, checkable on one candidate in isolation the instant it fires — same requirement as every other production threshold in this project (RSI_MIN, MIN_TRADED_VALUE), including the same caveat that a fixed value needs periodic (not per-test) re-validation against drift.
+
+**Fresh-only re-verification of the weekend's key findings, done before adopting this convention (not just asserted)**: the Early(15d)/Unique(15d) split survives (Unique% moves 40.8%→42.8%, Fresh-only-Unique still a loser at 31.8%win/−3.340%exp); the fixed-R win/loss-ratio finding survives nearly identically (baseline ratio 0.96 vs Fixed-3R 1.46, vs 1.01/1.49 raw); all 6 previously-tested fakeout-detection mechanisms reproduce their raw-population verdicts exactly on Fresh-only too (gap-sustain, acceptance-streak, RVOL@Trigger, velocity, volume+displacement, price+time confirmation — none flip).
+
+**Full retroactive Fresh-only re-check completed 2026-09-20 morning, covering the two remaining pieces not yet re-verified**: RQ-67A's context features and all four "cut it faster" variants, both on the correct Freshness≤0.40 population (Delta n=3,358, vs 4,617 raw). Both confirm exactly. Context features (`rs_rating`, `sector_rs_pct`, `breadth_pct`, `nifty_ret5`) show the same small/negligible Early-vs-Unique gaps as the raw population, and `rs_rating` still reverses direction specifically within Unique(15d)-Fresh-only (highest-RS quartile worst on swing: 29.1%win/−3.993%exp vs lowest quartile's 35.6%win/−2.821%exp) — same shape as raw. Cut-it-faster, Fresh-only Delta baseline exp=+1.385%:
+
+| Rule | Modified exp |
+|---|---|
+| Confirmed 2-day worsening | +1.352% (worse) |
+| Confirmed 3-day worsening | +1.357% (worse) |
+| Cut at day+1 open if no gap | +1.309% (worse) |
+| Two red candles immediate | +1.330% (worse) |
+
+Every variant still loses to holding. **The entire weekend's negative-result catalog (RQ-66/66B/67A, all 4 cut-it-faster variants, all 8 fakeout-detection mechanisms) is now confirmed on the correct standing research population, not just the raw one — no exceptions found anywhere.**
+
+## A new mechanism tested and rejected: "confirm acceptance, then enter only on a same-day pullback to the trigger" (2026-09-20)
+
+Direct user synthesis of two apparently-conflicting findings (waiting for streak confirmation costs money because price runs up — but 78.8% of accepted trades pull back later the same day per the earlier pullback-anatomy finding): what if you confirm acceptance first, then only actually fill via a resting order if/when price comes back to the original trigger level? This is mechanically distinct from both previously-rejected ideas (not "buy at the confirmed price," not "require any pullback before any entry") and had not been tested. Since same-day intraday timing is invisible to a daily-bar simulation (a fill at 9:20 or 2pm on day 0 produces an identical forward trajectory), the test reduces cleanly to: decompose EMA34=2 breaches into `rejected` (never confirms streak≥3), `accepted_runaway` (confirms, never pulls back to trigger again that day), and `accepted_pullback` (confirms, then does pull back — the group this strategy would actually catch):
+
+| Category (Delta, Fresh≤0.40, n=240) | % | Swing win/exp | Options win/exp |
+|---|---|---|---|
+| Baseline (everyone, immediate entry) | 100% | 61.3% / +1.008% | 64.9% / +0.984% |
+| rejected | 19.2% | 56.5% / −0.673% | 15.2% / −0.838% |
+| **accepted_runaway** | 30.8% | **70.3% / +3.129%** | **97.9% / +2.998%** |
+| **accepted_pullback (the catchable group)** | 50.0% | 57.5% / +0.345% | 65.6% / +0.578% |
+
+Holds on raw and Fresh-only, Full and Delta-only alike (checked all four cuts). **Rejected**: the group this strategy would actually catch (accepted-then-pulls-back) is *worse* than blanket immediate entry on both metrics — and the group it structurally can never catch (accepted-and-runs-away, since a resting order at trigger never fills for a stock that never returns there) is by far the best group in the whole decomposition. Mechanism: a stock retesting *after* already showing acceptance is itself a mild weakness tell — genuine strength doesn't look back. Same underlying fact as the original pullback-anatomy finding (2026-09-13) and the already-rejected retest-confirmation entry rule, now precisely quantified for a distinct, genuinely new proposed rule. **General principle stated explicitly by the user and worth keeping as a standing frame**: `rejected`/`accepted_runaway`/`accepted_pullback` — like Early/Unique before it — is a real, meaningful decomposition that is knowable only in hindsight; no live policy can selectively capture only the good third of a hindsight-only decomposition, it can only choose *which policy* to run and inherit whatever blend of outcomes that policy produces. This is now the same structural conclusion reached independently through five or six unrelated angles this weekend (EMA34 Early/Unique, RQ-66/67's feature hunt, the four cut-it-faster variants, the fakeout re-verification, and now this) — a strong, convergent result, not a series of separate near-misses.
+
+## Retroactive methodology caveat (2026-09-20): `portfolio.py`/`simulate_lots()` assumes perfect chronological capture with no realistic visibility constraint — every capital-constrained CAGR conclusion built on it (including the 2026-09-06 fixed-3-days-after-arming rejection) should be treated as provisional, not decisive
+
+See the full note inserted in place next to that original finding, above (2026-09-06 section, "Standing methodology caveat"). Surfaced by direct user question while considering whether to reuse `portfolio.py` to validate "Opportunity Cost Exit" for swing. `simulate_lots()` sorts every candidate by `entry_date` and admits purely on cash-affordability — it has no ranking mechanism and assumes the trader is simultaneously aware of and can act on every affordable candidate the instant it appears, with zero real-world execution/visibility risk. This exact gap was independently found and named while building RQ-57 (2026-09-18, months later) but never generalized into a standing rule at the time. **A sharper, related point from the user, more fundamental than the ranking-mechanism gap**: even a fully realistic candidate-ranking simulation still assumes the trader successfully allocates to the ranked-good trade every time — real execution (screen time, attention, luck) can never be guaranteed to match a simulation's assumptions, no matter how realistic the candidate model is. This is the actual theoretical justification for asymmetric risk:reward as a design philosophy separate from whatever any CAGR backtest says: since you cannot guarantee catching the best available trade at the right time, size wins to be large enough relative to losses that the system survives realistic execution variance, rather than depending on always getting the "right" trade. **Do not reuse `portfolio.py` for any future capital-constrained question** — if one is needed, it requires RQ-57's real approach (intraday cache + live 9:20 ranking), not a portfolio allocator.
+
+## Critic review of Update 67, adopted in full (2026-09-20): objective split (Expectancy vs. Robustness), RQ-66 elevated to Tier A Rejected Research, stop-tightening deferred pending an Exit Efficiency Audit first
+
+**Research objective split, named explicitly and adopted as the v31.1 objective**: *Expectancy* (average return over many trades) vs. *Robustness* (behavior under an unlucky realized stretch — the actual concern raised this weekend: "what if I only ever run into the bad third"). Everything found this weekend points toward optimizing Robustness now, not further Expectancy hunting.
+
+**RQ-66 elevated to Tier A Rejected Research, precise wording**: "within currently available breach-time information, Early-vs-Weak separation appears unlearnable" — deliberately scoped to current features/data/timeframe/methodology, not a permanent impossibility claim. **Correction to the critic's own search-space table** (the critic proposed sector participation/market breadth/cross-sectional relative strength as still-untested "unexplored families" — this is wrong, all three were tested in RQ-67A, 2026-09-19, and rejected: `sector_rs_pct`, `breadth_pct`, `rs_rating`, and `nifty_ret5` — none distinguish Early from Unique, and `rs_rating` reverses direction specifically within Unique). Corrected table:
+
+| Search space | Status |
+|---|---|
+| Single-stock price/volume features (RQ-66 Stage 1/1B/2) | Exhausted |
+| Cross-sectional/market context (RQ-67A: sector RS, breadth, stock RS, Nifty tailwind) | Exhausted |
+| Options-market context (OI/IV as a genuine classifier, not Audit-only telemetry) | Barely tested — the one real remaining gap |
+
+**Fixed-R exits reframed from "recommendation" to "robustness candidate"** — the win/loss-ratio improvement (baseline ~1.0 → Fixed-3R ~1.46-1.49, survives Fresh-only) is real, but CAGR, drawdown, and capital-utilization were never checked, and a direct follow-up test found the "3R" framing is largely illusory in practice: **83% of Fixed-3R exits are the 15-day `max_hold_cap`, not the R-target** (only 2.1% of trades ever actually reach 3R) — the mechanism is closer to "remove the resistance-target ladder, hold to the cap or the stop" than a genuine R-multiple-targeting system. Tightening the initial stop (0.5×ATR vs the production 1.0×ATR) to test whether a closer target gets hit more often **does not help** — target-hit rate is statistically unchanged (2.1%→2.2%) while stop-hit rate rises slightly (14.3%→14.8%), net win/exp/ratio numbers unchanged (56.3%win/+2.232%exp/1.49 vs 56.3%win/+2.237%exp/1.50). **Do not tighten the stop based on this reasoning — it doesn't work, for the same "stop sits inside the pullback distribution" reason already established this weekend.**
+
+**Standing plan, RQ-68 before RQ-69**:
+- **RQ-68 — Exit Efficiency Audit** (first question, no stop changes yet): does the current exit (structural stop + SMA21 trail + resistance ladder + 15-day cap) capture enough of each trade's own MFE? Metrics: % MFE captured, exit efficiency (exit price / max achievable price), MFE-before-SMA21-activates (is the trail engaging too late), MAE-before-+3% (do winners survive the initial stop naturally, without needing a wider one).
+- **RQ-69 — Stop Geometry Audit, comparative, NOT Delta-only**: sweep `STRUCTURAL_STOP_ATR_BUFFER` (1.0/0.75/0.5/0.0×ATR) across **Common, Delta, and the overall EMA34=2 population separately** — the structural stop is shared production machinery for both populations, so optimizing it on Delta alone risks silently breaking the ~78%-of-system Common population with no way to detect it. Metrics: average R captured, stop-hit rate, and **Recovery-After-Stop rate** (of trades stopped out, what % would have gone on to be profitable under the current wider stop, and their average MFE after the stop point) — explicitly weighted above raw win rate, since every "tighter stop" idea tested this weekend failed via this exact mechanism (cutting recoverable pullbacks, not filtering genuine noise) and it has never been directly measured before now.
+
+## RQ-68 — Exit Efficiency Audit, real answer, comparative across Common/Delta/Overall, on the correct Freshness≤0.40 population (2026-09-20)
+
+Real production `detect_entry()`/`check_exit()` engine (both BC and VCP patterns), full 500-ticker universe. **First pass accidentally ran on the raw, unconditioned population — caught immediately by direct user question ("is this freshness 0.4 or not?") right after adopting the v31.1 Freshness≤0.40 convention one section above — corrected and rerun properly.** Both passes agree closely (reported below is the corrected, Fresh≤0.40 version, n=1,080 of 1,690 total trades):
+
+| | Exit efficiency (winners, realized/MFE) | Mean MFE (winners) | Mean realized (winners) | % ever engage trail (+3%) | % of eventual MFE already present at engagement | MAE before engage | Never-engage: n, mean pnl, win% |
+|---|---|---|---|---|---|---|---|
+| Overall | 72.5% (median 79.9%) | +7.49% | +5.63% | 52.7% | 70.7% | −2.10% / median −1.37% | 511 (47.3%), −3.15%, 37.0% |
+| Common | 72.8% (median 79.8%) | +7.37% | +5.58% | 53.1% | 68.7% | −2.14% / −1.38% | 315 (46.9%), −2.65%, 40.3% |
+| Delta | 71.9% (median 80.2%) | +7.70% | +5.72% | 52.1% | 74.0% | −2.03% / −1.28% | 196 (47.9%), −3.96%, 31.6% |
+
+**Two real findings**: (1) winners give back ~27-28% of their peak favorable move on average before exiting — real, quantified room, consistent across Common and Delta, not dramatic but not nothing. (2) The SMA21 trail only protects the *last* ~26-32% of a winning trade's total move — by the time it engages (+3% up), 69-74% of the eventual total MFE has already occurred, so its real job is locking in the tail end of a move, not capturing the bulk of it. Separately, **MAE before engagement is modest** (median ~1.3-1.4%) — winners generally establish themselves without needing much room, a real data point for RQ-69's stop-width question. **A large group (46.9-47.9% of all trades) never reaches +3% at all** before being stopped or capped out, and is clearly weaker on average (win rate 31.6-40.3%) — Delta's never-engage group is notably weaker than Common's (31.6% vs 40.3% win), a real, Fresh-only-specific divergence worth carrying into RQ-69.
+
+**New angle surfaced for RQ-69, beyond stop width alone**: since the trail engages only after most of a winning move has already happened, `TRAIL_ENGAGE_PCT` (currently 1.03, i.e. +3%) itself may be worth testing alongside stop width, not just the initial stop buffer — engaging earlier could improve exit efficiency, at the risk of whipsawing on volatility before a real move develops (the same failure mode as every "tighter/earlier" idea rejected this weekend, so must be tested with the same Recovery-After-Stop discipline, not assumed to help). Script: `rq68_exit_efficiency_worker.py` (not yet moved from `/tmp`, needs saving into the project if this line continues).
+
+## RQ-69 — Stop Geometry Audit, comparative across Common/Delta/Overall, on Freshness≤0.40 (2026-09-20)
+
+Real production `detect_entry()`/`check_exit()` engine, one entry-detection pass per ticker with 4 parallel exit simulations per trade (entries are identical across variants since only the stop's ATR buffer changes — `atr_entry` scaled by the buffer, not the global `STRUCTURAL_STOP_ATR_BUFFER` constant, so BC and VCP coexist safely and VCP's own stop — which never uses this buffer — serves as an internal no-effect control). Swept `structural_low − buffer×ATR` at buffer=1.0 (current production)/0.75/0.5/0.0 (stop placed exactly at the structural low, no ATR cushion at all), n=1,080 Fresh≤0.40 trades:
+
+| | Buffer 1.0 (current) | 0.75 | 0.5 | 0.0 |
+|---|---|---|---|---|
+| Overall win/exp/avgR | 64.2%/+1.565%/0.13 | 64.2%/+1.559%/0.13 | 64.2%/+1.571%/0.13 | 64.1%/+1.559%/0.14 |
+| Overall stop-hit rate | 10.9% | 11.3% | 11.7% | 12.4% |
+| **Recovery-After-Stop** | — | **0.0%** | **0.0%** | **0.7%** |
+| Common win/exp/avgR | 66.2%/+1.912%/0.15 | 66.2%/+1.903%/0.15 | 66.2%/+1.906%/0.16 | 66.0%/+1.888%/0.16 |
+| Delta win/exp/avgR | 60.9%/+0.995%/0.09 | 60.9%/+0.995%/0.09 | 60.9%/+1.021%/0.10 | 60.9%/+1.018%/0.10 |
+
+**Win rate, expectancy, and average R captured are essentially flat across the entire buffer range, on both Common and Delta separately** — even removing the ATR cushion entirely barely moves anything, while stop-hit rate rises only modestly (10.9%→12.4% at the extreme). **Recovery-After-Stop is ≈0% throughout** — unlike every other "tighten the stop" idea rejected this weekend (streak-based, acceptance-based), the extra stop-outs a tighter ATR buffer causes are not real future winners being cut short; they're trades that were headed to a loss either way, just realized slightly earlier/differently. That's the actual mechanism behind the flat result: win rate can only move if a trade flips from win to loss, and this lever essentially never does that (unlike the earlier levers, which did).
+
+**Real, concrete illustration using actual open positions** (not backtest-detected entries — `detect_entry()`'s own algorithmic pick for these tickers differs from the real manual entries, so these are standalone examples, not double-counted in the aggregate above): GRANULES (entry 872.70, structural_low 816.00, ATR 25.55) and ANANDRATHI (entry 2228, structural_low 2090.00, ATR 41.35) both had real subsequent lows (829.00, 2150.00) comfortably above even the tightest (0.0×ATR) stop — stop width made zero difference to either. **VIJAYA (entry 1525, structural_low 1421.10, ATR 48.55) is a genuine, real exception**: real lowest Low after entry was 1380.00 — above the current 1.0×ATR stop (1372.55, never breached) but below every tighter variant (0.75×=1384.68, 0.5×=1396.82, 0.0×=1421.10, all of which would have stopped it out here) — and the real forward price 15 days later was 1558.90, a real winner. Consistent with, not contradicting, the ≈0% aggregate (buffer=0.0 showed 0.7%, i.e. roughly 1-in-130-odd) — rare individual exceptions exist even when the aggregate rate is near-zero; some stop-outs are also just systematic bad-market-day risk no technical lever can prevent, and nothing here is meant to address that. **Real practical implication, since trade quality doesn't change**: a tighter stop means smaller risk-per-share (e.g. VIJAYA's ₹152.45/share at 1.0× vs ₹103.90/share at 0.0×) for a fixed dollar-risk budget, allowing a larger position for the same risk without hurting trade quality — a position-sizing lever, not an entry/exit-quality one. Not yet tested directly (would need to fix a rupee-risk-per-trade budget and compare realized portfolio-level returns, not just per-share R). Scripts: `rq69_stop_geometry_worker.py` (not yet moved from `/tmp`).
+
+**Direct follow-up, prompted by a sharp user question ("shouldn't average loss size at least shrink with a tighter stop, even if win rate doesn't move?") — verified rather than asserted, and the real mechanism is two offsetting effects, not "nothing happens":**
+
+| Sub-group (tight=0.0×, baseline=1.0×) | n | Tight-stop pnl | Baseline outcome |
+|---|---|---|---|
+| Stopped under BOTH buffers | 118 | −8.457% | −8.692% (also `stop`, just later/lower) |
+| Stopped under tight ONLY (baseline exits `max_hold_cap`/`resistance` instead) | 16 | −10.820% | −8.692% |
+
+The user's intuition holds for the majority (n=118): cutting a trade that's headed for a stop either way, slightly earlier, does shrink the loss a bit (~0.24pp/trade) — smaller than the raw stop-distance gap would suggest, because many of these have already engaged the SMA21 trail before getting stopped, and once engaged both buffers converge toward the same trail level (only the pre-engagement gap actually differs). But a smaller, opposite-direction group (n=16) shows the reverse: these trades dip down to touch the tight stop, get cut there, but under the wider stop are never stopped at all and *partially recover* by day 15 (`max_hold_cap`) to a less-negative price than where the tight stop caught them — cutting exactly at the momentary low is worse than waiting out a partial bounce. **The two effects nearly cancel**: 118×(+0.235pp) − 16×(−2.128pp) ≈ −6.3pp spread across 134 trades ≈ −0.05pp, diluted further across the full 1,080-trade Fresh≤0.40 population ≈ −0.006pp — matching the actually-observed aggregate move (+1.565%→+1.559%) almost exactly. Real, verified mechanism, not a hand-wave: expectancy doesn't move because two genuine, opposite-direction effects are occurring on different sub-populations and roughly offsetting, not because tightening the stop does nothing to anyone.
+
+## Fixed-R CAGR/drawdown check — real, decisive, and reverses the "robustness candidate" framing (2026-09-20)
+
+Direct user objection to any portfolio-simulation approach requiring a candidate-selection/ranking rule ("we might end up choosing lucky trades in the backtest, but in the real world we might not, and there's no way to know") — correct concern, and it killed the RQ-57-style realistic-ranking design before it was built (also too small a sample for CAGR: ~70-90 real intraday days). **Resolved by reusing this project's own existing precedent exactly**: the 2026-09-07 deterministic Risk-of-Ruin methodology — max 5 concurrent positions, admit strictly in chronological entry-date order, skip if the cap is full, no ranking or scoring of any kind. Converted both `pnl_pct` populations into R-multiples first (structural_low/ATR at entry, recomputed per trade, same formula throughout), full 5-year EMA34=2 population:
+
+| | Admitted (of total) | Final cumulative R | Max drawdown | Worst losing streak |
+|---|---|---|---|---|
+| Baseline (current production) | 263 of 1,697 (15.5%) | **+26.15R** | **−4.57R** | 6 trades, −2.40R |
+| Fixed 3R | 192 of 1,570 (12.2%) | +24.49R | −5.02R | **9 trades, −3.45R** |
+
+**Fixed-3R loses on every metric — lower cumulative return, deeper max drawdown, longer and costlier losing streak.** Mechanism: Fixed-3R holds positions longer on average (median 17d→21d, established earlier tonight), so each occupied slot ties up capacity longer under a fixed 5-concurrent-position cap, admitting 27% fewer total trades (192 vs 263) over the same historical window. The per-trade win/loss-ratio improvement (established earlier, ~1:1→~1.5:1, survives Fresh-only) is real in isolation, but doesn't survive contact with realistic trade throughput — fewer opportunities taken outweighs each one being individually better-shaped, and the worse case (a longer, deeper losing stretch) is the opposite of what "robustness" was supposed to buy. **This is the identical failure mode that killed the original fixed-3-days-after-arming exit on 2026-09-06** (good per-trade stats, reversed by a real capacity-aware test) — Fixed-R falls into the same trap. **Conclusion: Fixed-R, as built (targeting 3R against the current wide stop), is rejected as a system-level candidate.** This doesn't invalidate the underlying win/loss-shape insight (bigger wins, smaller losses is still a sound thing to want) — it means this specific mechanism isn't the way to get there; a genuinely better version would need to achieve the asymmetric shape without paying for it in holding time (e.g., a tighter stop paired with a nearer, more frequently-reachable target, rather than a far 3R target that mostly just runs out the 15-day clock — see RQ-68's own finding that 83% of Fixed-3R's exits are `max_hold_cap`, not the R-target itself). Not pursued further tonight — a genuinely new construction would be needed, not a re-tuning of this one.
+
+**[2026-09-20 CORRECTION — the "rejected" verdict above was itself run on the raw, unconditioned population, not Freshness≤0.40, directly contradicting the standing convention adopted earlier the same session. Caught by direct user question ("is this freshness 0.4 or not?").] Re-run on the correct Fresh≤0.40 population, the verdict reverses:**
+
+| | Admitted | Final cumulative R | Max drawdown | Worst losing streak |
+|---|---|---|---|---|
+| Baseline (Fresh≤0.40) | 253 of 1,081 | +15.21R | −11.21R | 10 trades, −6.02R |
+| Fixed 3R (Fresh≤0.40) | 184 of 1,050 | **+19.72R** | **−6.95R** | 12 trades, −6.54R |
+
+Fixed-3R now shows higher cumulative return (~30% more) and a shallower max drawdown (~38% shallower) on the correct population — a reversal significant enough that it was checked for robustness before trusting it (per Rule #6), by sweeping the concurrent-slot count itself (3/5/10/20/50), not just testing at one arbitrary "5":
+
+| Slots | Baseline cumR (n) | Fixed-3R cumR (n) | Baseline maxDD | Fixed-3R maxDD | Baseline streak | Fixed-3R streak |
+|---|---|---|---|---|---|---|
+| 3 | +8.18R (151) | +12.46R (114) | −6.27R | −4.34R | 6/−3.83R | 9/−2.38R |
+| 5 | +15.21R (253) | +19.72R (184) | −11.21R | −6.95R | 10/−6.02R | 12/−6.54R |
+| 10 | +41.05R (459) | +43.13R (345) | −14.40R | −11.50R | 11/−6.80R | 10/−3.70R |
+| 20 | +70.85R (811) | +82.24R (628) | −23.66R | −21.53R | 7/−4.21R | 13/−5.08R |
+| 50 (~unconstrained) | +103.47R (1078) | +121.61R (1006) | −23.62R | −32.93R | 8/−3.07R | 20/−9.65R |
+
+**Per-trade return robustly favors Fixed-3R at every slot count from 3 to 50** — a real, non-fragile signal, not a "5"-specific artifact. **Drawdown/losing-streak are genuinely mixed and flip with capacity**: Fixed-3R is shallower/better at realistic low-to-moderate capacity (3/5/10, plausibly closer to what an individual actually manages), but *worse* at very high, unrealistic capacity (50, ~the whole pool running concurrently) — a 20-trade/−9.65R streak there, the worst number in the whole table. **A separate, real methodological finding surfaced investigating why Freshness initially looked worse than Raw at slots=5**: the full, unconstrained per-trade averages of Raw and Fresh≤0.40 are nearly identical (mean R/trade 0.0972 vs 0.0957, win 64.2% vs 64.3% — Freshness is not worse), but the *admitted* subset after the 5-slot cap diverged sharply (0.0994 vs 0.0601 avg R/admitted trade) — proving the capacity-constrained admission process is itself sensitive to exactly which trades happen to be chronologically available once the candidate pool changes, independent of true underlying quality. This is a real, generalizable caveat: even a zero-ranking, pure-FCFS capacity simulation (built specifically to avoid the "did we get lucky picking trades" concern) is not immune to a *different* flavor of the same problem — which specific trades are available to fill a slot is itself sensitive to small changes in the candidate pool.
+
+**Time-sliced view (6-month/monthly periods, 5-slot, Fresh≤0.40), directly requested to see the real path, not just the endpoint — the most decision-relevant finding of this whole line**: both mechanisms hit a shared, genuinely bad stretch at the same real calendar time (Sept-Oct 2024: baseline −1.46R then −3.80R; Fixed-3R −2.91R then −2.99R) — a systematic market-wide event neither exit mechanism could have avoided, consistent with earlier findings that some drawdowns are just bad-market-day risk. But **Fixed-3R has a real, rockier start baseline never has**: from Aug 2022 to March 2023, Fixed-3R's running total goes *negative* (down to −0.52R by Dec 2022, −0.42R again by March 2023) — baseline's worst point in the same stretch is +0.05R, never below zero. Fixed-3R's path is also generally lumpier (e.g. +5.20R in November 2023 alone, 100% win that month, vs quieter/steadier months for baseline). Both end up positive by 2026, Fixed-3R higher (+19.72R vs +15.21R), but via a path that would have felt materially worse, especially early on.
+
+**User's explicit framing, logged verbatim as the operative principle for this whole line, pending critic input — not adopted, not rejected, held as an open observation**: "while 5-year analysis is looking good, it's also equally good to see how it is playing with my emotions over a period of time, and the more stable it is the better it will be." I.e., path stability/consistency over time is a real, separate criterion from the final aggregate number or even the single max-drawdown statistic — a mechanism that reaches a similar or better endpoint via a choppier, more emotionally taxing path is not automatically preferable just because the endpoint number is bigger. **No decision made — sent to the critic for input, per explicit instruction to keep this as an observation, not act on it yet.**
+
+**Fixed-3R combined with each RQ-69 stop-buffer variant, same 5-slot/Fresh≤0.40 capacity test — isolates a pure R-normalization effect, not a genuine quality change.** Since entries and exit dates barely change across stop-buffer widths, the admitted trade set is *identical* at every buffer (184 trades, 58.2% win, every time) — only the R-multiple scale differs, since R = pnl% ÷ risk%, and risk% shrinks as the buffer tightens:
+
+| Stop buffer | Admitted | Win% | Cumulative R | Max DD | Worst streak | Return/DD ratio |
+|---|---|---|---|---|---|---|
+| 1.0×ATR (current) | 184 | 58.2% | +19.72R | −6.95R | 12/−6.54R | 2.84 |
+| 0.75×ATR | 184 | 58.2% | +20.81R | −7.11R | 12/−6.71R | 2.93 |
+| 0.5×ATR | 184 | 58.2% | +22.04R | −7.29R | 12/−6.91R | 3.02 |
+| 0.0×ATR (tightest) | 184 | 58.2% | +24.96R | −7.71R | 12/−7.36R | **3.24** |
+
+Real, same-trade-sequence proof that this is pure re-scaling, not new information: if a trader sizes to a fixed rupee-risk-per-trade, a tighter stop means more shares for the same risk, so both return and drawdown grow proportionally in rupee terms — but the *ratio* between them genuinely improves a little (2.84→3.24) as the stop tightens. This is exactly the position-sizing lever already flagged in RQ-69, now confirmed inside the same capacity-constrained frame used to judge Fixed-R's viability — not a new, independent finding, the same one from a different angle.
+
+**Directly tested and REFUTED: does a tighter stop (nearer 3R target) get hit more often — checked at the most extreme case (0.0×ATR, target as close as it can possibly be)**: target-hit rate barely moves (1.7%→1.9% from 1.0×ATR to 0.0×ATR), `max_hold_cap` stays completely dominant (83.5%→81.7%) at every width tested. The binding constraint on reaching 3R isn't distance, it's time.
+
+**Confirmed directly — uncapped (no `max_hold_cap` at all) holding-time distribution, Fixed-3R, Fresh≤0.40**: median 28 trading days, p75=45, p90=65, max=283. Removing the cap entirely makes `target_R` jump from 1.7% (capped) to **11.2%** (uncapped) — most eventual target hits are real, they just take far longer than 15 days to arrive; `stop` still dominates either way (85.8% uncapped). **82.6% of all Fresh≤0.40 trades take longer than 15 days to naturally resolve** — and what actually happens to that group if allowed to run: win rate 58.6%, mean +5.73%, median +1.79%, a genuinely good outcome currently being truncated into a mediocre `max_hold_cap` exit at whatever price sits on day 15. **Real structural finding: a 3R target and the 15-day cap are mismatched** — the target needs roughly double the time the discipline allows, for the median trade. Since the 15-day cap was already a deliberate, settled choice (respects the real 2-3 week ceiling, not a backtest-optimal number), the fix isn't to extend the cap — any future R-multiple exit needs a target sized to actually be reachable within ~15 days, not a distant 3R.
+
+**Checked and refuted: is this specifically a Fresh-population quirk (the "needs time to build up" hypothesis)?** No — median uncapped holding time is identical for Fresh and Extended (28 days each, n=872/404). Extended actually shows a fatter tail (p90 81 vs 65 days) and slightly higher win rate (57.4% vs 51.0%) in this uncapped frame — the long resolution time is a general property of the far 3R target, not something specific to catching Fresh setups.
+
+**Status: held as an open observation, not a decision, per explicit instruction — the main finding standing for now is the reversed-on-Fresh-only capacity result (Fixed-3R ahead on cumulative R and max drawdown at realistic capacity, per-trade return-per-trade robust across every slot count tested), with the real caveats now attached: (1) the improvement is partly pure R-normalization/position-sizing, not new trade quality; (2) the underlying 3R target is structurally mismatched with the 15-day cap, resolving in ~28 days median rather than 15; (3) the path to get there was rockier early on than baseline's. Batching this whole line, plus the remaining pre-rabbit-hole items (average MFE-after-stop-out, `TRAIL_ENGAGE_PCT` sweep, options-context classifier), for one consolidated critic update once all are done, rather than sending piecemeal.**
+
+## RQ-69's remaining requested metric — average MFE after stop-out (2026-09-20)
+
+Of the 134 Fresh≤0.40 trades stopped under the tightest (0.0×ATR) buffer, only 17 have a genuine forward window to measure (baseline's own exit meaningfully later than the tight stop's — most of the other 117 converge to the same SMA21-trail exit point once engaged, or baseline resolves close in time anyway). **For those 17: mean MFE after the stop-out = +4.82% (median +2.60%)** — 82.4% show at least some further upside (≥1%) after being stopped, 35.3% show a real move (≥5%). Split further: the 16 that stayed losers under baseline too averaged +3.76% MFE-after-stop (some upside, not enough to flip the trade); the 1 case that did recover to a winner under baseline showed +21.67%. Honest caveat: n=17 is small — trust the direction (real, modest upside typically exists after a stop-out), not the exact magnitude.
+
+**Explicit, standing caution attached to this finding by the user, to be carried forward with it everywhere it's referenced — this is not a case for wider stops**: "we don't want to keep widening our tight SL just because there is hope that someday it will recover — that is not the way I am planning to trade, and I don't want my system to behave that way either." The finding that real upside often exists after a stop-out is a description of what the data shows, not a recommendation to act on it — using it to justify wider stops (hold on hope of recovery) is precisely the psychologically-dangerous trading behavior being deliberately avoided, and this project's own tighter-stop findings (RQ-69: Recovery-After-Stop ≈0%, trade quality doesn't change with stop width) already argue against loosening stops in the first place. Any future reference to "there's often upside left after a stop" must be read as a description, not a prescription.
+
+## `TRAIL_ENGAGE_PCT` sweep — a real, well-behaved improvement, plateaus clean and doesn't interact with stop width (2026-09-20)
+
+Surfaced by RQ-68 (the SMA21 trail only protects the last ~30% of a winning move, since ~70% of eventual MFE has already happened by the time it engages at +3%) — tested whether engaging earlier or later changes exit efficiency, same single-entry/multi-variant simulation structure as RQ-69 (toggling the `TRAIL_ENGAGE_PCT` global per variant per bar, same technique used all session for `EMA34_RISING_DAYS_MIN`), Fresh≤0.40, n=1,079 trades, 8 thresholds swept (1.01 to 1.20), cross-checked against both the current (1.0×ATR) and tightest (0.0×ATR) stop buffer to rule out interaction:
+
+| Engage threshold | ATR=1.0 win/exp | ATR=0.0 win/exp |
+|---|---|---|
+| 1.01 (earliest) | 63.3% / +1.487% | 63.2% / +1.487% |
+| 1.02 | 63.5% / +1.518% | 63.4% / +1.515% |
+| **1.03 (current)** | 64.1% / +1.563% | 64.0% / +1.557% |
+| 1.05 | 64.1% / +1.577% | 64.0% / +1.571% |
+| 1.08 | 64.4% / +1.596% | 64.3% / +1.590% |
+| 1.10 | 64.4% / +1.596% | 64.3% / +1.590% |
+| 1.15 | 64.5% / +1.601% | 64.4% / +1.595% |
+| 1.20 | 64.5% / +1.601% | 64.4% / +1.595% |
+
+**Engaging earlier is worse, engaging later is better, monotonically up to a clean plateau around 1.08 — no further gain from 1.08 through 1.20 at either stop-buffer setting.** Same mechanism as everything else found this weekend: a tighter, trend-following stop kicking in too soon risks whipsawing out of normal early volatility before a real move develops; more room before the trail activates helps, doesn't hurt. The two ATR variants track each other almost exactly at every threshold, confirming `TRAIL_ENGAGE_PCT` and stop-buffer width are independent, non-interacting levers. **Real, modest, genuinely well-behaved finding — current production (1.03) leaves a small amount on the table; ~1.08 is the actual plateau, not an arbitrarily-picked point.** Held as an observation pending critic review alongside everything else in this batch, not yet adopted.
+
+## Options-market context as a genuine entry-time classifier — tested and rejected, closes the last remaining search-space item; a real bug found and fixed along the way (2026-09-20)
+
+Real `oi_buildup_bullish()` (front-month futures price+OI, 3-day window, prior-day-ending so it's genuinely live-usable — never the breach day's own row), tested as a classifier against the Early(15d)/Unique(15d) label, F&O-only EMA34=2 Delta candidates, Fresh≤0.40 (n=1,507 with real futures data; the futures-data coverage itself only starts ~2024-01, see bug below, so this population skews more recent than most of this weekend's other tests).
+
+**Real bug found and fixed**: `load_day_futures()` crashed with a raw `KeyError` on any pre-2024 date instead of the documented "no data → `None`" contract `oi_buildup_bullish()` already relies on. Root cause confirmed directly: bhavcopy files cached before ~2024-01 only ever contain STO (options) rows, never STF (futures) — a real, permanent data-availability gap already anticipated in the function's own docstring ("pre-2024 bhavcopy gap") but never actually handled — the column-select just crashed instead of returning `None`. Fixed: check for the required futures columns before selecting, return `None` otherwise. All 72 tests still pass; verified pre-2024 now returns `None` cleanly and post-2024 is unaffected (629 real rows for a spot-checked date).
+
+**Population level**: OI buildup rate nearly identical for Early (26.3%) vs Unique (26.5%) — same non-distinguishing shape as every other context feature this weekend (sector RS, breadth, Nifty tailwind, stock RS).
+
+**Whole-population outcome by buildup presence**: Buildup=True (n=398) slightly worse on swing (61.1%/+0.883% vs Buildup=False's 62.9%/+1.089%) and slightly better on options (67.3%/+0.956% vs 66.3%/+0.874%) — small, mixed, not a clean signal; the swing direction here doesn't match the earlier general-population RQ-48 finding (positive lift on both sides), most likely just population-specific (smaller, EMA34=2/Delta-only, recent-years-only) rather than a real contradiction.
+
+**Decisive test, within true-Unique(15d) only**: Buildup=True (n=175): swing win 26.3%, exp **−3.896%** (worse than Unique's own −3.743% average). Buildup=False (n=485): swing win 32.4%, exp **−2.875%** (better than average). Within the genuinely bad tail, OI buildup presence correlates with *worse* outcomes, not better — same reversal pattern already seen with `rs_rating` within Unique. Options side shows no meaningful difference (+0.699% vs +0.715%).
+
+**Options-market context is now exhausted as a classifier, closing the last row of the corrected search-space table** — single-stock technical (RQ-66), cross-sectional/market context (RQ-67A), and options-market context are all tested and rejected. No remaining untested classifier family for the Early/Unique split with currently available data. (Correction to prior wording per critic review: this closes the search space for breach-time classifiers using **currently available data sources** — not a permanent claim; a future data source such as IV history could reopen it.)
+
+## `TRAIL_ENGAGE_PCT` promoted to production: 1.03 → 1.08 (2026-09-20)
+
+Per the critic's review of Update 68 — ranked this the single cleanest, most unambiguous positive finding of the weekend (real, monotonic, clean plateau, no downside found anywhere in the tested range, cross-validated against both stop-buffer settings to rule out interaction) — and the explicit "ship the positive before touching the null" call against the still-open ATR buffer question. Changed `backtest.py`'s `TRAIL_ENGAGE_PCT` constant from 1.03 to 1.08. `python3 -m pytest tests/ -q` still 72/72 (tests reference the constant relatively, not by literal value, so unaffected by the change).
+
+## Standing grounding rule for any ATR-buffer / stop-width research (RQ-70 and beyond) (2026-09-20)
+
+Explicit, user-stated constraint, to be applied to every future stop-loss-width evaluation, not just RQ-70: **the stop buffer must not be judged, kept, or sized based on how well it protects against market-wide shock days (a bad Nifty day), news/event-driven moves, or unusual liquidity dislocations.** Verbatim: "if it turned out to be, it is preventing me from a worse drawdown, Nifty day or something, I don't want that level of protection... a bad market day is a bad market day... that is not something I want to optimize on. Or a news-oriented thing, event thing... I don't want it to be liquidity-seeking for sure." Only ordinary, stock-specific, non-event price action should count as evidence for or against a given stop width. Any future ATR-buffer analysis must isolate/exclude shock and event days from the actual decision, even if it still measures them descriptively.
+
+**Correction to how this gets applied, also user-stated, sharper than the above**: there is no valid "telemetry vs decision-making" split for the stop loss specifically. The stop level is computed BEFORE entry and directly determines position size (risk-per-share → share count for a fixed rupee-risk budget) — unlike a pure classifier feature (OI buildup, RS rating, etc.) which can be observed after the fact without having changed the trade itself, there is no non-causal, observe-only version of a stop width: whichever width is chosen IS the real trade (real exit level AND real position size) that was taken. Any ATR-buffer evaluation must therefore be judged on the real executable trade (actual position-sized dollar/percentage outcome) within the normal, non-shock/non-event subset specifically — not a hypothetical "what would this have looked like as pure telemetry" rendering of shock-day behavior.
+
+## RQ-70 — ATR Buffer Removal Audit, Phase 1 (Gap vs. Wick classification): the buffer's real effect is 100% ordinary intraday noise, and even there it mostly just delays the same loss (2026-09-20)
+
+First real test of whether the ATR buffer is doing anything, and — per the grounding rule above — whether what it does is even the kind of thing worth keeping. Replayed every Fresh≤0.40 trade at both current (1.0×ATR) and tightest (0.0×ATR) buffers side by side (same technique as RQ-69), but this time captured, for every `stop`-reason exit specifically, the stop level in effect that day plus that day's real Open/Low — classified as **gap** (Open already at/through the stop — buffer width was irrelevant, price jumped past both stops from a lower level) vs **wick/intraday** (Open above the stop, Low touched or crossed it — the kind of ordinary single-stock noise the buffer could plausibly matter for).
+
+**Population level (n=186 stop-loss exits across both buffers)**: gap-driven stop-outs are rare either way — 8.9% at 0.0×ATR, 11.8% at 1.0×ATR. The overwhelming majority of all stop-outs (~89-91%) are ordinary intraday wick/close-through events, not gaps — this is squarely within the "ordinary price action" scope the grounding rule says should count as evidence.
+
+**The decisive cut — trades where the buffer actually mattered**: 16 trades stopped under 0.0×ATR but survived (didn't stop that day) under 1.0×ATR — i.e., the buffer's entire measurable effect on this population, isolated to exactly the cases where it changed anything. **All 16 of these (100%) are wick/intraday-driven, zero are gap-driven** — confirms the buffer's real job, when it does something, is genuinely about ordinary intraday noise, not an accidental gap-shield. This is real, in-scope evidence under the grounding rule, not something to discount as shock/event noise.
+
+**But then checked what the 1.0×ATR buffer's "save" actually bought, for those exact 16 trades, under the real executable exit logic**: 15 of 16 (93.75%) still ended up exiting via `max_hold_cap` as a loser anyway (mean −8.69%, median −8.93%) — the wider stop didn't prevent the loss, it just delayed it by however many days until the 15-day cap ran out. Only 1 of 16 (6.25% win rate) went on to become a real winner (resistance exit, +7.66%). This is a direct, itemized confirmation of RQ-69's aggregate "Recovery-After-Stop ≈0%" finding — but stronger, because it's isolated to exactly the trades the buffer changed, with gap contamination ruled out first.
+
+**Reading so far**: the ATR buffer is not an illusory gap-shield (it genuinely engages during ordinary noise, as intended) — but even in that legitimate, in-scope role, it's not actually protecting winners; it's mostly just postponing an already-bad trade's loss by a few days at the cost of a wider stop (smaller position size) for every trade, not just the 16 it "saves." Honest caveat: n=16 is small — trust the direction, not the exact 93.75%/6.25% split.
+
+## RQ-70 Phase 2 (Volatility-regime interaction): no interaction anywhere — refutes the one remaining theoretical case for keeping the buffer (2026-09-20)
+
+Directly tests the critic's own hypothesis for why the buffer might still matter despite Phase 1/RQ-69's flat aggregate result: ATR is meant to normalize for volatility, so maybe it earns its keep specifically in high-volatility names even if it's neutral on average. Bucketed Fresh≤0.40 trades into terciles by `atr14/entry_price` at entry (low <2.51%, mid, high >3.36% — n=360 each), compared buffer=1.0 vs 0.0 win rate/expectancy within each bucket:
+
+| Vol bucket | 1.0×ATR win/exp | 0.0×ATR win/exp |
+|---|---|---|
+| Low vol | 64.7% / +0.863% | 64.7% / +0.848% |
+| Mid vol | 63.5% / +1.350% | 63.2% / +1.287% |
+| High vol | 65.0% / +2.573% | 65.0% / +2.634% |
+
+**No interaction anywhere — differences are noise-level (<1pp win, <0.1% expectancy) in every bucket.** Critically, the high-volatility bucket — the one place the buffer's normalization job should theoretically matter most — shows 0.0×ATR *marginally ahead*, not behind. This directly refutes the "maybe it's a volatility-regime hedge, not an alpha lever" defense of keeping the buffer; there's no regime, high or low, where removing it costs anything measurable. Combined with Phase 1 (its only real effect is 16 trades' worth of ordinary-noise saves, 93.75% of which just delay the same eventual loss), the ATR buffer now has two independent negative results and zero positive ones.
+
+## RQ-70 Phase 3 (Position-Sizing / Capital-Efficiency): a real mechanical tradeoff, honestly not decisive at portfolio level — inherits the same admission-artifact fragility already documented for Fixed-R (2026-09-20)
+
+Fresh≤0.40, both buffers, real production exit logic, fixed ₹2,000 risk-per-trade convention (matches the Fixed-R work's own sizing assumption).
+
+**Part A — per-trade, no capacity constraint (n=1,079 each)**: tighter stop mechanically needs *more* capital deployed per trade to hit the same fixed rupee-risk budget, not less — smaller risk-per-share (0.0×ATR avg initial risk 11.50% vs 1.0×ATR's 13.58%) means more shares are needed to reach ₹2,000 of risk, so more capital is tied up per trade (avg ₹20,383 vs ₹18,108, +12.6%). Dollar-PnL-per-trade is correspondingly higher too (avg ₹285.5 vs ₹258.3, +10.5%) — this is the same R-normalization mechanism already proven for Fixed-R, just expressed in rupees: since realized % return is flat across buffers (RQ-69/Phase 1/2), and dollar PnL = risk_budget × r_captured, a smaller `initial_risk_pct` mechanically inflates both r_captured and capital-required together. **This is not a free lunch — return on capital deployed is unchanged (tautologically, since dollar_pnl/capital_deployed = pnl_pct exactly), it's the same trade, just leveraged differently by the fixed-risk sizing rule.**
+
+**Part B — capital-constrained (fixed total ₹ pool, deterministic FCFS admission by entry date, no ranking — same no-selection-bias methodology used for the Fixed-R Risk-of-Ruin check)**: tested at 4 pool sizes (3×/5×/10×/20× the average per-trade capital at 1.0×ATR), since a tighter stop needs more capital per trade and therefore fits *fewer* concurrent positions through the same pool — the real question is whether that throughput loss offsets the higher per-trade dollar edge.
+
+| Pool size | 1.0×ATR: admitted / total $pnl / max DD | 0.0×ATR: admitted / total $pnl / max DD |
+|---|---|---|
+| 3× | 205 / ₹34,725 / −₹8,913 | 156 / ₹28,116 / −₹7,661 |
+| 5× | 306 / ₹47,816 / −₹17,658 | 268 / ₹89,638 / −₹13,425 |
+| 10× | 541 / ₹102,880 / −₹47,298 | 482 / ₹116,694 / −₹43,265 |
+| 20× | 868 / ₹228,949 / −₹40,791 | 807 / ₹222,947 / −₹51,452 |
+
+**Not robust — the winner flips with pool size** (1.0×ATR ahead at 3× and 20×, 0.0×ATR ahead at 5× and 10×), and the 5× result's win-rate jump for the admitted subset (66.8% vs 63.1%, bigger than anything seen in the unconstrained population) is the exact signature of the capacity-admission-timing artifact already documented and named during the Fixed-R rabbit hole — *which specific trades happen to be chronologically available to fill a slot is itself sensitive to small changes in per-trade capital requirements, independent of true trade quality*. Per Research Integrity Rule #6, a headline number this sensitive to an arbitrary pool-size choice is not being reported as a decision input.
+
+**[2026-09-20 CORRECTION — the rupee-pool version of Part B above used the wrong methodology]**: a fixed ₹-pool sized as a multiple of average per-trade capital silently gives the tighter stop *fewer effective seats* than the wider stop at the same pool size (since it needs more capital per trade) — mixing "how many positions you run" with "how much each one costs," which the user does not actually do (real sizing: a fixed number of concurrent positions, each independently risking a fixed ₹2,000 regardless of stop width). Re-ran Part B the correct way — fixed **seat count** (3/5/10/20 concurrent positions, deterministic FCFS by entry date, no capital tracking, no ranking — same methodology already trusted for the Fixed-R Risk-of-Ruin check):
+
+| Seats | 1.0×ATR: admitted / total $pnl / avg $pnl / maxDD | 0.0×ATR: admitted / total $pnl / avg $pnl / maxDD |
+|---|---|---|
+| 3 | 171 / ₹44,383 / ₹259.6 / −₹15,559 | 171 / ₹49,254 / ₹288.0 / −₹16,067 |
+| 5 | 269 / ₹63,265 / ₹235.2 / −₹26,600 | 269 / ₹69,289 / ₹257.6 / −₹27,447 |
+| 10 | 498 / ₹109,091 / ₹219.1 / −₹44,567 | 498 / ₹123,795 / ₹248.6 / −₹44,292 |
+| 20 | 845 / ₹191,567 / ₹226.7 / −₹59,862 | 845 / ₹213,585 / ₹252.8 / −₹62,962 |
+
+**This is robust and consistent, unlike the rupee-pool version**: 0.0×ATR wins on total $ P&L and avg $ P&L/trade at every single seat count tested, by a fairly steady ~10-14% margin, with the *identical* admitted trade set/count at every seat count for both buffers (seat occupancy depends only on entry/exit dates, not capital, so this comparison is genuinely apples-to-apples — no admission-timing artifact here, unlike the rupee-pool version or the earlier Fixed-R Raw-vs-Fresh case). Max drawdown is roughly a wash — sometimes marginally worse for 0.0×ATR (3, 5, 20 seats), once marginally better (10 seats) — no consistent direction, small in magnitude either way.
+
+## Re-testing two stale exit-timing rejections on the current EMA34=2/Fresh≤0.40 population and current stop geometry (2026-09-20)
+
+Both the reactive 3-day-stall and fixed-N-days-after-arming were last validated/rejected on a population and stop mechanism that's since changed (pre-EMA34=2, pre-Freshness≤0.40, pre-`TRAIL_ENGAGE_PCT`=1.08 — and fixed-N-days-after-arming's original rejection specifically used `portfolio.py`, since flagged (2026-09-20, see above) as assuming unrealistic perfect chronological capture). Re-ran both directly rather than assuming the old verdicts still apply.
+
+**3-day stall** (arm at 0.55R — this weekend's R-convention, not the old 3×ATR distance — exit after 3 consecutive days with no fresh high): fires on 61/1,079 trades (5.6%), averaging +4.42% on those vs. −1.63% to −2.22% for what they'd have averaged under `max_hold_cap`. But aggregate is nearly flat (win 64.4%→64.7%, exp +1.596%→+1.504%, median +2.282%→+2.249%, return/day +0.3065%→+0.3098%/day) — **reproduces the exact "near-wash" verdict from 2026-09-14, on a materially different population.** The original finding holds up, not stale.
+
+**Fixed-N-days-after-arming** (unconditional exit exactly 3 trading days after arming at 0.55R, no streak-tracking): fires on 76/1,079 trades (7.0%). Per-trade % stats look similar-to-slightly-better (win 64.4%→65.2%, median +2.282%→+2.295%) but mean expectancy and dollar terms are worse (exp +1.596%→+1.479%; at fixed ₹2,000 risk, avg $pnl/trade ₹258.3→₹225.9, about −12.5%). **Then ran the corrected seat-based capital-constrained comparison** (3/5/10/20 seats, FCFS by entry date, per-variant exit-date capture — the methodology fix from earlier today, not the old distrusted `portfolio.py`):
+
+| Seats | Baseline: admitted / total $pnl / avg $pnl | Fixed-3-after-arm: admitted / total $pnl / avg $pnl |
+|---|---|---|
+| 3 | 171 / ₹44,383 / ₹259.6 | 175 / ₹43,987 / ₹251.4 |
+| 5 | 269 / ₹63,265 / ₹235.2 | 276 / ₹49,984 / ₹181.1 |
+| 10 | 498 / ₹109,091 / ₹219.1 | 513 / ₹99,892 / ₹194.7 |
+| 20 | 845 / ₹191,567 / ₹226.7 | 861 / ₹181,613 / ₹210.9 |
+
+**Baseline wins at every seat count, consistently** — confirms the original 2026-09-06 "do not adopt, natural exits compound better" verdict independently, on a different population AND a methodology this project now trusts more than the one that produced the original rejection. Two independent confirmations (old flawed methodology, new trusted one) agreeing is real evidence, not a coincidence of one bad tool. **Status: both re-confirmed rejected/near-wash — no change to the frozen exit architecture from either re-test.**
+
+## Fixed 1R/2R/3R targets side-by-side, current population/settings, with return/day and dollar-expectancy (2026-09-20)
+
+Direct request: put 1R, 2R, and 3R fixed targets (replacing the moving resistance target, stop/climax/max_hold unchanged) side by side with `return/day` and dollar-expectancy at fixed ₹2,000 risk — same current EMA34=2/Fresh≤0.40 population/stop geometry as everything else re-tested today.
+
+| Variant | Win | Exp | Median | Avg days | Ret/day | Avg $pnl (₹2000 risk) | Target hit rate |
+|---|---|---|---|---|---|---|---|
+| Baseline (moving resistance) | 64.3% | +1.606% | +2.262% | 15.0 | **0.3098%/day** | ₹255.6 | 49.7% |
+| 1R | 57.5% | +1.978% | +1.471% | 19.3 | 0.2136%/day | ₹287.5 | 16.1% |
+| 2R | 56.9% | +2.143% | +1.332% | 20.5 | 0.0871%/day | ₹330.8 | 5.4% |
+| 3R | 56.9% | +2.134% | +1.332% | 20.9 | **0.0347%/day** | ₹335.3 | 1.3% |
+
+Clean, monotonic pattern as the target widens: win rate drops, average dollar-per-trade rises, but **return/day collapses** (0.31%→0.21%→0.09%→0.03%, roughly 9x worse at 3R than baseline) because target-hit rate falls off a cliff (49.7%→16.1%→5.4%→1.3%) and almost every trade just rides out to the 15-day `max_hold_cap` instead (baseline 42.3% share → 3R 89.0% share). This is the same 15-day-cap-vs-far-target mismatch already found for 3R specifically during the earlier Fixed-R rabbit hole, now shown cleanly across all three targets together: **the wider the fixed target, the more the trade converts from "hit a real target" into "ride the clock and hope," and the worse the capital-rotation efficiency gets, even though raw $-per-trade looks better.** Consistent with the standing critique already on record (2026-09-06) that return/day only matters if freed-up capital is genuinely redeployed — the real decisive test for any of these, if pursued further, is the seat-based capital-constrained comparison already built and trusted this weekend (used for Fixed-3R and fixed-N-days-after-arming), not this per-trade table alone.
+
+**Re-checked at the tighter candidate stop (0.0×ATR, the RQ-70 removal candidate) instead of the current live 1.0×ATR** — same population (n=1,049, confirmed identical since entry detection doesn't depend on the stop buffer):
+
+| Variant | Win (1.0×→0.0×) | Avg $pnl (1.0×→0.0×) | Ret/day (1.0×→0.0×) | Target hit rate (1.0×→0.0×) |
+|---|---|---|---|---|
+| Baseline | 64.3%→64.2% | ₹255.6→₹283.8 | 0.3098%→0.3018% | 49.7%→49.6% |
+| 1R | 57.5%→57.6% | ₹287.5→₹317.7 | 0.2136%→0.2330% | 16.1%→19.6% |
+| 2R | 56.9%→56.8% | ₹330.8→₹372.8 | 0.0871%→0.0866% | 5.4%→6.7% |
+| 3R | 56.9%→56.8% | ₹335.3→₹376.9 | 0.0347%→0.0301% | 1.3%→1.5% |
+
+**No change to the conclusion.** Win rates unchanged, dollar-per-trade higher across the board (same R-normalization mechanism as everywhere else this weekend), target-hit rates nudge up slightly but nowhere near enough to matter (a tighter stop makes the same distant target only marginally easier to reach, matching the already-established "tighter stop barely moves target-hit rate" finding). Return/day still collapses monotonically as the target widens, baseline still wins clearly. **Confirms the core problem is time (15-day cap vs. how far the target sits), not stop width** — switching the stop doesn't rescue fixed-R targets.
+
+**RQ-70 overall verdict**: three results now, all pointing the same direction. Phase 1: the buffer's only real effect is 16 ordinary-noise saves, 93.75% of which just delay the same eventual loss rather than prevent it. Phase 2: zero interaction with volatility regime, including high-vol, the one regime where it should matter most if it mattered at all. Phase 3 (corrected): at real, fixed-seat position sizing — which is how this is actually traded — removing the buffer produces a consistent, robust $-P&L improvement (~10-14%) with no meaningful drawdown cost, because the underlying % trade quality is unchanged (Phase 1/2/RQ-69) while the fixed-risk sizing rule mechanically extracts more rupees per unit of realized % return from a tighter stop. No dimension tested shows a reason to keep the 1.0×ATR buffer; capital-efficiency, once measured the way it's actually used (seats, not a rupee pool), is a real reason to remove it, not just a non-decisive mechanical curiosity.
+
+**[2026-09-20 methodology re-check]**: found and fixed the same per-variant exit-date bug in this Phase 3 script that was independently caught while building the 3-day-stall/fixed-N-days-after-arming re-tests (both variants' exit_date was being stamped from whichever variant finished last, not each one's own real exit day). Re-ran the seat-based table above with the fix — **barely changed** (only 1.6% of trades ever had a genuinely different exit date between the two buffers to begin with): 3/5/10/20 seats now admit 171/171, 269/270, 498/498, 845/847 respectively (vs. forced-identical before), and 0.0×ATR still wins total $pnl and avg $pnl/trade at every seat count by the same ~10-13% margin. The conclusion was not an artifact of the bug.
+
+## A foundational exit-mechanism bug: stop and resistance were both evaluated on the day's CLOSE, not real intraday order execution — found, root-caused, and fixed on the stop side (2026-09-20)
+
+**How this surfaced**: investigating the loss-bucket distribution's extreme tail (a −₹5,135 IEX trade, −₹4,723 BEML trade, well past the intended ₹2,000 risk). Traced IEX directly: a real, confirmed **-29.6% single-day regulatory crash** (CERC's market-coupling decision breaking IEX's exchange monopoly, 2025-07-24 — verified via web search, not assumed; stock hit its lower circuit at exactly ₹131.50, matching the cached data precisely, so not a data artifact or corporate action). This one was genuine, unavoidable gap risk — the day's Open (₹169.10) was already below the stop (₹178.50), so no order type could have done better. Correctly out of scope for the ATR-buffer decision per the standing grounding rule.
+
+**But checking further found something much bigger**: of 80 stop-exits (Fresh≤0.40, 0.0×ATR) realizing worse than −1.05R, only 2 (IEX, BEML) were genuine opening gaps. **The other 78 were NOT gaps** — the day opened above the stop, but `check_exit()`'s `hit_stop = row.Close < current_stop_level(...)` only evaluates the day's **close**, so on a day where price crosses the stop intraday but keeps declining into the close, the model records the exit at that full closing loss instead of where a real resting stop order would have filled — near the stop, the moment price first touched it.
+
+**Initially misdiagnosed as a deliberate, defensible design choice** (reasoned by analogy to the entry side's own explicit "close-based breakout, not intraday touch, by design" convention, already tested and kept — see the near-miss-high-breakout section). **User correction, important and worth preserving precisely**: this analogy doesn't hold. The entry-side close-confirmation was a real, deliberate, tested decision. The exit-side stop/target checks were never designed that way — a real stop-loss and a real target order are resting orders that fire the instant price touches them, intraday, not "wait for end of day and see." Conflating the two was a mistake, not a subtlety.
+
+**Also found, separately, a symmetric issue on the target side** (the very complaint that opened this whole thread — "why does GRANULES/IFCI look like it should have exited on day 1, yet the system holds for 15+ days" — was correct, not a misunderstanding): `hit_resistance` is also purely Close-based (`row.Close >= state["target"]`). Under a real resting limit-sell, a wick up through the ratcheting daily-pivot target would already have filled. Testing this properly (touch-based: `High >= target`) showed the current mechanism is dramatically over-sensitive to real execution — target-hit share jumps from 49.7% to 89.1%, average holding time for a resistance exit collapses from 9.78 days to 3.63 days, and the target's own average gain shrinks from +6.07% to +2.03% (real profit-taking becomes mostly incidental noise-catching, not genuine breakout capture). **Not yet fixed — target-side redesign is the next phase, several candidates already tested (see below), not yet decided.**
+
+**Stop side, fixed**: touch-based (`Low <= stop_level`), with a 0.5% slippage haircut on the fill (`stop_level*(1-0.005)`) to reflect realistic trigger/fill variance rather than an optimistic "fills exactly at the level" assumption. Tested both buffers (1.0×ATR, 0.0×ATR), Fresh≤0.40, target left Close-based (isolating the stop-side fix specifically):
+
+- Stop-exit share rises (7.9%→11.6-13.2%) — real execution catches wick-through-and-recover cases the close-based model was letting ride (sometimes into a later win that was never real).
+- **But each individual stop loss becomes smaller, not bigger** (−9.70%→−8.4%) — a real order fires at the touch, not at whatever the close happens to be after riding out a bad day.
+- **Flip-rate, checked directly**: 17-18 trades (1.6-1.7% of the population) flip from winner (close-based) to loser (touch-based) — **zero flip the other direction**, confirming this is a one-way correction (touch-based can only catch stops close-based missed, never remove a real one).
+- **Drawdown improves substantially and consistently** at every seat count (3/5/10/20) and both buffers in the seat-based capital-constrained simulation — 22-55% smaller max drawdown (e.g., 5 seats/1.0×ATR: −₹26,600→−₹11,916), while total $ P&L stays roughly a wash. The IEX/BEML-driven extreme loss-bucket tail (below −₹3,000) disappears entirely under touch-based execution; worst loss in the population drops from −₹5,135 to −₹2,297.
+
+**Reading**: this is good news, not bad. The close-based model was making the system look *riskier* on its worst days than real execution would actually be — fixing it mainly removes exaggerated tail-risk that was a modeling artifact, not a real return cost. **Standing implication, not yet acted on**: `MAX_HOLD_DAYS`, the Freshness≤0.40 population convention, EMA34=2's own adoption, and essentially every win-rate/expectancy-based finding in this project's history were measured using the old close-based mechanism — absolute numbers everywhere are provisional pending the corrected mechanism; relative comparisons (does classifier X separate good from bad trades) are plausibly more robust to a bias hitting both compared groups equally, but this has NOT been verified and should not be assumed. Planned order: finish the exit mechanism (stop done, target next, then `MAX_HOLD_DAYS`), then spot-check Freshness/EMA34=2 specifically against the corrected baseline before deciding whether wider re-validation is needed.
+
+**Standing note, not a decision**: if the ATR buffer is ultimately removed (0.0×ATR), the user's original ₹2,000-risk-per-trade convention (bumped up from a preferred ₹1,000) was itself a response to the current wide stop not allowing enough shares at ₹1,000 risk. A tighter stop may make ₹1,000 risk workable again — revisit position sizing once the ATR-buffer decision is finalized, not before.
+
+## Target-side redesign, touch-based execution: which pivot rung, and what happens to the stall/arming overlays now (2026-09-20)
+
+**Pivot-rung sweep** (touch-based target `High >= target`, touch-based stop already fixed, Fresh≤0.40): only pp/r1/r2 exist (no r3), swept which rung(s) the target is allowed to use.
+
+| Variant | Win | Exp | Median | Avg days | Ret/day | Hit rate |
+|---|---|---|---|---|---|---|
+| pp_only | 61.1% | +1.468% | +0.540% | 4.6 | 0.112%/day | 94.7% |
+| r1_only | 80.1% | +1.249% | +1.933% | 8.0 | 0.658%/day | 77.5% |
+| r2_only | 64.6% | +1.301% | **+2.642%** | 13.7 | 0.425%/day | 50.6% |
+| **nearest_r1_r2 (skip pp)** | **80.3%** | +1.296% | +1.969% | 7.8 | **0.773%/day** | 77.8% |
+| current_pivot (production, nearest of all 3) | 68.1% | +1.259% | +1.630% | 5.1 | 0.550%/day | 89.1% |
+
+**`pp_only` is confirmed as the worst offender** — it's the closest of the three levels, producing the tightest, noisiest exits (94.7% hit rate, median only +0.540%). **`nearest_r1_r2` (drop pp from the target computation entirely) is the standout candidate** — best win rate in the table (80.3%) and best return/day by a clear margin (0.773%/day, 40% ahead of current production), without needing to go all the way to the slower, rarer r2_only. Leading replacement for the current mechanism, pending further scrutiny.
+
+**Re-tested the 3-day stall and fixed-3-days-after-arming overlays (arm at 0.55R) on top of both the current target and `nearest_r1_r2`** — both are now essentially inert:
+
+- On current target (touch-based, 89.1% hit rate, 3.6-day average): overlays fire on only 5 of 1,174 trades (0.4%) — baseline/stall/fixed3afterarm statistically identical (68.3-68.4% win, same everything).
+- On `nearest_r1_r2` (77.8% hit rate, 7.8-day average, more room to matter): overlays fire on 13 of 1,127 trades (1.15%) — still statistically indistinguishable from baseline (80.4-80.6% win, +1.26-1.29% exp across all three).
+
+**Real conclusion, not just a null result**: the 3-day stall and fixed-N-days-after-arming were built to solve a problem the *broken close-based target* was creating — trades lingering unresolved for weeks because the target rarely got close-confirmed. Once the target is touch-based and honest (even before picking the final rung), 78-89% of trades resolve via a genuine hit within 4-8 days, leaving only 11-14% of trades that ever reach a point where a stall/arm rule could act. There's no lingering population left for these overlays to work on anymore — not because the underlying idea was wrong, but because the thing it was compensating for (an artificially slow-resolving target) no longer exists once the target mechanism itself is fixed.
+
+## `nearest_r1_r2` drawdown table and per-trade dollar PnL, both buffers — validating the leading target candidate before deciding (2026-09-20)
+
+Same seat-based capital-constrained methodology as the ATR-buffer work, now on `nearest_r1_r2` + touch-based stop (0.5% slippage), Fresh≤0.40, comparing against the original all-close-based baseline:
+
+| Seats | Original (close-stop + close-target) | Corrected (touch-stop + `nearest_r1_r2` touch-target) |
+|---|---|---|
+| 3 | 171 admitted / ₹44,383 / **−₹15,559** | 303 admitted / ₹64,900 / **−₹8,657** |
+| 5 | 269 admitted / ₹63,265 / **−₹26,600** | 470 admitted / ₹117,403 / **−₹10,243** |
+| 10 | 498 admitted / ₹109,091 / **−₹44,567** | 803 admitted / ₹169,822 / **−₹20,334** |
+| 20 | 845 admitted / ₹191,567 / **−₹59,862** | 1,101 admitted / ₹197,882 / **−₹26,234** |
+
+Roughly half the drawdown, 45-75% more total $ P&L, 60-80% more trades admitted at every seat count — because trades resolve in ~8 days instead of ~15, so the same seats turn over far more often. Not a marginal tweak, a materially better system on every axis simultaneously.
+
+**Per-trade dollar PnL (₹2,000 risk), 1.0×ATR vs 0.0×ATR**:
+
+| | Win | Avg WIN | Avg LOSS | Blended avg/trade | Median $pnl/trade |
+|---|---|---|---|---|---|
+| 1.0×ATR | 80.4% | +₹539 | −₹1,261 | ₹186.3 (0.093R) | ₹291.3 |
+| 0.0×ATR | 80.4% | +₹602 | −₹1,360 | ₹217.6 (0.109R) | ₹352.1 |
+
+Same win rate (target-hit is buffer-independent), but every dollar figure is bigger at 0.0×ATR — the same R-normalization mechanism found throughout RQ-70. Worth flagging honestly: the *blended average* per trade here (₹186-218) is actually a bit lower than the original close-based baseline's ₹255.6 — win rate went way up (64%→80%) but each individual win got smaller (quick, modest moves instead of letting bigger ones develop) while losses got a bit bigger. The real payoff is at the portfolio level (faster turnover → far more trades fit through the same capital → better total $ and drawdown), not in the raw single-trade average — a genuinely different trade rhythm (frequent small wins) than before (occasional bigger ones), not just a better version of the same one.
+
+**Dollar-outcome bucket table** (0.0×ATR): worst loss capped at −₹2,264 (same touch-based-stop safety), but the shape is now heavily concentrated in small wins (70.8% land in ₹0-1,000, up from 39.6% originally) with a much thinner upper tail (1.6% above ₹2,000, vs. 7.2% before).
+
+## Two more target candidates tried and rejected: bare "exit at first no-fresh-high streak" (catastrophic without an arm gate), and the arm-gated version (better, still loses to `nearest_r1_r2`) (2026-09-20)
+
+Motivated directly by the divergence investigation below: since a real trade's life involves many short pauses before a genuine reversal, why not use the trade's *own* first pullback as the exit signal instead of an external pivot level? Tested two ways.
+
+**Bare version (no arm gate at all, K=1/2/3 days of no fresh high triggers exit)** — a clean, decisive failure:
+
+| K | Win | Median | Ret/day | Fires on |
+|---|---|---|---|---|
+| K=1 | 43.8% | **−0.344%** | −0.316%/day | 98.9% of trades |
+| K=2 | 44.4% | **−0.409%** | −0.207%/day | 96.5% |
+| K=3 | 45.3% | **−0.459%** | −0.151%/day | 92.0% |
+
+Below-50% win rate, negative median at every K, fires on nearly everything — this independently reproduces a failure mode already found and named on 2026-09-05: "removing the arming gate entirely is a real regression... cuts good trades before they've developed." A real uptrend pauses constantly without it meaning anything; catching the very first pause with no other condition just catches normal noise.
+
+**Arm-gated version (arm at 0.55R first, same as the 3-day-stall convention, then watch for K days of no fresh high)** — better, but still clearly behind the leading candidate:
+
+| Variant | Win | Median | Ret/day | Max_hold share |
+|---|---|---|---|---|
+| K1_armed | 58.0% | +1.603% | 0.107%/day | 57.8% |
+| K2_armed | 57.3% | +1.471% | 0.056%/day | 61.0% |
+| K3_armed | 57.0% | +1.317% | 0.027%/day | 64.8% |
+| `nearest_r1_r2` (standing leader) | **80.3%** | **+1.969%** | **0.773%/day** | 8.0% |
+
+Fixing the arm-gate problem stops the mechanism from firing on everything (23-31% instead of 92-99%), but `nearest_r1_r2` still wins decisively on every metric, and most tellingly, `max_hold_cap` still swallows 58-65% of trades under this mechanism vs. only 8% for `nearest_r1_r2` — most trades still never get caught by either condition and just run out the clock. **Verdict: the trade's own swing structure, even with the arm-gate fix, is a less reliable signal than a simple external pivot level (r1/r2). `nearest_r1_r2` remains the standing leader across every target mechanism tested (pivot rungs, fixed-R, fixed-%, stall/arm overlays layered on a target, and now stall/arm used as the target itself).**
+
+## Reverse-engineering the real reversal point: does RSI/volume divergence across swing highs predict what's coming — tested capped and uncapped, decisively rejected both times, with a real mechanism found (2026-09-20)
+
+Different angle from hypothesis-driven candidate testing: instead of guessing target mechanisms, look at where trades *actually* reverse and check what the market looked like there. Replayed trades under `trail_only` (SMA21 trail + stop + climax, no separate target), found each trade's swing-high sequence (K=2-day fractal: a High counts once 2 days pass without being exceeded), and compared RSI/volume at the first swing high vs. the final one for trades with ≥2 genuine higher highs.
+
+**First pass (capped at `MAX_HOLD_DAYS`=15)**: divergence (RSI down + volume down despite a higher price high) was real and detectable (47.6% RSI divergence, 42.1% volume, 22.7% both) but predicted *better* outcomes, not worse — divergent trades: 88.0% win/+6.13% mean vs. non-divergent: 72.9%/+5.20%. **But then checking the exit-reason breakdown revealed the cap was hiding the real question**: 95.8% of these trades exit via `max_hold_cap`, not `stop` — they weren't reversing at all, just stalling (still +5.78% average) and getting force-closed by the calendar, not by any real technical breakdown.
+
+**Re-ran fully uncapped** (`MAX_HOLD_DAYS` removed for this experiment specifically, bounded only at 250 trading days) to see the trade's real, natural life: 95.4% now exit via a genuine `stop` (real reversal, not a time-out), average holding time jumps to ~51 days, and even stop-exits average **+5.21%** overall (**+12.49%** for the higher-high subset) since it's a trailing stop — by the time it actually catches you, you've usually banked real profit first. **Divergence result holds up, even more clearly, on this real dataset**: 132 diverging trades (94.7% win, +15.62% mean) vs. 364 non-diverging (87.1% win, +12.55% mean) — divergence still predicts *better*, not worse.
+
+**Verdict: closed, with a real mechanistic explanation, not just two null results.** Classic bearish-divergence lore comes from reversal/topping-pattern contexts; it doesn't transfer to a system built to catch stocks *early* in a fresh momentum move — a second high made on softer RSI/volume here is usually just a normal healthy pause within an intact trend, not distribution. This is the same underlying pattern as every other "detect the bad tail early" investigation this project has run (RQ-53, "cut it faster") — a signal that looks like weakness in isolation carries no predictive value in this specific population.
+
+**Real structural finding surfaced along the way, independent of divergence**: the trade's genuine, natural, undistorted life is ~51-52 days on average (for trades that develop at least 2 real swing highs) before a real reversal (trailing-stop hit) — nowhere close to the current 15-day cap. This directly informs the still-open `MAX_HOLD_DAYS` re-tuning question flagged earlier: the cap isn't just occasionally early, it's cutting off the *majority* of a real trend-following trade's natural life for this subgroup specifically.
+
+## A market-microstructure detour, a real portfolio-metric bug caught, and the target definition finally rebuilt properly on scipy — where the target-side investigation actually lands (2026-09-20)
+
+**A metric bug, caught mid-session**: the "return/day" figure used throughout today's target comparisons (mean of each trade's own `pnl%/holding_days`) is distorted — a single fast, sizeable loss dominates that average (e.g., −8% in 5 days = −1.6%/day) while a slow winner barely registers (+3% in 22 days = +0.14%/day), so it can show a mechanism as clearly worse when the real, portfolio-level money is fine. Switched to **portfolio $/day = total $pnl ÷ total capital-days held**, which doesn't have this distortion. Under the corrected metric, **pure trail-only (no target at all) actually beats every target-based mechanism tested today** — the opposite of what the flawed metric suggested. This means every earlier "X beats Y on return/day" claim from today (pivot rung sweep, fixed-R comparison, stall/arm tests) should be treated as unreliable; only the portfolio-$/day numbers below are trusted.
+
+**Swing-low trail, a real established technique, tested against SMA21**: per real swing-trading practice (trail the stop below the most recently confirmed higher low, not a moving average distance), built and tested. Nearly identical portfolio $/day to SMA21 (₹13.24 vs ₹13.34) — not a clear win — but a genuinely different risk shape: stops out more often (16.6% vs 13.7% of exits) at **half the average loss size** (−3.98% vs −7.52%), the same kind of offsetting-effects cancellation found for the ATR buffer (RQ-69) and now a third time here.
+
+**Target + trail combinations tried, twice, with real bugs caught each time**: (1) the pre-entry 252-day high (`high_252`) frequently collapsed onto the entry day's own high for fresh-breakout entries — a degenerate, meaningless "target" barely above entry, caught by direct inspection of real trade examples, not assumed; (2) a hand-rolled ZigZag state machine had a genuine bug (multiple consecutive same-type pivots, violating basic alternation) — caught the same way. **Per direct instruction, stopped hand-rolling and installed `scipy` instead** (`requirements.txt` updated) — rebuilt on `scipy.signal.find_peaks` applied to **log(High)** (so a fixed `prominence` parameter maps to a fixed % move regardless of price level), `distance=3`/`prominence=log(1.05)` matching the standard ZigZag "Deviation/Backstep" convention from the trading literature, lookback strictly excluding the entry day itself (fixes the `high_252`-style degenerate case structurally, not just by patching one example). Verified directly against real dates before trusting any aggregate number.
+
+**Portfolio $/day, final comparison**: `scipy ZigZag target → swing-low trail` = ₹12.84/day (65.3% of trades get a real, verified-legitimate target, resolving in 14.2 avg days) vs. pure SMA21 trail ₹13.34/day and pure swing-low trail ₹13.24/day. Pure trail still edges ahead (~3-4%) on raw aggregate money.
+
+**But the real, decisive question — for trades that end up as stop-losses, how much genuine upside got touched and fully given back before the reversal**:
+
+| | Avg MFE touched | Avg final pnl | Avg give-back | Touched ≥2% first |
+|---|---|---|---|---|
+| SMA21 trail, stop-outs | +4.97% | −7.52% | **12.48pp** | **61.8%** |
+| ZigZag target, stop-outs | +4.84% | −6.51% | **11.35pp** | **58.2%** |
+
+**58-62% of eventual stop-losses genuinely touched at least +2% favorable movement first** (a quarter touched +5%+) before fully round-tripping into a net loss — real, common give-back, not a rare edge case. This is a genuine tension with the aggregate $/day result, not a contradiction: pure trail wins in total because it preserves more upside on *winning* trades that run far, but on *losing* trades specifically it's measurably costly — it lets real, touchable gains fully reverse instead of banking any of it. The ZigZag-target mechanism already reduces this somewhat (11.35pp vs 12.48pp give-back) simply by intercepting some trades before they complete the full round trip.
+
+**Decision for now**: adopt `scipy ZigZag target → swing-low trail` as the standing target mechanism, not pure trail — nearly identical aggregate efficiency, genuinely reduces the give-back tension, and is the one candidate with fully verified numbers (library-based, real examples checked) rather than a hand-rolled implementation with two caught bugs behind it. **Not a final answer** — the give-back tension is only partially addressed. Next, explicit follow-up: test a genuine partial-exit design (bank some position size at the real target, trail the remainder) to see if it captures more of the give-back without giving up much of what pure trail preserves on winners.
+
+## Update 71 governance decisions — versioning, new Tier A metric, and standing workflow rules (2026-09-20)
+
+**Version boundary adopted**: "Legacy Exit Engine" (≤ Update 69, close-based stop/target) vs. "Execution Engine v2" (Update 70+, touch-based stop + touch-based target, both real fixes validated). All exit-dependent metrics from the Legacy Engine are frozen/obsolete unless explicitly replayed under v2 — this includes the entire breach-classifier line (RQ-51, RQ-64-67), RQ-68/69, and the original ATR-buffer research, none of which are re-verified under v2 yet.
+
+**Give-back Ratio promoted to a Tier A audit metric**, alongside Exit Efficiency — different populations, different questions: Exit Efficiency measures how much MFE *winners* surrender before their real exit; Give-back Ratio (`MFE − ExitPnL`, computed for trades that end up losers) measures how much MFE *losers* surrender before finishing as a loss. Directly actionable per the user's own stated trading weakness (cutting winners early, holding losers too long) — give-back is measuring the system's version of the same failure in reverse: holding a real winner long enough for it to become a loser.
+
+**Research Integrity Rule #7 adopted — Metric Integrity Before Optimization**: a metric cannot be optimized until its measurement point is causally valid. Four independent cases this weekend alone: the original Freshness look-ahead bug (must use the PRIOR day's row), the target-ratchet lookahead (must use the prior close, not today's), the trigger-anchored return artifact (anchor must be at the actual measurement point, not a later one), and the return/day averaging artifact (portfolio capital-days, not a mean of per-trade ratios). (Numbered #7 to continue this project's existing Rule #6 sequence, not restart numbering.)
+
+**Standing workflow rule adopted — inspect before trusting**: every surprising aggregate finding requires at least 3 manually inspected real trade examples (tickers, dates, actual values) before being promoted or rejected — not after being challenged on it. This caught the IEX gap, the `high_252` degenerate-target bug, the hand-rolled ZigZag alternation bug, the target-ratchet lookahead, and the return/day averaging artifact — five real catches from one weekend, all from checking examples rather than trusting an aggregate table on its own.
+
+**Sequencing, agreed with one modification**: Phase A (execution semantics: touch stop + touch target + prior-close ratchet + 0.5% slippage) is frozen, do not revisit. Phase B (working, not-final exit baseline: ZigZag target + swing-low trail) is locked for now. Phase C (spot-check EMA34=2 vs 9, then Freshness≤0.40, on the Phase B baseline) comes *before* partial exits specifically to avoid replaying EMA34/Freshness twice if partial exits turn out to need their own exit architecture. Phase D (MAX_HOLD_DAYS and ATR buffer, both mechanically coupled to whichever exit is in place, retuned specifically for Phase B) follows. Partial-exit design (RQ-72) comes last in this ordering, once the rest of the architecture is settled once, not before.
+
+**ATR buffer — burden of proof flipped, based on evidence already in hand**: per direct user instruction, ATR-buffer width is being treated as a risk/position-sizing decision, not a pure statistical one — "this is something I decide my position and risk on, not something I can change dynamically." Reframed: ATR1 (the current 1.0× buffer) must now prove itself against ATR0 (structural low only, no cushion), not the other way around. Every finding so far is one-sided against ATR1: only ~1.5% of trades ever differ between the two buffers at all; 15 of those 16 differing trades still ended up losers anyway (the buffer just delayed the loss); Recovery-After-Stop ≈0%; zero interaction across volatility regimes, including high-vol where a normalization role should show up if it existed; seat-based capital efficiency favors ATR0; and the touch-execution fix itself already recovered most of the drawdown improvement previously (wrongly) credited partly to buffer width. **No positive evidence for ATR1 has surfaced in any test run this weekend.** One more specific, cheap check queued before fully closing this out: a distance-distribution audit — bucket trades by how much *extra* stop distance ATR1 actually adds (0-0.25% / 0.25-0.5% / 0.5-1% / >1%), then check whether the trades receiving the largest ATR-driven distance penalty are actually better for it. If not (expected), this closes the book: ATR1 isn't just unnecessary, it's a real, uncompensated position-size tax concentrated on the highest-risk trades.
+
+## Phase C spot-check, part 1 — EMA34=2 vs EMA34≥9 (Common vs Delta) replayed on Execution Engine v2, and a real, understood driver found (2026-09-20)
+
+Direct replay of RQ-52A's Test P1 comparison (2026-09-18, Legacy Engine) on the current v2 baseline (touch stop, ZigZag target, swing-low trail), same population split (`is_delta = ema34_rising10 < 9`):
+
+| Engine | Common (EMA34≥9) | Delta (EMA34=2..8) |
+|---|---|---|
+| Legacy (close-based), full population | 60.7% win / **+0.995%** exp / +1.629% median | 61.7% win / **+1.255%** exp / +1.983% median |
+| Execution Engine v2, full population | 65.9% win / **+2.040%** exp / +1.556% median | 67.3% win / **+1.008%** exp / +1.334% median |
+| Execution Engine v2, Fresh≤0.40 | 67.4% win / +1.629% exp / +1.444% median, $13.13/day | 68.7% win / +1.063% exp / +1.355% median, $12.24/day |
+
+**[Correction, caught by direct user pushback]** — the Fresh≤0.40 row above is NOT comparable to a Legacy Fresh≤0.40 baseline the way it's laid out; the Legacy rows shown are full-population only. The actual Legacy Fresh≤0.40 baseline is RQ-69's (this weekend, same population): **Common 66.2% win / +1.912% exp; Delta 60.9% win / +0.995% exp — Common already led Delta on expectancy on Fresh≤0.40 in the Legacy engine, by an even bigger margin than v2 shows.** There is no Fresh≤0.40 reversal at all; that comparison was a population mismatch on my part, not a real engine effect. The **full-population** comparison (both rows genuinely apples-to-apples) is the one real reversal: Delta legitimately beat Common on expectancy under Legacy, full population; Common now leads under v2, full population.
+
+**Root cause traced directly, not assumed** — checked the win→loss flip rate (Legacy vs v2, exact ZigZag+swing-low-trail mechanism, full population) split by Common/Delta: Common 6.4%, Delta 5.9% (Delta's flip rate is *not* higher — the "Delta has more wick-through-stop-then-recover trades" hypothesis is directly disproven). Decomposed by exit reason instead:
+
+| Exit bucket | Common share/avg | Delta share/avg |
+|---|---|---|
+| target (real, progressed trades) | 27.6% / +2.99% | 46.6% / **+3.56%** (Delta better) |
+| stop (never really got going) | 11.9% / −4.04% | 12.8% / **−7.28%** (Delta worse) |
+| max_hold_cap (drifted, unresolved) | 59.8% / +2.67% | 40.4% / **+0.61%** (Delta worse) |
+
+**Delta's real winners are fine, even slightly better than Common's. The entire gap is concentrated in Delta's weak, non-progressing trades** (stop-outs and drifting max_hold_cap exits) — the same population RQ-68 already flagged under Legacy as Delta's "never-engage" group being meaningfully weaker than Common's (31.6% vs 40.3% win). Not a new problem — the corrected exit mechanism just measures that pre-existing weakness more honestly (touch-based stops capture real severity; the old close-based/ratchet mechanism smoothed it over less accurately for both groups, but Delta's thinner baseline margin means the same relative move costs it more in absolute terms).
+
+**Verdict, unchanged from before but now on firmer ground**: not a reversal of the EMA34=2 decision. Uniqueness (entry-timing, engine-invariant), fragility (confirmed pre-entry/structural, engine-invariant), operational capacity, and the options-side freshness lift (separate, untouched exit mechanism) all still stand. Only the raw stock-side expectancy comparison is genuinely weaker under v2, and it's weaker for a well-understood, localized reason — Delta's already-known-weak subgroup, not its real winners.
+
+## Phase C spot-check, part 2 — Freshness≤0.40 vs Extended on Execution Engine v2: real, but not a reversal of established wisdom (2026-09-20)
+
+Same EMA34=2 population (Common+Delta combined), split by `fresh≤0.40` vs `fresh>0.40` (Extended) instead of by is_delta:
+
+| Engine | Fresh≤0.40 | Fresh>0.40 (Extended) |
+|---|---|---|
+| Pure Legacy (close-stop + close-target), unmodified | 64.4% win / +1.596% exp / $17.25/day | 64.4% win / **+2.312%** exp / **$21.15**/day |
+| Touch-stop only (target still close-based) | 62.7% win / +1.418% exp / $14.64/day | 63.6% win / **+2.260%** exp / **$21.06**/day |
+| Execution Engine v2 (touch-stop + ZigZag target) | 67.9% win / +1.414% exp / $12.84/day | 63.5% win / **+2.376%** exp / **$20.13**/day |
+
+**Extended already beat Fresh≤0.40 on expectancy and portfolio $/day in the original, untouched Legacy engine, for this exact EMA34=2 population — before any fix this weekend touched anything.** Ruled out the touch-stop fix as the cause directly (win→loss flip rate by freshness bucket: Fresh 1.7%, Extended 1.0% — real but far too small, ~18 vs ~6 trades, to explain a gap this size). The gap widens somewhat through each successive engine fix (0.72pp→0.84pp→0.96pp in expectancy terms) but did not originate from them.
+
+**Traced back to the original source, not just asserted**: the documented Legacy-engine finding for this exact EMA34=2 population (line ~2714 above, `ema2_freshness_reaudit.py`, corrected for the look-ahead bug) already showed **swing was a near-wash between Fresh and Extended** (61.5% win/+1.056% exp vs 60.6%/+1.071% — essentially tied), while the real, strong Freshness signal was always on **options** (65.1%/+0.848% Fresh vs 52.9%/+0.395% Extended, a 12+ win-rate-point gap). **This is not a reversal of established wisdom — there was never a strong "Fresh beats Extended on swing" finding to reverse.** What's shown here is an extension of an already-known "swing barely cares about freshness" pattern, now showing a bit more separation in Extended's favor rather than a dead heat — not a genuine collapse of the Freshness signal. The real, load-bearing evidence for Freshness≤0.40 has always been the options leg, which uses a separate, untouched exit mechanism (day+1-open) — not yet re-verified this weekend, and the actual next open question, not "did we break Freshness."
+
+## Governance decision — Primed Gate is canonical for research going forward; `detect_entry()`/Entry Gate is legacy-only (2026-09-20)
+
+Re-ran `ema2_freshness_reaudit.py`'s Entry Gate leg (never recomputed correctly since the 2026-09-18 look-ahead fix) and found Extended beating Fresh on both swing and options — the opposite of Primed Gate's clean, reproduced result. Investigated, not dismissed: the trigger-anchoring in the options metric is legitimate (matches real trigger-based execution, not a bug — corrected after initially mis-calling it one, caught by direct user pushback). The real cause: **Entry Gate is a different estimator of the strategy population, not the executable one** — it requires `entry_signal()`/`checklist_pass()`'s close-based confirmation, which selects for days that already closed strong, so a forward-return calculation on that population partly re-counts the same day's own already-realized strength. Precise wording adopted (per critic correction — "biased" implies implementation error, this is a different population definition): **Entry Gate estimates performance for a hindsight-confirmed breakout subset, not the executable Primed strategy.**
+
+**This reopened a bigger question**: `backtest.detect_entry()` — the entry mechanism used throughout this entire weekend's execution-engine rebuild (touch-based stop, ZigZag target, swing-low trail, give-back audit, both EMA34 and Freshness spot-checks) — is Entry-Gate-equivalent (close-based confirmation), not Primed-Gate-equivalent (the real, live mechanism: `base_filters_pass()` + an actual intraday trigger-band cross, matching `_passes_primed_checks()`). **Resolved with the critic**: yes, `detect_entry()` is deprecated for new performance claims — Primed Gate is canonical going forward. `detect_entry()`/Entry Gate is retained only for legacy comparisons and regression testing, not new research.
+
+**Scope of what actually needs re-running, per the critic's decomposition — NOT everything**:
+
+| Category | Examples | Re-run on Primed Gate? |
+|---|---|---|
+| Population-invariant (validates exit *logic*, not which trades exist) | Touch-based stop validation, ZigZag target reconstruction, swing-low trail mechanics, give-back audit, M1 look-ahead fix | **No** — these hold regardless of which population they're demonstrated on |
+| Population-sensitive (strategy statistics) | Win rate, expectancy, profit factor, Fresh vs Extended, EMA34=2 vs 9 promotion metrics, capacity | **Yes** — depends directly on which trades exist |
+| Structural findings (subgroup characterization) | Delta's weak subgroup exists / is "never-engage" behavior (high confidence, likely survives); exact stop-out/max-hold severity gap (spot-check magnitude only) | Spot-check, not full re-run |
+
+**Why using Entry Gate this weekend wasn't itself a mistake**: this weekend's work was about execution mechanics (does touch-based stop/target behave correctly), deliberately holding entry fixed as a controlled baseline — changing the execution engine and the entry population simultaneously would have confounded attribution. The actual mistake would only be promoting those absolute metrics as production numbers without the Primed Gate rerun — which is exactly the caveat now attached.
+
+**Recommended rerun order (dependency-ordered, not everything at once)**: P0 build the Primed Gate canonical trade list → P1 recompute baseline metrics (win rate/expectancy/profit factor/capacity) on it → P2 EMA34=2 vs EMA34≥9 comparison on the same Primed population → P3 Freshness audit → P4 spot-check the Delta subgroup decomposition's magnitude. Everything else inherits the already-validated execution logic.
+
+**Standing note for every result produced between the exit-mechanism bug and this decision**: validated under the corrected execution engine, but still pending the canonical Primed Gate rerun for absolute numbers (win rate, expectancy, profit factor, freshness lift, EMA34 promotion metrics specifically) — not "everything is invalid," a narrower and more precise caveat than that.
+
+**Architectural recommendation, not yet actioned**: formalize entry-model naming so this ambiguity can't recur — `base_filters_pass()` (candidate generation) → `primed_gate()` (entry eligibility) → `trigger_cross()` (execution) as the canonical chain, with `detect_entry()` renamed/wrapped as an explicit `detect_entry_legacy()` adapter rather than something that can be accidentally reached for in new research code.
+
+## A real, pre-existing gap in Primed Gate's structural stop, found while building P0 — real, but not a P0 blocker (2026-09-20)
+
+Before running the full Primed Gate population, inspecting real examples first (per this session's standing rule) surfaced repeated same-ticker re-entries into one continuing move (GRANULES fired "fresh" entries on 7 separate dates across 6 weeks, each recomputing `structural_low` over a 20-day lookback that reaches back to before the whole move started, producing 15-29% initial risk vs this project's normal 7-12% range). **Verified this is not new** — the identical, already-cited "established, reproduced cleanly" Primed Gate numbers (`ema2_freshness_reaudit.py`'s `primed_gate()`, 65.1%/61.5%) share the same lack of re-entry tracking. On a 10-ticker sample, 49% of all Primed Gate fires already exceed 15% risk (median 14.83%). Confirmed as a live-relevant gap too, not backtest-only — `monitor_positions.py` computes real position stops with the identical formula; `extension_days` exists as an informational dashboard flag but is not a hard filter.
+
+**Critic verdict, adopted**: real (7/10 severity) but explicitly not a P0 blocker. Key distinction clarified — this conflates two separate research questions: **RQ-A (trade population)** — when does a breakout count as a genuinely new opportunity — and **RQ-B (stop construction)** — given an accepted entry, where should the initial stop live. The stop math itself isn't wrong; a 20-day structural low is computed exactly as specified, it's just answering "where did the whole breakout start" rather than "where should a late re-entry actually risk against."
+
+**Explicit caution on the 49% figure — do not trust yet**: it measures all *qualifying* Primed fires, not *executed* trades — a real trader would very plausibly take only the first fire in a continuing move and skip/ignore the rest, meaning the executed-trade population could look materially different from the raw-fires population. A large stop on a repeat entry also isn't necessarily a simulation bug — it may correctly describe "this isn't an attractive trade," not "this trade is mis-simulated." **Three diagnostics queued before drawing conclusions**: (1) risk% vs `extension_days` — do wide stops only appear after long extensions; (2) risk% vs first-breakout/repeat-breakout label — quantify how much of the 49% is driven by re-entries specifically; (3) risk% distribution restricted to genuinely executed live trades, if that history exists.
+
+**Fix options scored, none adopted yet**: cooldown-after-exit (3/10, measures time not market structure, would skip legitimate second setups after a real pullback); gate on `extension_days` (8/10, already computed, already live, a candidate filter not a stop fix); recompute `structural_low` from the latest real pullback/swing low instead of a fixed 20-day window (9.5/10, most principled, but unproven — needs testing without introducing lookahead or excessive stop-outs before replacing anything); "breakout lineage" campaigns (a ticker's breakout gets a first/continuation/late-extension stage label, ends on structure loss/deep pullback/fresh consolidation) — proposed as the richer, eventual replacement for `extension_days`.
+
+**Sequencing, agreed**: P0 (build the canonical Primed Gate trade list) proceeds unchanged — its job is reproducing the trade population as currently defined, not redesigning risk logic. P1 (baseline metrics) follows. **RQ-73A — Breakout Lineage & Structural Stop Anchoring** spun off as its own, independent research item (first/repeat-breakout labeling, risk% distribution by label, structural-stop alternatives tested only after the problem is properly isolated) — does not block P0/P1, and does not retroactively invalidate this weekend's execution-engine work (touch-based stop, ZigZag target, give-back audit, swing-low trail, M1 fix — those validate exit *behavior*, independent of this entry-population question). What it *does* potentially affect once resolved: capacity, average risk-per-trade, win rate, expectancy, and position-sizing research specifically, since those depend directly on initial stop distance.
+
+**RQ-73A repeat-entry hypothesis: rejected directly, on the full population, not just the small sample.** First breakouts (`extension_days=0`, genuinely fresh) already show 60.6% exceeding 15% risk (median 16.69%) — barely below repeats' 68.9% (median 18.26%), and only 28% of all fires are repeats to begin with. Removing repeat entries does not fix the wide-risk phenomenon; it's something more fundamental than breakout-lineage tracking (plausibly the fixed 20-day `structural_low` window vs. a stock's actual, variable-length base structure) — parked as RQ-73A's remaining open question, not pursued further right now.
+
+**SL calculation independently verified correct**: 18 real Primed Gate trades (mixed across high-risk >18%, normal 7-12%, and `extension_days=0` cases), recomputed entirely from scratch (not reusing `current_stop_level()`) — trigger, 20-day structural low, ATR, buffer, final risk% all matched the code's output exactly on every sample. Wide initial risk is a real property of the current stop definition on Primed Gate, not a calculation bug. Closes the audit cleanly: safe to proceed with the actual experiment.
+
+## P0/P1 baseline, and New SL / New Target / Trail-only isolated one at a time on the real Primed Gate population (2026-09-20)
+
+Canonical Primed Gate trade list (`base_filters_pass()` + real intraday trigger cross, `entry_price=trigger`, EMA34=2 capturing both Common/Delta), full 500-ticker universe, n=7,903 (vs. ~1,000-1,700 under the deprecated Entry-Gate/`detect_entry()` population all weekend — confirms the expected scale difference). Then tested New SL and New Target as isolated, independent changes (not just combined), since the user explicitly wants to track these as two clearly separable things going forward — SL is considered settled (ATR buffer aside, a separate future question), target is expected to keep evolving:
+
+| Variant (Fresh≤0.40) | Win | Exp | Median | Portfolio $/day |
+|---|---|---|---|---|
+| **Legacy (original baseline)** | 63.7% | +1.451% | +2.110% | **$12.36** |
+| New SL only (touch stop + slippage, target/trail unchanged) | 63.1% | +1.315% | +2.064% | $11.33 |
+| New Target only (ZigZag + swing-low trail, stop unchanged) | 71.4% | +0.996% | +1.437% | $10.51 |
+| Trail legacy (no target, close-stop, SMA21 trail) | 56.2% | +1.780% | +1.158% | $10.92 |
+| Trail new (no target, touch-stop, swing-low trail) | 56.4% | +1.570% | +1.199% | $9.81 |
+| Combined (New SL + New Target, = P0/P1 baseline) | 71.3% | +0.902% | +1.435% | $9.65 |
+
+## ATR buffer distance-distribution audit — closes the ATR question, confirms RQ-69 rather than reversing it (2026-09-20)
+
+Per the user's prioritization (settle `MAX_HOLD_DAYS`/ATR before continuing to iterate Target, since those "settle once and for all" while Target won't), ran the one remaining queued ATR test from Update 71: bucket trades by how much extra stop distance the 1.0x ATR buffer adds (as % of entry price — this is fixed at 1.0x always, so the bucket is really a volatility-regime split, not different buffer multiples), then check whether the trades paying the largest ATR-driven distance penalty are actually better for it. Built on the canonical Primed Gate population (rq93/94's mechanism — touch-based stop, ZigZag target, swing-low trail), n=7,922 full / 4,858 Fresh≤0.40, comparing ATR0 (structural_low only) vs ATR1 (structural_low − 1.0×atr14, current prod default).
+
+**First pass (raw %-return) looked like a reversal of RQ-69's "no benefit" verdict** — ATR1 showed +0.089pp/trade average edge, win rate 66.6% vs 66.1%. Three real trades hand-verified across the distance distribution (AXISBANK, KAYNES, GALLANTT) confirmed the mechanism itself is bug-free — day-by-day stop levels, hit conditions, and exit prices all reconstructed by hand exactly matched the worker's output.
+
+**But the full breakdown kills the reversal.** 90.9% of trades never even reach ATR0's tighter stop — buffer choice is irrelevant to them, but they still pay for it in position size (see below). Of the 9.1% that do reach it: 46% stop out the same day regardless (pure stop-level/slippage noise, not a real effect). The remaining 4.9% of the whole population is where it actually matters, and it splits almost evenly both ways:
+- **2.7% of trades (212) benefit** from the extra room — avg +6.43pp better.
+- **2.2% of trades (178) get hurt** — price just kept bleeding with the extra room, avg **-2.63pp worse**. This losing-side failure mode hadn't been surfaced before.
+- Net: +0.172pp/trade from the winners of this split, -0.059pp/trade cost from the losers — nets to the thin +0.089pp headline. This is the *same* "two small offsetting effects roughly cancel" pattern RQ-69 found on the old Entry-Gate population — a confirmation, not a new finding, just netting slightly positive here instead of ~zero.
+
+**Capital-efficiency-adjusted, ATR0 wins outright.** ATR1's avg initial risk is 18.43% vs ATR0's 15.16% (1.22x wider on Full; 1.255x on Fresh≤0.40) — meaning ~19-25% smaller position size for the same rupee risk, on every trade, permanently. R-multiple (pnl% ÷ risk%, the correct fixed-risk-sizing comparison): **ATR0 = 0.0619R avg vs ATR1 = 0.0536R avg on Full; 0.0654R vs 0.0558R on Fresh≤0.40 — ATR0 wins both.** The raw +0.089pp comparison only looked good because it ignored that ATR1 trades carry proportionally more risk to get there.
+
+**Two structural questions answered, one proven not just observed**: (1) *Can ATR1 ever cut a genuine winner?* No — provably. `stop_level_atr1 ≤ stop_level_atr0` on every single day by construction (same buffer subtracted throughout, no exceptions), so any trade that never touches ATR0's stop mathematically cannot touch ATR1's either. Confirmed empirically too — all 5,240 ATR0 winners are byte-identical under ATR1. (2) *Does volatility predict which trades benefit vs get hurt, enabling a selective buffer?* No — divergence rate by ATR% bucket is flat (3.8%, 4.4%, 2.9%, 4.1%, 3.1%), no monotonic relationship. Volatility bucket doesn't concentrate the benefit; a volatility-gated buffer wouldn't improve this trade-off.
+
+**Verdict: ATR0 (structural low only, no buffer) stands as the settled baseline**, confirmed on both Full and Fresh≤0.40. Not sent to critic — re-confirms RQ-69's prior call rather than overturning it. ATR question closed; proceeding to `MAX_HOLD_DAYS` re-tuning next.
+
+## MAX_HOLD_DAYS sweep — plateau-shape puzzle resolved by isolating entry population (2026-09-20)
+
+Swept N∈{5,10,15,20,25,30,45} on the settled Primed Gate mechanism (ATR0, ZigZag target, swing-low trail). First attempt (single 45-day simulation, bucketed post-hoc per candidate N) had a real methodological bug, caught before trusting it: a longer simulation blocks a ticker's one-position-at-a-time slot for the full 45 days regardless of which N is being evaluated, silently dropping re-entries a shorter cap would have freed up sooner (caught directly on NMDC: the 45-day run skips 2022-03-25 and 2022-04-01 entries the N=15 baseline takes, because the prior trade is artificially held open past them). Rebuilt as 7 fully independent simulations, sanity-checked against the existing rq93 canonical population at N=15 (entry dates matched exactly).
+
+Result: win/exp/median climb steadily with no plateau anywhere in 5-45 days (win 66.2%→69.8%, exp +0.890%→+1.007%), while portfolio-%/day falls monotonically favoring shorter holds (0.092→0.053) — a different shape from the original 2026-09-14 decision, which found a clear plateau by day 20 and picked 15 as a cheap trade-off inside the user's stated 2-3-week practical hold ceiling.
+
+**User's hypothesis, tested directly**: is this because Entry Gate (`detect_entry()`, close-confirmed) is a fundamentally different, pre-filtered population than Primed Gate (raw intraday breach)? Isolation test — identical exit stack held fixed (ATR0, ZigZag, swing-low trail), only entry swapped back to `detect_entry()`/breakout_cont-only. **Confirmed cleanly**: Entry Gate reproduces the original 2026-09-14 plateau almost exactly (win rate flat 70.1%/70.1%/70.2% across days 20-30, exp barely moves 2.427%/2.502%/2.505%), while Primed Gate keeps climbing throughout the same range under the identical exit mechanism. The shape difference is driven entirely by entry population — Entry Gate only takes already-close-confirmed trades, so most of what's going to resolve already has by day 20; Primed Gate includes raw breaches (including weaker/failed setups) that take longer to wash out or occasionally come good — not by the touch-execution or ZigZag-target changes originally suspected.
+
+**Practical upshot**: the 15-day ceiling's real cost, measured on the actual executable (Primed Gate) population, is larger than the 2026-09-14 estimate, which was made on a hindsight-biased population. User is not moving the ceiling regardless — a real, stated operational constraint (can't manage an open position past 2-3 weeks) independent of what the data show — so this doesn't change any action, but the mechanism is now understood rather than mysterious. Portfolio-%/day continues favoring shorter holds under both entry populations, but this assumes frictionless capital reinvestment (the same assumption that sank Fixed-R exits under the real capacity-constrained test) and remains unverified — deprioritized for now per user's call, since they aren't holding longer either way.
+
+## Freshness=0.40 re-swept under the new mechanism — a real, unresolved problem (2026-09-20)
+
+The 0.40 cutoff (adopted 2026-09-14) was explicitly logged at the time as "no natural knee anywhere... not a validated optimum, just a reasonable, moderately strict, defensible reference point," on the old exit mechanism (close-based stop/target, SMA21 trail) and a different entry population. Never re-swept since — this weekend's Phase C part 2 only checked the *direction* of Fresh-vs-Extended (held up, not reversed), not the threshold value itself.
+
+Re-ran the full cumulative sweep on today's settled mechanism (ATR0, ZigZag target, swing-low trail, `MAX_HOLD_DAYS=15`), full Primed Gate population (n=7,920):
+
+| Threshold | n | Win | Exp | Portfolio %/day |
+|---|---|---|---|---|
+| ≤0.20 | 2,993 | 72.2% | +0.670% | 0.088 |
+| ≤0.30 | 4,064 | 70.7% | +0.704% | 0.087 |
+| ≤0.40 (current) | 4,877 | 69.8% | +0.721% | 0.086 |
+| ≤0.50 | 5,549 | 68.8% | +0.702% | 0.081 |
+| ≤0.60 | 6,131 | 67.7% | +0.641% | 0.072 |
+| ≤0.80 | 7,151 | 66.6% | +0.710% | 0.076 |
+| No filter | 7,920 | 66.2% | +0.880% | 0.091 |
+
+Win rate is still monotonic (freshness works as a rank signal, as always claimed). Expectancy and portfolio-%/day are not — they dip through the middle and no-filter beats every cumulative threshold including ≤0.40. Decile breakdown shows why: a real U-shape. Verified before trusting it — outlier concentration on the standout decile (top-10 share 26.5%, under the 40% danger line; excl.-top-10 expectancy still +1.79%), and whether it's just the already-known Delta-weak-subgroup showing through a correlated proxy (fresh↔is_delta correlation only -0.370, not the whole story) — **the U-shape persists within Common trades alone**: decile 9 (fresh 0.845-0.989, most "extended") = +2.73% exp / 0.212 portfolio-%/day, the single best cell in the table; decile 6 (fresh 0.50-0.61, right where the current 0.40 cutoff sits) = +0.07% exp / 0.006 portfolio-%/day, the worst. Checked R-multiple since decile 9 also carries much wider initial risk (27.05% avg vs decile 6's 16.76%) — survives risk-adjustment: 0.1045R vs 0.0111R, compressed from the raw gap but still real and still ordered the same way.
+
+**New wrinkle, not yet reconciled**: correlation(fresh, initial_risk_pct) within Common = 0.696 — very strong. Looks entangled with the RQ-73A structural-stop-width issue (parked, unresolved, from earlier the same day) rather than an independent signal — possibly "freshness" and "how wide the 20-day structural stop ended up" are two views of the same underlying "how extended is this setup" property, not two separate findings.
+
+**Tension resolved, not just observed**: the standing assumption was "fresher = better," implying a monotonic relationship — so a U-shape looked like an anomaly demanding a missing filter. Checked the actual formula: `freshness = 0.5×RSI14_percentile + 0.5×20-day-momentum_percentile` (`live_checkpoint.py`'s `_freshness_score()`) — "less fresh" literally means higher RSI and higher recent momentum, i.e. an emphatic, already-confirmed move, not a weak one. "Fresher = better" is a mean-reversion-style prior (get in before it's overbought); but momentum persistence is an equally real, competing edge (a stock already showing strong RSI/momentum at breakout is higher-conviction, not stale). Both are legitimate and point opposite directions on the same one-dimensional metric — which is exactly why the shape isn't monotonic: crisp fresh breakouts win one way, confirmed strong-momentum trades win another way, and the muddled middle (neither clean nor confirmed) is genuinely the weakest population, not noise.
+
+**Tested the direct "logic around" implication — a two-sided filter (keep both tails, cut the middle) instead of a one-sided cutoff:**
+
+| Variant | n | Win | Exp | Portfolio %/day |
+|---|---|---|---|---|
+| Current: Fresh≤0.40 (one-sided) | 4,877 | 69.8% | +0.721% | 0.086 |
+| No filter | 7,920 | 66.2% | +0.880% | 0.091 |
+| **Two-sided: Fresh≤0.20 OR ≥0.80** | 3,762 | **70.3%** | **+1.034%** | **0.121** |
+| Two-sided: Fresh≤0.30 OR ≥0.80 | 4,833 | 69.4% | +0.982% | 0.112 |
+| Extended-only: Fresh≥0.80 | 769 | 62.6% | +2.452% | 0.197 |
+| Extended-only: Fresh≥0.70 | 1,250 | 61.5% | +1.970% | 0.162 |
+
+**Retracted immediately after — a real gap, caught directly**: a stricter filter mechanically changes the trade population size, so per-trade and per-deployed-day metrics improving as a filter tightens isn't automatically a real edge. Checked total realized output (`sum(pnl_pct)` across the whole test period, unconstrained by capacity) instead:
+
+| Variant | n | Exp/trade | Portfolio %/day | Total pnl%-sum |
+|---|---|---|---|---|
+| Current: Fresh≤0.40 | 4,877 | +0.721% | 0.086 | 3,516 |
+| No filter | 7,920 | +0.879% | 0.091 | **6,965** |
+| Two-sided: ≤0.20 OR ≥0.80 | 3,762 | +1.034% | 0.121 | 3,890 |
+| Extended-only: ≥0.80 | 769 | +2.452% | 0.197 | 1,885 |
+
+No-filter produces almost double the total output of the "better-looking" two-sided filter, purely from trade count; extended-only (best per-trade number) produces the *least* total output of all four — too few qualifying setups to compound through. Per-trade and per-deployed-day metrics improve as the filter tightens; total output collapses as it tightens — the exact same throughput trap as the MAX_HOLD_DAYS question above, resting on the same unverified assumption (capital freed by skipping a trade gets redeployed into something equally good elsewhere) that sank Fixed-R exits once actually tested with a real capacity constraint.
+
+**Honest state**: the U-shape and its RSI/momentum mechanism are real and hold up (outlier-checked, subgroup-decomposed, risk-adjusted). The two-sided-filter *fix* is not yet established — it's an unresolved per-trade-quality-vs-total-output trade-off, needing the same deterministic capacity-constrained methodology as everything else flagged today before promotion either way.
+
+## Critic's control-flow verdict on Update 75, and P0 — the primary new-SL/new-target experiment, full battery (2026-09-20)
+
+Critic's response to Update 75: close several loops and prune the research tree aggressively rather than let Freshness become another open-ended thread. Verdict, item by item — Primed Gate population, `detect_entry()` deprecation, initial SL arithmetic, ATR0 vs ATR1, repeat-entry hypothesis: all **closed**, no further work. `extension_days` as a freshness control: insufficient, parked. 20-day structural-low question (RQ-73A): stays parked — a strategy-design question, not a correctness one, and shouldn't be resolved before seeing how the new SL behaves in practice. MAX_HOLD_DAYS: mechanism explained (entry-population driven), optimization deferred — 15 stays as the operational ceiling regardless of what the unconstrained curve shows. Freshness U-shape: real and worth recording, but the two-sided-filter fix is unproven and explicitly should NOT be chased into a capacity test right now — doing so now would be "optimizing entry filtering and holding-period throughput before seeing how the new SL and target actually work," exactly the control-flow drift being guarded against. The 0.696 fresh↔initial-risk correlation: a dependency to watch, not yet enough to merge RQ-73A and the Freshness thread into one question — critic's reasoning: the new SL experiment is a natural bridge, since if the U-shape survives a substantially different SL, that's evidence freshness is independent; if it disappears, much of the "freshness effect" was actually a stop-construction artifact.
+
+**One prerequisite before the primary experiment**: same minimal standard as the SL check — a few real trades, manually reconstruct the new ZigZag target, confirm it's not a research project, just a correctness check. Done: 3 real NMDC trades (2022-04-01, 2023-08-01, 2024-04-10). Two produced a target — both confirmed as genuine local price peaks strictly prior to entry (printed the surrounding price window, target date's High is a real local max, no higher High exists between target date and entry), entry day itself correctly excluded from the lookback. The third correctly returned no target — confirmed the entire 300-day lookback window's max High (41.90) sits below entry price (42.11), a genuine "making a fresh high, nothing above to target" case, not a bug. Target computation passes the correctness check same as SL did.
+
+**P0 result — full battery, per critic's exact list**, on the settled mechanism (ATR0, ZigZag target, swing-low trail K=2, `MAX_HOLD_DAYS=15`), Primed Gate population:
+
+| | Full (n=7,920) | Fresh≤0.40 (n=4,877) |
+|---|---|---|
+| Win rate | 66.2% | 69.8% |
+| Expectancy | +0.879% | +0.721% |
+| Median | +1.279% | +1.380% |
+| Avg / median days held | 9.6 / 15.0 | 8.4 / 9.0 |
+| R-multiple (mean/median) | 0.0613 / 0.0928 | 0.0654 / 0.1183 |
+| Initial risk (mean/median) | 15.16% / 13.85% | 12.30% / 11.65% |
+| Portfolio %/day (descriptive only, not a promotion criterion per critic) | 0.0912 | 0.0855 |
+
+**Exit-reason mix**: max_hold_cap 49.3%, target 40.9%, stop 9.1%, climax 0.2% (full pop). 67.5% of trades have a target at all (32.5% are making fresh highs with nothing above to aim at); of those with a target, 60.5% hit it. The no-target subset resolves almost entirely via max_hold_cap (85.5%) or stop (13.2%).
+
+**Trail behavior**: engages (crosses +8% from entry) in 18.5% of trades; actually binding (overriding the base structural stop) in just 2.6% of all trades.
+
+**Give-back (losers)**: 60.5% touched ≥2% favorable move before finishing as a loss, avg give-back 9.98pp — consistent with the earlier give-back audit (58-62%/11.35-12.48pp), slightly better under this mechanism.
+
+**Exit efficiency (winners)**: 53.3% of peak MFE captured on average — notably lower than the legacy mechanism's ~72-73% (RQ-68). Mechanically explained: max_hold_cap is now 49.3% of all exits (a pure calendar cutoff, zero profit protection) vs. the legacy mechanism's SMA21-trail-dominated mix — the same gap partial-exit design was meant to address, now quantified precisely on the real mechanism.
+
+**Stop-out behavior, split by type** (critic's remaining explicit ask): stops aren't a uniform bucket. Trail-floor stops (28.5% of all stops, full pop) are winners on average (**+4.64%**) — the trail only fires after the trade already moved up ≥8%, so hitting it means giving back some profit, not losing money. Base-structural-stop exits (71.5% of stops) are the real losers (avg **-12.48%**). Realized loss on a stop averages only 0.67x (full) / 0.85x (Fresh≤0.40) of the planned initial risk — pulled toward zero/positive by the trail-floor subset.
+
+**This closes out every item on critic's P0 list.** Next per critic's stated sequencing: P1 partial-exit design, now that the all-or-nothing exit system's behavior is fully characterized rather than assumed.
+
+## P1 — Partial-exit design, run as an observation only, not a candidate for adoption (2026-09-20)
+
+**Explicit framing, stated by the user before running this**: "I don't really like partial exit trades. More operational headache, let's run it but I will keep it as an observation only." Not being adopted regardless of result — recorded here so this doesn't get mistaken for a pending decision later.
+
+Design: bank 50% of the position at the first Close ≥ entry×`TRAIL_ENGAGE_PCT` (the same +8% milestone the trail already uses), move the remaining 50%'s stop to breakeven at that moment, let the remainder ride under the existing target/stop/trail/max_hold_cap logic unchanged. One variant, not a sweep. Same trade population in both arms (no confound, verified: the 81.4% of trades that never reach +8% are byte-identical between baseline and blended).
+
+| | Full (n=7,966) | Fresh≤0.40 (n=4,879) |
+|---|---|---|
+| Baseline (100%, all-or-nothing) | 64.4% win / +0.739% exp / +1.098% median | 68.8% / +0.632% / +1.297% |
+| Partial-exit (blended 50/50) | **67.1% / +0.920% / +1.455%** | **70.2% / +0.818% / +1.493%** |
+
+The entire improvement comes from the 18.6% of trades that ever reach +8% — verified the other 81.4% are mathematically unchanged. Within the triggered subset, the blended result hits 100% win rate by construction: once profit is banked and the remainder's stop moves to breakeven, the worst-case outcome on that half is roughly flat, structurally removing the "give it all back to a loss" scenario quantified in P0's give-back audit (60.5% of losers had touched ≥2% profit first). Real, but expected/definitional — this is the known mechanical benefit of the technique (protect earned gains), not a surprising discovery. No further work planned on this thread per the user's operational-overhead call.
+
+## A bigger, unexpected finding surfaced from the same data: flat exit at +8% beats both riding AND the partial-exit design (2026-09-20)
+
+User's direct follow-up question to the partial-exit result: "what if I would have booked flat 8% close always?" — i.e., take the entire position off (100%, not 50%) the first time it closes at `entry×TRAIL_ENGAGE_PCT`, no partial/tranche management at all. Derived directly from the existing partial-exit data (no new simulation): for the 18.6% of trades that ever reach +8%, this variant books the trigger-day close; the untriggered 81.4% are unchanged.
+
+| | Full (n=7,966) | Fresh≤0.40 (n=4,879) |
+|---|---|---|
+| Baseline (ride to natural exit) | 64.4% / +0.739% / total 5,885 | 68.8% / +0.632% / total 3,084 |
+| Partial 50/50 blended | 67.1% / +0.920% / total 7,330 | 70.2% / +0.818% / total 3,991 |
+| **Flat: 100% off at first +8%** | **67.1% / +1.102% / total 8,775** | **70.2% / +1.004% / total 4,899** |
+
+Beats both other variants on expectancy and total output, same population, no confound. On the 18.6% (14.6% Fresh≤0.40) of trades that reach +8%, riding further **loses 1.95pp/trade on average** (2.55pp Fresh≤0.40) versus taking it flat there — the current target/trail/max-hold mechanism actively costs money on average once a trade has already proven itself.
+
+**Verified this isn't outlier-driven before trusting it**: median delta (ride − flat) = -1.89pp, matching the mean's story; worst-10 trades account for only 3.9% of the total negative effect — a broad, majority pattern (60.7% of triggered trades lose from riding), not a tail artifact.
+
+**Mechanism, by exit reason, on the triggered subset**:
+- **Riding loses (60.7% of triggered)**: 39.5% are genuine stop-outs — real reversals giving back the whole move, the same pattern the give-back audit already quantified. 36.3% are, surprisingly, `target` exits that *still* lose to flat-8% — a real pricing quirk: the ZigZag target only needs to sit above entry price, not above the +8% level, so it can be below +8%; if the trade gaps past both levels on the same day, booking at the exact target price leaves money on the table versus what a flat exit at that day's actual close would have captured.
+- **Riding wins (35.4% of triggered)**: 71.1% are max_hold_cap (slow, steady grinders that kept climbing the full 15 days) and 23.6% are genuine target hits *above* +8% — real, bigger structural moves that justify holding.
+
+**Why this is more significant than the partial-exit result, and unlike it, not ruled out on complexity**: partial exits require managing two tranches (a real operational cost the user explicitly rejected). This is a single, flat exit rule — same operational shape as the existing target mechanism, just triggered earlier and unconditionally. It directly challenges the "let winners run" assumption built into the whole target/trail/max-hold design for this subset of trades. Not yet promoted — needs the same standard as everything else today (real-example inspection of a few "riding lost" and "riding won" cases, and a check for whether this holds at other flat-exit levels near +8%, not just this one point) before treating it as more than a strong candidate. Sent to critic as a genuinely new, unexpected finding, not a confirmatory one.
+
+**Sent to critic (Update 75)** with this corrected framing — the U-shape mechanism as a trustworthy finding, the two-sided filter as a promising but unvalidated candidate pending the capacity check.
+
+## Update 76 exchange — the +8% flat exit is downgraded, a design-principle debate resolves the trail-vs-flat-exit inconsistency, and stall exits get reframed as the project's central unresolved question (2026-09-20)
+
+Critic's first response to Update 76 promoted the flat +8% exit to top research priority (three reasons: same population/no filtering artifact, median agrees with mean so it isn't a few spectacular give-backs, and 60.7% of triggered trades is a majority effect, not noise) and proposed a verification ladder — Stage A: manually inspect ~20 trades split across ride-loses-badly/slightly and ride-wins-moderately/hugely; Stage B: sweep nearby flat-exit levels (6/7/8/9/10%) to check whether the shape is a real plateau or a coincidence tied to exactly +8%. Also flagged a genuine, separate design inconsistency: the ZigZag target only needs to sit above entry price, not above the trail-engage threshold, so a trade can have its target below +8% — meaning the system can book an exit at +5.5% via "target" even after momentum has already closed above +8%, an ordering that doesn't match the intended semantics. Proposed invariant: "a structural target below the trail-engage threshold is not a valid structural target" — pending a one-line audit (what % of target exits have a target below +8%; ignore if ~1%, real issue if ~25%).
+
+**User pushback, immediately fatal to the "promote +8%" framing**: "if only ever in the history 18% trades are gonna touch 8%, why should I be tuning my strategy for that? That is clearly an outlier." Critic agreed fully and reversed: the entire +0.363pp aggregate improvement comes from redesigning exit behavior around one-fifth of the trade population — a high bar that isn't met just because the effect is statistically real. Reframed the finding's actual value: not "8% is the right exit level" but a diagnostic — "trades that become meaningful winners often give back gains after reaching +8%," pointing at a broader, more valuable question ("what characterizes winners that have already done enough vs. winners that keep trending"). Recommended a cheap descriptive breakdown instead of a threshold sweep: split the 18.6% triggered subset into stop/trail winners, max-hold winners, max-hold losers, target-exits-below-+8%, target-exits-above-+8%, to understand the give-back mechanism without proposing a new rule. **+8% flat exit removed from the active roadmap, kept only as a documented observation.**
+
+**User's sharper follow-up, catching a self-inconsistency**: the existing trail (engages in 18.5% of trades, per P0) was never subjected to the same "too small a population to justify" objection that just killed the flat +8% exit — and the trail *actually binds* (overrides the base stop) in only 2.6% of all trades, an even smaller footprint than the rejected +8% rule. Critic agreed this was valid, distinguished two categories of rule: core/execution rules (need to improve the strategy broadly to justify their complexity) vs. safety/exceptional rules (an airbag analogy — rare activation is fine if it prevents a specific catastrophic failure mode cheaply) — but conceded the trail has never actually been proven to be earning its keep; its 18.5%/2.6% footprint is consistent with either "essential rare protection" or "decorative trim; we don't yet know which." Proposed a trail-on-vs-trail-off contribution experiment (same entry/target/stop/max-hold, only the trail toggled) to measure it directly, not yet run.
+
+**User's own design principle, stated directly**: "I would like to keep it like this, a filtering rule/bad-trade recognizing, I like if it works on a subset, because that is what I want, as less bad trades as possible — but random improvements which only work for 5% population is complexity." Critic formalized this into a standing project rule, refined one step further: the real dividing line isn't subset-size, it's whether the subset is **identifiable before entry**. Filtering/bad-trade-recognition rules (Freshness, Fragility, Delta/Common split) are allowed to target a small, niche subset, because their job is deciding whether to take a trade at all, using only pre-entry information — a subset that disproportionately removes losers is exactly the point, however small. Execution/exit-management rules (the trail, partial exits, a flat +8% exit, stall exits) act only after capital is already committed, using post-entry information ("+8% reached" is not knowable until the trade is already running) — these must justify their complexity by a broad contribution across the strategy, not by improving a small post-entry subset in isolation, since they add ongoing complexity to every single trade for a payoff realized on only a few of them.
+
+**Standing design principle, adopted**: *Filtering rules may target a subset, because their job is pre-entry trade selection using only information available before commitment. Execution/exit rules must justify their existence by contribution to the whole strategy, because they add complexity to every trade for a payoff realized on only some of them.* Applied to the current queue: flat +8% exit — rejected (execution rule, small post-entry population, doesn't fit). Trail after +8% — audit pending (execution rule of unproven value, not yet rejected or confirmed). Freshness U-shape — worth pursuing (entry-side, pre-entry-identifiable). Structural-stop redesign — revisit only if it improves pre-entry trade selection or risk realism broadly. Stall exits — execution rule, re-test conditional on whether the new mechanism changes the old capital-constrained rejection.
+
+**The central reframe — stall exits promoted from a queued item to the project's most important open question**: user reiterated the original framing directly ("we are not doing general swing, we are doing breakout momentum swing but we sit through things even in fakeouts and momentum stalls like regular swing and wait for recovery"). Critic's response: this is "the central unresolved research question of the entire project," and P0's own data supports it directly — 49.3% of ALL trades exit via `max_hold_cap`, and (from the loser breakdown) 78.3% of losing trades exit that way, averaging -5.22%. The dominant loser isn't a violent reversal (only 20.9% of losers are active stops, averaging a worse -11.83%) — it's "breakout never became momentum, and we watched it decay for two weeks." Distinguished two failure modes: Type A, fake breakout (momentum disappears almost immediately) vs. Type B, momentum stall (price just stops behaving like momentum — the larger population, and the one the current mechanism has no detector for at all).
+
+**Explicit mandate, not to be violated**: this is now **RQ-77: Momentum Failure Recognition**, reframed away from "test stall exits" — no new rule is to be designed or invented ("do not invent Stall v4"). This project already built and validated three stall detectors pre-dating this weekend's engine rebuild (3-day-stall, Energy Stall, the Efficiency-trigger Wyckoff redefinition — the latter explicitly logged at the time as "a genuinely clean, robust result... and then died under capital constraints" once tested with a real capacity limit). The task is strictly diagnostic: reuse an existing detector as-is under the new canonical engine, and ask (1) when it would have first fired for each trade, (2) what P/L was at that moment for the 78.3% max-hold losers (damage avoided), (3) whether those trades would have recovered by day 15 anyway (false-exit risk), (4) how many eventual winners it would have incorrectly cut (opportunity cost). No portfolio/capacity simulation yet — that comes only after the diagnostic, and only if the detector still looks genuinely promising, per the explicit reminder that Efficiency Stall's earlier "clean, robust" per-trade result did not survive a real capacity-constrained test.
+
+**Revised roadmap, in order**: P1 RQ-77 (Momentum Failure Recognition, diagnostic only) → P2 +8% sanity check (demoted from redesign to a small 20-chart-plus-nearby-sweep check on a benchmark, not a live candidate) → P3 target-below-trail-engage audit (one statistic) → P4 Freshness capacity simulation (parked) → P5 structural-stop redesign/RQ-73A (parked, most invasive, last).
+
+## RQ-77 — Momentum Failure Recognition, diagnostic result: the reused stall detector doesn't fix this either (2026-09-20)
+
+Reused the plain, already-validated 3-day-no-fresh-high stall (volume condition dropped, historically shown to add nothing) purely as an observer against the P0 canonical population — armed, tracked, and recorded, but never actually exiting a trade. Per critic's explicit mandate: no new rule invented, exact historical arm definition reused (`0.5×R`, `R = ATR_TRAIL_MULT(3.0) × atr14` — the literal old convention, in ATR terms, not translated through the new structural-low stop distance).
+
+**Caught and fixed before trusting the result**: a first attempt mistakenly defined the arm threshold as `0.5 × initial_risk_pct` (the new mechanism's own stop-distance concept, averaging ~15%) instead of the historical `0.5 × 3×ATR14` (~9.8%, so an arm around ~4.9%) — putting the arm bar at ~7.5%, nearly as strict as the already-rejected +8% level. That version only fired on 9.6% of trades / 2.9% of max-hold losers, an obviously-too-conservative artifact of the wrong translation, not a real result. Corrected to the exact historical R definition before reporting anything.
+
+**Result, on the corrected definition** (fires on 17.4% of all 7,920 trades):
+
+Max-hold losers (n=2,094, avg -5.22%): the detector catches only **9.7%** of them (203 trades) — the other 90.3% never show a clean "made a high, then flatlined 3+ days" pattern; they're choppier, still ending as losers without ever tripping this specific detector. Where it does fire on this subgroup: 85.2% correct calls, avg **4.35pp of further damage avoided** (avg pnl at fire +1.16%, avg pnl at actual day-15 exit -3.19%) — genuinely useful when it triggers, just incomplete coverage.
+
+Eventual winners (n=5,244): the detector fires on **21.4%** of them before their real, profitable exit — 95.7% of those firings were already positive (avg +6.87% at fire vs +8.34% at actual exit), so adopting it wouldn't turn a winner into a loser, but it would give up an average **1.47pp of upside**, mostly on slow max_hold_cap grinders (81.4% of this subgroup) that eventually worked out anyway — the same "slow grinder" pattern the +8%-flat-exit analysis already surfaced.
+
+**Naive population-wide effect of adopting it as a live exit rule** (exit at the stall price whenever it fires, keep actual outcome otherwise): expectancy +0.879%→+0.835%, total output 6,965→6,614 — **a small net decline**, not an improvement, splitting almost exactly 50/50 between helping (46.7% of fires) and hurting (47.0%) on the trades it touches.
+
+**Conclusion**: the reused, historically-validated stall detector does not fix the momentum-failure problem under the new mechanism either. It correctly identifies a real subset of failing trades early (genuine value when it fires), but coverage is incomplete (misses ~90% of max-hold losers) and the cost of cutting eventual winners short roughly offsets the benefit — the same "looks clean per-trade, doesn't clearly win in aggregate" shape that killed it historically under capital constraints, this time visible even before reaching that stage. Per critic's own stated mandate (only proceed to the deterministic capacity-constrained test if the diagnostic still looks genuinely promising), this does not warrant that next step. RQ-77 stays open as a real, unsolved question — the existing detector families (plain 3-day stall tested here; Energy Stall and the Efficiency-trigger Wyckoff redefinition not yet re-tested under this mechanism) don't close it, and no new detector has been invented per the explicit "don't build Stall v4" instruction.
+
+## RQ-77 continued — the arming gate is a real structural blind spot for catching losers, and Efficiency trigger (unarmed) doesn't escape the underlying trade-off either (2026-09-20)
+
+Direct user critique of the whole arm-then-detect convention: every stall detector arms only after the trade is already up a meaningful amount (0.5R ≈ +4.9%), which means these detectors can only ever catch *fading winners* — they are structurally blind to trades that go straight down, flat, or choppy-negative from day one, which is exactly the population that "hurts more." Verified directly before building anything new: of the plain 3-day stall's 1,891 "never fired" max-hold losers, **100% were net negative at exit, and 67.8% were already down ≥3%** — the +4.9% arm threshold was never remotely reachable for most of them. The blind spot is real and large, not a minor edge case.
+
+**Efficiency trigger's own formula** (`|3-day net return| < 2.0% AND Volume3/Volume20 > 1.2`) has no dependency on cumulative P&L — it only reads a rolling 3-day window, so it's mechanically capable of firing on a flat or losing trade with no arm gate at all. Tested unarmed (checked from day 3 onward regardless of current P&L), also flagging, per the user's separate caution below, whether each entry's same-day close would *also* have confirmed as a valid close-based Entry Gate candidate (`detect_entry()`, not reimplemented).
+
+**Result: removing the arm gate does fix the loser-blindness, but at a cost that roughly cancels the benefit.** Fires on 31.0% of all trades (vs the armed version's 17.4%). Catches ~45% of max-hold losers (vs 9.7% armed) with real damage avoided (~2.5-2.75pp). But it also now fires on 26.6% of all eventual winners before their real exit (vs 21.4% armed), catching them earlier (avg pnl at fire only 3.90% vs eventual 7.06%) for a bigger average opportunity cost (3.16pp vs 1.47pp armed). Naive population-wide adoption: expectancy +0.890%→+0.777%, total 7,063→6,164 — a **larger** net decline than the armed version's, not an improvement; fires split 46.8% help / 49.3% hurt, essentially a coin flip. **Conclusion: removing the arm gate doesn't escape the underlying tension, it just relocates the cost from "missed losers" to "clipped winners," and nets out slightly worse. Neither the armed nor unarmed version of this detector family solves RQ-77.**
+
+## A bigger, unexpected finding surfaced along the way: same-day close-confirmation is a huge, early quality signal — but a near-identical intervention already failed once (2026-09-20)
+
+While building the unarmed-Efficiency-trigger diagnostic, flagged each Primed Gate entry with whether that same day's close would *also* have confirmed as a valid close-based Entry Gate candidate (`detect_entry()` with the real regime gate, `require_regime=True` — not a bare `entry_signal()` check).
+
+**Result: only 9.1% of all Primed Gate breaches would also close-confirm — and that 9.1% is a dramatically different, much stronger population**: 83.6% win / +3.318% expectancy, vs. 64.5% win / +0.648% for the 90.9% that wouldn't confirm. Known by end of the *same day* — far earlier than any multi-day signal tested in this whole RQ-77 thread.
+
+**Reconciled the 9.1% figure against an already-established historical number before trusting it**: FINDINGS.md's original 2026-09-13 Entry-Gate-vs-Primed-Gate discovery documented ~1,600-1,646 `checklist_pass()`-confirmed trades out of ~10,764-14,225 raw breaches (~11.6-15.3%, ~13% midpoint) — meaningfully higher than today's 9.1%. Checked directly on a 30-ticker sample rather than assuming a bug: `entry_signal()` alone (no regime gate) gives 14.9% — squarely inside that historical range. Adding `detect_entry()`'s regime gate (`market_trending()`, `require_regime=True`) on top cuts it to 6.5% on that sample (9.1% on the full population). **Fully explained, not a bug**: the historical figure measured `checklist_pass()`/`breakout_continuation()` confirmation alone; today's number additionally requires the regime gate, which is what production `detect_entry()` always applies. Both numbers are legitimate, answering slightly different questions — 9.1% is the correct one for "would this fully replicate as a real Entry-Gate trade," which is what the quality-gap finding above is built on.
+
+**A directly relevant historical precedent, caught before treating this as actionable**: this is not the first time a same-day confirmation-based quality gap has been found and quantified. The 2026-09-13 "Acceptance as an execution-state variable" test found an almost identical shape — a real quality gap between same-day "accepted" and "rejected" trades (accepted: 59.8% win/+1.48% median/+0.89% mean; rejected: 54.5%/+0.70%/-0.73% mean) — and then tested acting on it directly (tightening the stop specifically for the "rejected" group, leaving "accepted" trades alone). **That intervention was explicitly REJECTED**: it made the rejected group meaningfully worse (win rate 54.5%→42.1%, median +0.70%→-2.03%), because non-acceptance/non-confirmation is normal behavior even in trades that go on to become real winners — a tighter stop on that subgroup whipsaws out the ones that would have come back, converting recoverable trades into locked losses.
+
+**Standing caution, not yet resolved**: knowing a subgroup is statistically worse does not mean intervening on that subgroup helps — the intervention itself can destroy exactly the trades within it that were going to work out, as already demonstrated once for a near-identical signal. Today's would_confirm finding is logged as a genuine, real, and now more sharply quantified observation (a stronger and cleaner version of the already-known pattern), **not yet treated as actionable** — any future test of intervening on the would_confirm=False group (tightening stops, cutting size, early exit) needs to reckon with this exact precedent first, not repeat it.
+
+## P2/P3 — critic's Update-76 sanity ladder, completed (2026-09-20)
+
+**P3 (target-below-trail-engage audit, one statistic)**: for `target`-exit trades, exit price equals the target price exactly (no slippage applied there), so `pnl_pct` for those rows *is* the target level relative to entry — no rerun needed. Result: **92.2% of all target exits (2,984 of 3,238) have a target below the +8% trail-engage threshold** (median target level: only +2.29% above entry). As a share of the whole population: 37.7% of ALL trades resolve via a target sitting below where the trail would even start protecting. This is far past critic's stated "25% = real architecture issue" bar — it's the dominant case, not an edge case. Confirms the design inconsistency flagged in Update 76 is structural, not marginal.
+
+**P2, Stage B (nearby threshold sweep, 6/7/8/9/10%)**: extended the same real, unchanged baseline simulation to additionally record — purely as bookkeeping, never used to actually close a position early — the first day Close crosses each candidate level. This does NOT carry the MAX_HOLD_DAYS-style re-entry-population bug, since the real simulated position and its timing are completely unaffected by which levels are tracked.
+
+| Level | Fires | Flat-exit win | Flat-exit exp | Flat-exit total |
+|---|---|---|---|---|
+| +6% | 27.2% | 68.06% | +1.1389% | 9,020 |
+| +7% | 21.9% | 67.35% | +1.0979% | 8,695 |
+| +8% | 18.5% | 67.11% | +1.1017% | 8,726 |
+| +9% | 15.2% | 66.81% | +1.0803% | 8,556 |
+| +10% | 12.7% | 66.64% | +1.0509% | 8,323 |
+
+(Baseline for comparison: exp +0.8795%, total 6,965.) A broad, smooth plateau — all five levels beat baseline substantially, peaking gently at +6% and declining gradually to +10%, no single spike at exactly +8%. Passes critic's Stage-B robustness check cleanly — the +8% finding is not a coincidence tied to one threshold.
+
+**P2, Stage A (real-example inspection, 4 of the requested ~20)**: pulled real OHLC data for one example per bucket rather than all 20 superficially.
+- **CEMPRO (ride loses badly, delta -34.99pp)**: ZigZag target sat barely above entry (~0.3%) and was blown through the very next day (that day's High +38%) — exit booked at the exact target price (+0.39%) while the stock went on to run 50%+ over the following weeks. A vivid, real instance of the P3 design flaw, not just a statistic.
+- **KPITTECH (ride loses slightly, delta -6.23pp)**: crossed +8% on day 1's close (+12.16%), then a slow multi-week grind down with a genuine mid-decline bounce (day 8, back to +14.95%) before stopping out at +5.92%. Reversal was not obvious in real time.
+- **DIXON (ride wins moderately, delta +3.65pp)**: crossed +8% on day 12 (+8.36%), continued a genuine uptrend to the 15-day cap (+11.96%) — real "let it run" success, not decay.
+- **TTML (ride wins hugely, delta +65.39pp)**: crossed +8% on day 1 (+9.69%), then an extraordinary near-vertical rally to +84% before settling at +75.08% at the cap.
+
+**Pulled the remaining 16 (full 20, per follow-up request) — sharper conclusion than expected, the buckets split cleanly by cause, not just magnitude**:
+- **Ride loses badly, 5/5 are `target` exits** (IRFC, MRPL, GALLANTT, UCOBANK, CEMPRO) — every single one blows through both target and +8% the same day, booking at the low target price while the stock keeps running. Not diffuse momentum failure — 100% the target-floor bug, mechanically, every time.
+- **Ride loses slightly, mixed causes, the real give-back cases** (NH/stop, JWL/max_hold_cap, MAXHEALTH/stop, YESBANK/target-but-developed-over-17-days-not-instant, KPITTECH/stop) — genuine reversals/grinds, damage far smaller (-6pp range) than the target-bug bucket (-22 to -35pp).
+- **Ride wins moderately, 5/5 `max_hold_cap`** (HEROMOTOCO, EXIDEIND, BHARATFORG, ABB, DIXON) — consistent slow-grinder category.
+- **Ride wins hugely, 4/5 `max_hold_cap`, 1 `stop`** (NBCC, TATAPOWER, AWL, TTML ride to cap; IRFC-2024 peaks ~+68% then gives back to +54% before the trailing stop finally catches it) — even the biggest winners give back something, just not enough to matter.
+
+**This means the target-floor fix isn't a marginal improvement — it would likely eliminate almost all of the catastrophic "riding loses badly" cases specifically**, since they're mechanically the same bug in this sample, not a diverse set of momentum-failure stories.
+
+Both P2 stages and P3 complete. Sent to critic together (Update 78) with the RQ-77 conclusion from the prior section.
+
+## Target-floor invariant implemented and rerun — critic's Update 78 verdict, closes the loop cleanly (2026-09-20)
+
+Critic's response to Update 78: RQ-77 CLOSED (no viable detector found under the canonical mechanism, narrowly — "existing tested detectors do not provide sufficient evidence for replacing the current exit architecture," not "momentum-failure recognition is impossible"). would_confirm CLOSED AS OBSERVATION (keep as telemetry, don't turn into a rule — a near-identical intervention already failed once). Target-floor invariant promoted from "pending audit" to an actual minimal implementation fix, precise wording: *"Once the strategy contains a profit-protection mechanism that activates at +8%, a structural target below +8% cannot remain an unconditional exit target."* Implementation instruction, deliberately minimal: don't invent a new target formula — if the ZigZag target sits below the trail-engage threshold, it's simply non-actionable; the trade falls back to normal stop/max-hold/trail logic, exactly as if no target existed. Also reframed the whole flat-+8%-exit finding as a diagnostic artifact of this same bug, not evidence that +8% itself is a correct exit level — the earlier "riding loses" signal was partly the target-floor bug hiding inside it. P4/P5 stay parked — "we're about to make a load-bearing exit correction... it makes no sense to optimize entry selection against the old exit behavior and then redo it again."
+
+**Implemented exactly as specified** (one line, in the scratchpad worker, mirroring what a real fix would look like in `resistance_target()`/`find_zigzag_target()`'s caller): after computing the ZigZag target, `if zz_target is not None and zz_target < entry_price * TRAIL_ENGAGE_PCT: zz_target = None`. Reran the full canonical P0 battery.
+
+| | Before (rq99) | After (rq104, target-floor applied) |
+|---|---|---|
+| n | 7,920 | 6,270 |
+| Win rate | 66.2% | 55.2% |
+| Expectancy | +0.879% | +1.495% |
+| Median | +1.279% | +1.041% |
+| Avg days held | 9.6 | 13.8 |
+| **Total pnl-sum** | **6,965** | **9,374** |
+| R-multiple (mean) | 0.0613 | 0.1094 |
+| Has target available | 67.5% | 17.9% |
+| Trail ever engaged | 18.5% | 31.8% |
+| Stopped via trail floor | 2.60% | 6.91% |
+| Exit efficiency (winners) | 53.3% | 58.3% |
+| Give-back (losers, touch≥2% / avg pp) | 60.5% / 9.98pp | 69.0% / 10.54pp |
+| Exit mix (target/max_hold/stop) | 40.9% / 49.3% / 9.1% | 3.5% / 78.9% / 16.5% |
+
+**Population-size caveat, flagged explicitly, not hidden**: n drops 21% (trades hold longer on average without an early target lock, reducing how many new entries fit each ticker's single-position slot over the same period — same dynamic as the MAX_HOLD_DAYS finding, verified sound methodology since this compares two fully independent simulations, not a single-run bucketing artifact like the first, flawed MAX_HOLD_DAYS attempt).
+
+**Despite 21% fewer trades, total realized output is up 35%** — this is the load-bearing number, since it doesn't depend on the "more trades = better" assumption that tripped up several findings today (Freshness two-sided filter, the naive stall-adoption tests). Fewer trades, more total profit, a genuinely robust result.
+
+**The trail gets used exactly as predicted**: engagement rate roughly doubles (18.5%→31.8%), trail-floor-binding stops nearly triple (2.60%→6.91%) — direct, quantitative confirmation that the target was previously preempting the trail from ever getting a chance to operate, exactly the CEMPRO mechanism. Exit efficiency for winners improves too (53.3%→58.3%) — the remaining winners are ones that genuinely developed, not ones artificially capped at a near-entry target.
+
+**Real, acknowledged cost**: win rate drops meaningfully (66.2%→55.2%) and give-back gets slightly worse (60.5%→69.0% touch rate, 9.98→10.54pp avg) — expected, since far fewer trades now get a quick, locked-in small win via target (target-exit share collapses 40.9%→3.5%), so more trades ride further and are exposed to more reversal risk before resolving via stop or max_hold. This is the honest trade-off, not swept under the rug — the aggregate numbers (total output, R-multiple, trail utilization) say the correction is a genuine net improvement, not a free lunch.
+
+**Target-floor invariant: adopted for the canonical research mechanism.** Sent to critic (Update 79) for the next read — per their own prescribed next step, the real question is now "what problem actually remains" once this correction is in place, not further target tuning.
+
+## Two controlled checks critic asked for before full promotion, both done (2026-09-20)
+
+Critic's read on Update 79: the target-floor correction itself is validated (target availability 67.5%→17.9%, trail engagement 18.5%→31.8%, trail-floor exits 2.60%→6.91%, winner MFE capture 53.3%→58.3% — "almost a textbook confirmation of the hypothesized mechanism"). But before calling the engine fully promoted, wanted two specific, narrow checks — not new research branches: (1) what happened to the ~1,650 entries "displaced" by longer-held positions blocking a ticker's slot, and (2) a descriptive audit of what the now-dominant 78.9% max-hold population actually consists of, specifically to decide whether RQ-77 should reopen.
+
+**Displaced-entry accounting**: for each ticker, any old-engine entry that falls inside a new-engine trade's now-longer holding window (blocked because that ticker's single position slot is occupied) counts as displaced. Population gap matches exactly: 1,650 (7,939→6,289 old vs new raw counts before the freshness dropna). 2,355 individual old-engine entries were blocked at some point (exceeds the net gap since some overlap/cascade). **Displaced entries' own quality under the old engine: 60.2% win / +0.835% avg — meaningfully worse than the old engine's overall population (66.2% win / +0.890% avg)**, total value 1,967. This is the favorable scenario: blocked trades are below-average quality, not the strategy's best opportunities. Critically, the new engine's +35% total-output gain (9,374 vs 6,965) happens *despite* forgoing this 1,967 of real value — not because of a favorable reshuffling into better substitutes. The underlying per-trade improvement is larger than the headline total suggests, not an artifact of capital-occupancy luck.
+
+**Max-hold descriptive audit** (n=4,945, 78.9% of the new engine's population): 51.6% winners (avg +8.52%), 10.7% near-flat, 37.7% losers (avg -5.51%). Split the losers exactly as critic specified — "genuine drift" (never touched +2% MFE) vs "real give-back" (touched real progress, then reversed): **only 30.5% are genuine drift** (avg MFE just 1.03%, final avg -6.35% — the breakout never developed) — **the majority, 69.5%, are real give-back** (avg MFE +5.07%, reversed to avg -5.14% by day 15, avg giveback 10.21pp). Both subsets had a pre-floor target available at the same rate (19.8% each), so this split isn't an artifact of the floor correction itself.
+
+**Implication for RQ-77**: this points toward keeping it closed, not reopening it. The dominant max-hold-loser pattern (69.5%) is exactly the "volatile development → temporary stall → still negative at day 15" scenario critic flagged as the dangerous case for an early momentum-failure exit — the same failure mode already demonstrated three separate times today (armed 3-day stall, unarmed Efficiency trigger, and the historical 2026-09-13 "Acceptance as execution-state variable" precedent) of cutting trades that show real, genuine progress. Only the minority (30.5%) matches the "pure drift, never develops" pattern that would justify reopening it — not the dominant story.
+
+**Separately, per direct user pushback on treating +8% as a validated boundary rather than a diagnostic scaffold**: critic agreed explicitly — the architectural finding (a ZigZag target below the profit-protection engagement level can preempt the whole momentum-management machinery) is validated; the specific +8% boundary is not. It was only ever the pre-existing `TRAIL_ENGAGE_PCT` value, reused for a clean first diagnostic, not derived as an optimum. Revised framing, adopted: **"Target-floor hypothesis: targets below the trail-engagement region should be treated as non-actionable. Exact boundary TBD."** The nearby-threshold sweep's "gentle peak at +6%, no discontinuity at +8%" is reconfirmed as evidence for a broad region, not an 8% optimum — and that sweep was pure bookkeeping (never actually closes a position early), so a genuine boundary search needs a proper sequential simulation per candidate level (same rigor as the corrected MAX_HOLD_DAYS sweep), not just re-reading the bookkeeping numbers. Current 8% implementation kept as a temporary diagnostic correction; the boundary itself is queued as its own, separate, small research question — explicitly not to be rushed or conflated with the architectural finding.
+
+## R-multiple floor tested as an alternative to a flat percentage — reveals a sharp step function, not a curve, and re-entangles with RQ-73A (2026-09-20)
+
+Prompted by recalling this project's own earlier web research on standard swing-trading target conventions (targeting the prior swing high, or a fixed 1:2/1:3 risk:reward multiple) — tested whether the target-floor boundary is better framed as a minimum R-multiple (target must sit at least N×that trade's own initial risk above entry) rather than one fixed percentage applied to every trade regardless of stop width. Six genuinely independent full simulations (R_FLOOR ∈ {0.0, 1.0, 1.5, 2.0, 2.5, 3.0}, not bookkeeping — same rigor as the corrected MAX_HOLD_DAYS sweep, since changing which targets are actionable changes hold times and therefore the entry population).
+
+| R_FLOOR | n | Win | Exp | Total pnl | Target-exit share |
+|---|---|---|---|---|---|
+| 0.0 (no floor) | 7,939 | 66.2% | +0.890% | 7,063 | 40.8% |
+| 1.0 | 6,209 | 55.1% | +1.541% | 9,567 | 0.9% |
+| 1.5 | 6,195 | 55.1% | +1.534% | 9,505 | 0.1% |
+| 2.0 | 6,194 | 55.1% | +1.535% | 9,507 | 0.0% |
+| 2.5 | 6,194 | 55.1% | +1.535% | 9,507 | 0.0% |
+| 3.0 | 6,194 | 55.1% | +1.535% | 9,507 | 0.0% |
+
+**A sharp step function, not a smooth curve**: R_FLOOR=1.0 alone already beats the flat-8% floor (exp +1.541% vs +1.495%, total 9,567 vs 9,374) and essentially eliminates target exits (0.9%); raising the bar further (1.5R through 3.0R) changes almost nothing, since virtually no target clears even a 1R hurdle in the first place.
+
+**Why, and what it reconnects to**: median ZigZag target sits only +2.29% above entry (per the P3 audit), while median initial risk (R) in this mechanism is ~14-15% (the already-parked RQ-73A wide-structural-stop finding). A genuine 1:1 R:R target would need to sit ~15% above entry; almost none do. The traditional 1:2/1:3 convention from standard swing-trading references is essentially unreachable in the current system — not because targets are badly chosen, but because R itself is unusually wide. **This re-entangles the target-floor question with RQ-73A** in the same way the Freshness U-shape did earlier (correlation(fresh, initial_risk_pct)=0.696 within Common) — both point at the same underlying wide-stop property from different angles.
+
+**Practical implication for the "boundary TBD" question**: there's no meaningful percentage or R-multiple left to tune once you're past ~1R — it's a cliff, not a curve, so further boundary-sweeping in this direction is low-value. The deeper, real question is whether the 20-day structural-low stop anchor itself (RQ-73A, parked since 2026-09-20) is the actual root cause making almost every real swing-high target structurally unreachable at any sensible R:R.
+
+## RQ-73A promoted to active root-cause investigation by critic, with an explicit guardrail against jumping straight to "shorten it" (2026-09-20)
+
+Critic's read on Update 81: the R-floor boundary question is answered (a cliff between 0R and ~1R, not a curve — stop sweeping it; 1R adopted as a temporary architectural guardrail, not an optimized parameter). RQ-73A promoted from "parked optimization" to "active root-cause investigation" — three independent threads now point at the same underlying property (wide structural-stop distance directly measured; Freshness↔initial-risk correlation 0.696 within Common; ZigZag targets universally too close relative to R). Explicit guardrail: don't jump from "20-day low creates wide R" to "therefore shorten it" — first establish what the stop is actually protecting. Five specific diagnostics proposed: does price actually revisit the 20-day low; would a tighter anchor have stopped out eventual winners before they developed; how many winners depend on the wide stop to survive normal consolidation; is the wide risk driven by legitimate structure vs. an unusually deep pre-entry drawdown; does tightening improve R geometry without just converting winners into stop-outs. Also explicitly deprioritized reopening RQ-77 and P4 until this settles, since both may be measuring downstream artifacts of the same stop-width issue.
+
+**First test — tighter 10-day structural low, two fully independent simulations (not bookkeeping) under the R-floor=1.0-corrected mechanism, everything else unchanged:**
+
+| | Current 20-day min | Tighter 10-day min |
+|---|---|---|
+| n | 6,209 | 6,308 |
+| Win | 55.1% | 53.4% |
+| Exp | +1.541% | +1.368% |
+| Total pnl | 9,567 | 8,629 |
+| Avg initial risk | 14.55% | 10.86% |
+| R-multiple (mean) | 0.1151 | 0.1359 |
+
+Q1 (does price revisit the 20-day low at all): only 9.7% of trades ever touch it — 90.3% never test it either way. Q2/Q3 (does tightening kill legitimate winners): of current-engine winners (n=3,371), the tighter stop fires *before* the real winning exit in only 3.4% (113 trades) — a real but small cost (those trades average +4.66% under current vs. -8.30% under tighter). Q5 (does tightening improve R geometry): yes on the risk-adjusted metric — same pattern as ATR0-vs-ATR1: raw totals favor the wider stop only because it's not adjusted for the larger position risk it demands; R-multiple (the fair, capital-efficiency comparison) favors the tighter stop by ~18%.
+
+**Second test, per direct user instruction not to trust the earlier web research at face value**: verified "recent swing low" (Minervini: stop below the low of the *final contraction*, not the deepest point over the whole lookback) against the data directly, using the same scipy `find_peaks` machinery already adopted for the ZigZag target (not a new library) — applied to `-Low` instead of `High` to find troughs, over a short 40-day local window (not the target's 300-day scope, since a stop should reflect recent structure, not an old level from months back), taking the most recent confirmed trough.
+
+Verified the implementation before trusting the result: finds a genuine confirmed trough in 97.5% of cases (2.5% fallback to the 20-day min), at a sensible median distance of 11 days from entry — not a bug.
+
+| | Current 20-day min | Tighter 10-day min | Recent swing-low (scipy, 40d/3%) |
+|---|---|---|---|
+| Avg initial risk | 14.55% | 10.86% (-25%) | 13.21% (-9%) |
+| R-multiple (mean) | 0.1151 | 0.1359 (+18%) | 0.1178 (+2.3%) |
+| Winners hurt (stopped before real exit) | — | 3.4% | 1.62% |
+
+**Conclusion**: the article's underlying principle (anchor to recent structure, not the deepest point in a wide window) is directionally sound and correctly implemented here, but on this data the simpler "just shorten the window to 10 days" approach clearly beats the more sophisticated swing-low version on the metric that matters most (R-multiple), while only modestly worse on winner protection (3.4% vs 1.62%). The mechanical reason: a "confirmed" swing low requires several days of higher lows after it to validate, so by construction it can never anchor to the absolute most recent low — it sometimes lands on a slightly higher, less extreme point than the true recent minimum over the same span. The added complexity of swing-low detection isn't earning its keep versus the naive tighter window, at least with these parameters (40-day window, 3% prominence).
+
+## Q4 — descriptive audit of the 113 sacrificed winners, per critic's explicit final test before a stop decision (2026-09-20)
+
+Critic's read on the two RQ-73A tests: Q2/Q3/Q5 substantially answered (10-day stop is the leading candidate — real R-multiple gain, bounded winner cost), swing-low parameter tuning explicitly dropped ("that feels exactly like the kind of rabbit hole we were trying to avoid... the proposed sophisticated alternative has failed its burden of proof," parked/rejected for the current mechanism unless Q4 reveals a specific reason to revisit). One remaining test before any actual stop decision: characterize the 113 trades where the tighter 10-day stop would have prematurely killed a current-engine winner — are the extra 10 days protecting genuine breakout structure, or mostly preserving trades that already made an unusually deep, borderline-failed excursion?
+
+Pulled real price history for all 113 trades and computed, per critic's exact question list:
+
+- **Max drawdown (full hold)**: mean -9.66%, median -8.65%.
+- **Drawdown at the moment the 10-day stop fires**: mean -9.23%, median -8.45% — nearly identical to the eventual max drawdown, meaning the 10-day stop typically fires right near the actual bottom, not prematurely on a shallow dip.
+- **Days to 10-day stop fire**: median 7. **Days to recover back to breakeven from that point**: median 6 (the real profitable exit comes later still, near the 15-day cap for most).
+- **Share where price kept falling even further after the 10-day fire point** (not a clean V-turn, a genuinely prolonged decline first): 30.1%.
+- **Share that came within 2 percentage points of also threatening the wide 20-day stop**: 23.9% — for roughly a quarter of these trades, the extra 10 days of room wasn't comfortable slack, it was barely enough. The remaining ~76% had a real, independent cushion (avg 4.95%, median 3.49% below even the 20-day level).
+
+**Conclusion, nuanced, not a clean resolution either direction**: this is real structure being protected (median 7-day-fire/6-day-recovery round trip, drawdown depth matching the eventual bottom, not random noise) — not simply "failed breakouts eventually clawing back." But the full 20-day width isn't uniformly necessary: a genuine minority (23.9%) needed nearly all of it, while the majority (76.1%) had meaningful room to spare, suggesting an intermediate anchor (something between 10 and 20 days) might capture most of the same protection while still tightening risk for the majority. Sent to critic (Update 83) as the final input before a stop-width decision, per their explicit sequencing.
+
+## Full 10-20 day structural-lookback sweep — resolves as a genuine monotonic frontier, not a knee (2026-09-20)
+
+Critic's read on Update 83: the split evidence (24% need the full width, 76% don't) justifies an actual sweep, not just one intermediate 15-day test — explicitly reversing their own earlier "don't parameter-hunt" caution, since Q4 gave a specific reason a sweep is now warranted rather than fishing. Explicit pre-registered framing before running it: look for the *shape* of the tradeoff (a stable knee/plateau vs. a genuine monotonic frontier), not just whichever value has the highest expectancy. Constraint: sweep the structural lookback only (10 through 20 days, one day at a time) — prominence, swing-low definitions, ATR buffer all held fixed.
+
+Eleven fully independent simulations (not bookkeeping), everything else unchanged (ATR0, R-floor=1.0 target-floor, swing-low trail, `MAX_HOLD_DAYS=15`):
+
+| Lookback | n | Win | Exp | Total pnl | Avg risk | R-mean | Winner-sacrifice vs 20d |
+|---|---|---|---|---|---|---|---|
+| 10 | 6,308 | 53.4% | +1.368% | 8,629 | 10.86% | 0.1359 | 3.35% |
+| 11 | 6,292 | 53.6% | +1.390% | 8,744 | 11.22% | 0.1313 | 2.93% |
+| 12 | 6,281 | 53.8% | +1.413% | 8,876 | 11.56% | 0.1308 | 2.54% |
+| 13 | 6,269 | 54.0% | +1.424% | 8,926 | 11.91% | 0.1280 | 2.15% |
+| 14 | 6,266 | 54.1% | +1.437% | 9,003 | 12.22% | 0.1259 | 1.88% |
+| 15 | 6,256 | 54.2% | +1.444% | 9,032 | 12.52% | 0.1217 | 1.53% |
+| 16 | 6,247 | 54.4% | +1.468% | 9,171 | 12.87% | 0.1210 | 1.23% |
+| 17 | 6,235 | 54.7% | +1.491% | 9,295 | 13.29% | 0.1196 | 0.85% |
+| 18 | 6,226 | 54.8% | +1.503% | 9,355 | 13.70% | 0.1176 | 0.70% |
+| 19 | 6,215 | 54.9% | +1.524% | 9,474 | 14.13% | 0.1165 | 0.35% |
+| 20 | 6,209 | 55.1% | +1.541% | 9,567 | 14.55% | 0.1151 | — (baseline) |
+
+**R-multiple decreases smoothly and monotonically from 10d to 20d — no interior peak, no plateau, no knee.** Winner-sacrifice vs the 20d baseline also decreases smoothly and monotonically in the opposite sense (3.35%→0.35%). Total output, expectancy, and win rate all rise monotonically with longer lookback. This is exactly critic's second pre-registered scenario ("R steadily improves as the window gets shorter, while winner protection steadily deteriorates... a genuine risk/protection tradeoff rather than a sweet spot"), not the first (a stable region/knee).
+
+**Implication**: there is no data-discoverable "optimal" lookback in 10-20 days — it's a genuine, continuous frontier between capital efficiency (favors shorter) and winner-protection/total-output (favors longer). Picking a point on this frontier is a policy/preference decision, not something further sweeping or analysis can resolve. Sent to critic (Update 84) to decide where on this frontier to land, or whether fixed lookback itself is the wrong abstraction given the shape found.
+
+## RQ-73A closed as a resolved frontier (not an optimization), and a concrete new stop-design north star found (2026-09-20)
+
+Critic's read on Update 84: the monotonic frontier is itself the finding — R-multiple and total output disagree because they're answering genuinely different questions (capital efficiency per unit risk vs. what actually happened through time including preserved recovery trades), and manufacturing a threshold (e.g., "<1% winner-sacrifice") to pick a day from the table would mean choosing the objective function after seeing results. **RQ-73A closed as: the fixed structural lookback is an explicit, deliberate risk/protection tradeoff, not an accidentally oversized parameter** — the 20-day anchor buys +3.35pp of winner preservation at the cost of +3.69pp average risk and materially worse R (0.1151 vs 0.1359). Explicitly not moving to a dynamic/conditional stop yet — "the fact that the frontier doesn't resolve does not automatically mean we need a smarter stop; it means the current data cannot tell us what risk/protection tradeoff the strategy should prefer. That's a strategy-level decision, not a parameter-search problem." Proposed the real next question: not "which day is optimal" but "what stop philosophy should this system use" — with an explicit caution against inventing a formula (e.g., "entry − 3%" or "1×ATR") before checking whether the setup has a meaningful structural invalidation level at all.
+
+**User's design preference, stated directly, resolving the "what tradeoff to prefer" question**: "I would like my SL generally cuts 2-3% on the cost of 3-5% winners. But not really force this" — a soft design target (typical risk near 2-3%, accepting some 3-5% winners get sacrificed), explicitly not a hard per-trade rule. Critic's reframing: the research question changes from "which structural lookback maximizes something" to "why does this system need 10-15% of adverse movement before invalidation, and can a more appropriate level be defined that usually sits much closer to entry" — proposed characterizing the actual distribution (percentiles, bucket counts, relationship to ATR) before inventing any new formula.
+
+**Distribution characterized directly, decisive result**: under the CURRENT 20-day mechanism, **0.0% of trades fall in the 2-3% target zone** (median risk 13.13%, p10 still 8.01%); even the most aggressively tightened tested variant (10-day) only reaches **0.1%** in that zone (median 9.77%, 47.9% still >10%). This proves something the lookback sweep alone didn't: shortening the N-day-minimum window, no matter how far within the tested 10-20 range, cannot reach anywhere near the stated target — the entire "minimum Low over N days" family of stop construction is structurally incapable of producing 2-5% risk for the vast majority of trades. Validates critic's proposed pivot empirically, not just philosophically: the next research must be a genuinely different anchor concept, not another window-size variant.
+
+**ATR relationship, the concrete new lead**: median ATR is only 2.95% of price, but the current 20-day structural low sits at a median of **5.12x ATR** away from entry (p25 4.22x, p75 6.22x, p90 7.42x) — almost completely decoupled from the stock's own real, recent volatility. To land in the stated 2-3% target zone given the median stock's actual ATR, the multiple would need to be roughly **0.68x-1.02x ATR — essentially 1x ATR**, not the 3x this project's own older Family-C-era work used, and nowhere close to the current mechanism's ~5x. A plain `entry − 1×ATR` anchor would naturally scale with each stock's own volatility (wider for genuinely volatile setups, tighter for calm ones) rather than forcing a flat percentage — structurally compatible with "don't force this."
+
+**Not yet tested or adopted** — this is a concrete, well-grounded candidate for the next stop-design investigation (a volatility-normalized anchor, not another lookback variant), sent to critic (Update 85) before building or testing it, per the standing discipline of proposing a genuinely new anchor concept before running it.
+
+## Pure ATR anchor tested directly — a clear negative result, validates the whipsaw concern empirically (2026-09-20)
+
+Before testing, checked the web literature on ATR vs. structural stops for breakout trading: the standard recommendation is explicitly a **hybrid** — "structure-based with ATR buffer typically wins for technical strategies... place stop beyond the level by 0.3-0.5x ATR" — a small ATR buffer added to a real structural level, not a flat ATR distance from entry with zero structural reference. Also: "a stop placed without reference to structure may sit just inside a key technical level [and] get hit by normal noise" — the whipsaw risk this test was designed to check.
+
+Tested the pure version anyway, as directly requested (`entry − N×ATR`, no structural low at all), five multiples (0.5x, 0.75x, 1.0x, 1.5x, 2.0x), fully independent simulations, otherwise identical mechanism:
+
+| ATR mult | n | Win | Exp | Median risk | R-mean | pct stop | 20d-winners sacrificed |
+|---|---|---|---|---|---|---|---|
+| 0.5x | 9,868 | 28.7% | +0.558% | 1.56% | 0.2727 | 74.0% | 48.89% |
+| 0.75x | 8,699 | 33.8% | +0.678% | 2.35% | 0.2322 | 69.2% | 40.53% |
+| 1.0x | 7,919 | 37.7% | +0.777% | 3.14% | 0.2090 | 64.9% | 33.90% |
+| 1.5x | 7,036 | 44.3% | +0.967% | 4.71% | 0.1800 | 55.0% | 20.63% |
+| 2.0x | 6,621 | 48.9% | +1.061% | 6.27% | 0.1485 | 45.8% | 11.97% |
+
+**A clear negative result.** 1.0x ATR does land at the target median risk (3.14%, right in the stated zone), but win rate collapses to 37.7% (vs. 53-55% for the structural-low family) and stop-dominated exits reach 64.9% (vs. 17-27% for structural-low variants). Winner-sacrifice is an order of magnitude worse than anything in the lookback sweep: **33.9% of the 20-day-structural winners get killed early at 1.0x ATR**, versus the tighter-10d variant's worst case of 3.35%. Even 2.0x ATR still sacrifices 12.0%. This is the whipsaw failure mode exactly as the web research warned — a stop with zero structural reference gets hit constantly by ordinary volatility unrelated to whether the breakout thesis is actually invalidated.
+
+**Methodological flag, explicitly called out rather than left to mislead**: R-multiple looks *better* at low ATR multiples (0.27 at 0.5x vs. the structural family's best of 0.14) — this is an artifact, not a real finding. With risk this small (1.6%), any winning trade produces an inflated R-multiple purely from the tiny denominator; it isn't comparable to the lookback sweep's R-multiples, which were all computed in a similar risk-magnitude range (11-15%). The real signal is in win rate, exit mix, and winner-sacrifice, and those are unambiguous.
+
+**Conclusion**: pure ATR-only anchoring is rejected — confirms the web research's hybrid recommendation empirically, not just theoretically. The next candidate is a real structural level (e.g., recent swing low) plus a small ATR buffer (0.3-0.5x, per the literature), not either pure extreme (the current 20-day min or a flat ATR distance) — not yet tested.
+
+## Small ATR buffer on the tighter 10-day base — converges onto the same frontier, doesn't escape it (2026-09-20)
+
+Direct user catch: `structural_low − ATR_BUFFER×atr14` is exactly the hybrid formula, and this project already tested it (ATR0 vs ATR1) — but on the already-wide, settled-oversized 20-day base, where ATR0 (no buffer) won decisively. The untested combination is a small buffer on the *tighter* 10-day base from this round of RQ-73A, since a base sitting much closer to price is more exposed to ordinary noise, where a small buffer might behave differently than it did on the wide base.
+
+Five fully independent simulations (ATR_BUFFER ∈ {0.0, 0.25, 0.5, 0.75, 1.0} on the 10-day structural low, everything else unchanged):
+
+| Buffer | n | Win | Exp | Avg risk | Median risk | R-mean | 20d-winners sacrificed |
+|---|---|---|---|---|---|---|---|
+| 0.0x | 6,308 | 53.4% | +1.368% | 10.86% | 9.77% | 0.1359 | 3.35% |
+| 0.25x | 6,268 | 54.0% | +1.419% | 11.66% | 10.54% | 0.1294 | 2.22% |
+| 0.5x | 6,241 | 54.7% | +1.459% | 12.47% | 11.36% | 0.1244 | 1.21% |
+| 0.75x | 6,222 | 55.0% | +1.493% | 13.27% | 12.14% | 0.1186 | 0.82% |
+| 1.0x | 6,209 | 55.2% | +1.538% | 14.08% | 12.91% | 0.1135 | 0.59% |
+
+**Converges directly onto the same monotonic frontier from the pure lookback sweep, reached via a different formula.** Buffer=0.75x (risk 13.27%, sacrifice 0.82%) lands almost exactly on the 17-day lookback point (risk 13.29%, sacrifice 0.85%); buffer=0.5x (12.47%, 1.21%) sits between the 12-day and 13-day lookback points. "10-day window + N×ATR buffer" and "use a longer fixed window directly" trace out essentially the same tradeoff — the specific mechanism used to add stop distance doesn't matter much, only how much distance is added. Confirms the frontier found in the lookback sweep is a fundamental property of this exit architecture, not an artifact of one particular formula. The hybrid doesn't provide an escape from the tradeoff — it's the same frontier, differently parameterized.
+
+## Freshness-filter gap caught and closed — none of the RQ-73A investigation applied it, verified it doesn't change anything (2026-09-20)
+
+Direct user catch: every RQ-73A worker from the R-floor sweep onward (tighter-10d/root-cause, recent-swing-low, the full 10-20 day lookback sweep, pure ATR anchor, hybrid buffer) ran on the full, unfiltered Primed Gate population — none of them computed or applied the Freshness≤0.40 convention this project otherwise applies automatically. A real gap, not a deliberate choice.
+
+Re-ran the full 10-20 day lookback sweep with freshness tracked to check whether any RQ-73A conclusion was an artifact of skipping the filter. Full-population numbers reproduce the original sweep almost exactly (tiny ~19-trade difference per lookback value, from a handful of corp-action-interrupted rows lacking a computable freshness score — expected, not a discrepancy).
+
+**Fresh≤0.40 shows the identical monotonic frontier shape**: R-multiple decreases smoothly from 10d (0.1463) to 20d (0.1266); win rate, expectancy, and total output all rise smoothly the other way — same direction, same shape, no knee, nothing qualitatively different from the full population. Freshness filter now added to the RQ-73A worker template for any future continuation of this thread.
+
+**Extended the check to every other RQ-73A test, not just the lookback sweep** — built one per-ticker freshness lookup (entry-time-only, independent of which exit mechanism generated a given trade) and joined it onto all the remaining merged datasets without rerunning any simulations (99.7-99.8% match rate on each). All five hold up cleanly on Fresh≤0.40, no reversals:
+- R-floor sweep: same step function (0R is the outlier; 1.5R-3.0R stay essentially identical).
+- Tighter 10d vs 20d: same direction (10d = lower risk, higher R, lower win/exp/total).
+- Recent swing-low: same conclusion (comparable to/marginally behind 10d, not a clear win).
+- Pure ATR anchor: same catastrophic pattern — win rate collapses to 32-50% even as risk correctly lands in the 1.5-6% target zone. Whipsaw rejection holds.
+- Hybrid buffer on 10d: same monotonic convergence onto the identical frontier.
+
+**None of the RQ-73A conclusions (the frontier, its shape, the ATR-anchor rejection, the hybrid-equals-lookback finding) were an artifact of running on the unfiltered population.** The whole investigation is confirmed robust to the freshness-filter gap.
+
+## RQ-73A's final hypothesis — "final contraction/base low" — tested with theory and data in agreement, closes the whole investigation (2026-09-20)
+
+Critic's read on Update 87: close RQ-73A as a stop-construction search — three materially different formula families (10-20d lookback, pure ATR, 10d+ATR-buffer hybrid) all either fail outright (pure ATR) or trace the identical continuous risk/protection frontier, so the choice of stop width is a strategy-design/risk-tolerance decision, not a discoverable parameter optimum. Explicitly pushed back on treating the user's "2-3% risk, some 3-5% winners lost" preference as a target to force the data toward — even the most aggressive tested construction (10d) only reaches median risk 9.77%, nowhere near 2-3%; forcing it down there would mean abandoning the structural-invalidation concept entirely, a different strategy design, not an RQ-73A finding. Distinguished one final, genuinely different hypothesis worth testing before closing: "the low of the final contraction/base immediately preceding the breakout" — a different semantic question ("what price invalidates this specific setup") than every prior test ("how much historical downside should I tolerate"). Explicit requirement: a deterministic, entry-time-only definition, not a subjective/hindsight-prone "find the final contraction."
+
+**Researched before implementing, per direct user instruction to check whether this mixes two different trading styles**: confirmed "stop below the base/consolidation low" is a genuine, well-established technique — the Darvas Box method (1950s-60s: new high → range-bound box → breakout above the box, stop just below the box bottom) and flag/pennant continuation patterns (sharp move → tight consolidation → breakout, stop below the consolidation low) both use exactly this logic. But critically, both come with an explicit precondition found in the same research: the technique only applies within pattern families (Darvas Box, VCP, flags/pennants) whose *entry criteria themselves require* a genuine, identifiable box/consolidation to exist before the breakout. This project's `breakout_continuation` entry (EMA34 rising, price crossing `high10_prior`, volume z-score, `checklist_pass`) never screens for that Darvas/VCP-style "new high → range → breakout above the range" shape — it's a looser, momentum-based continuation signal. Flagged before testing: applying a base-low stop here may mean presupposing a structure the entry logic never verified exists — a real risk of mixing two different trading-style philosophies (range-then-breakout vs. momentum continuation), which would also explain why the earlier "recent swing low" test (rq107) underperformed.
+
+**Implementation, deterministic and entry-time-only**: (1) find the most recent confirmed swing high before entry via scipy `find_peaks` (60-day local window — marks where the current pullback/contraction began); (2) base low = `min(Low)` from that swing high's day to entry (the contraction that followed it); (3) fallback to the plain 10-day min if no qualifying swing high exists in the window. Computed independently of the target/trailing logic, per critic's explicit constraint.
+
+**Result: theory and data agree.** 85.5% of trades found a genuine recent-swing-high-anchored base (not a fallback artifact), but the outcome lands squarely on the already-established frontier, roughly equivalent to a 16-17 day fixed lookback — median risk 12.04%, mean 13.63%, R-mean 0.1181, sacrifice 1.30%, total pnl 9,318 (compare: 15d gives 1.53%/9,032; 20d gives 0%/9,567 — final-base sits between them on every axis, not below/outside them). The telling detail: **even among trades where a genuine base was found, average risk (14.60%) is actually wider than the current 20-day baseline (14.55%)** — the technique, when it successfully computes something, mostly reaches back to some earlier peak and rediscovers a similarly wide distance, because most Breakout Continuation entries don't have a genuine, tight, recent Darvas-box-style consolidation to anchor to. It finds "some earlier high, whatever it happens to be," not "the low of a compact base."
+
+**RQ-73A closed, definitively, with both theory and empirical evidence in agreement**: no tested anchor — historical-minimum window (10-20d), pure ATR, structural+ATR hybrid, or genuine Darvas/VCP-style base-low — escapes the structural risk/protection frontier intrinsic to this entry population. Pure ATR fails outright (whipsaw). Every structural variant, including the theoretically best-grounded one, lands on the same continuous tradeoff. The stop-construction question is resolved: **choice of stop width is a strategy-design/risk-tolerance decision, not a discoverable parameter optimum** — and the user's 2-3% preference remains a genuine design preference for a *different* strategy shape, not a target this entry population's actual structure can support without abandoning structural invalidation altogether.
+
+## Fragility/robustness audit begun — critic-directed backlog rebuild, pure observations logged as found (2026-09-20)
+
+Critic's read on RQ-73A's close: rebuild the research backlog before jumping to Freshness. Tier 0 (finish/validate what's in motion) includes fragility/robustness of the major conclusions before anything else — the concern being that some of today's findings might not be stable enough to deserve further optimization. Tier 0 item 1 (target-floor capital-occupancy attribution) was already satisfied by the earlier displaced-entry accounting (1,650 population gap, quality 60.2% win vs. 66.2% overall, confirming favorable). Remaining Tier 0 work: a final sanity audit and fragility/robustness testing, before Tier 1 (breach behavior), Tier 2 (options audit), and Tier 3 (Freshness capacity, redone on the settled architecture).
+
+**Trade and ticker concentration (standard project checks) — clean, no red flags**: top-10 trades are only 6.8% of total pnl (top-20: 12.1%), both far under the 40% danger threshold. All 454 tickers in the universe contribute; top-10 tickers are 20.9% of total pnl — broad-based, not a handful of lucky names.
+
+**Winner-removal stability — clean**: removing the top 10/20/50 winning trades entirely, expectancy stays solidly positive throughout (+1.396% / +1.318% / +1.133%, vs. the full population's +1.541%) and win rate barely moves (55.16% / 55.09% / 54.87% vs. 55.11%). The result isn't propped up by a small number of outsized trades.
+
+**Time-period stability — a real, more significant concentration than trade/ticker level suggested**: by calendar year of entry, **2023 alone contributes 48.6% of the entire backtest's total profit** (4,551 of 9,374), with a dramatically higher win rate (67.0% vs. 50-57% other years) and R-multiple (0.325 vs. 0.04-0.09 other years). 2021 is negative for both the new and old engine (-0.574% and -0.436% exp respectively, small n~220-250, likely partial-year/early-cache-history noise). Checked whether 2023 itself is a data artifact: its internal ticker concentration (20.1% top-10) matches the overall population's (20.9%) — not a handful of names, and its top contributors (BSE, SUZLON, IRFC, MAZDOCK, COCHINSHIP, INOXWIND, RECLTD, BHEL, PFC, ADANIPOWER) are the well-documented 2023 Indian PSU/infra/defense/renewable rally, a real, broad market regime — not a computation error. **The strategy's overall absolute profitability is genuinely regime-dependent** — this is a real fragility finding, not a false alarm.
+
+**Reassuring nuance, checked directly rather than assumed**: the *target-floor improvement itself* (new engine total minus old engine total, matched by year) is considerably less concentrated than the raw totals — 2023 contributes only 35.9% of the total improvement (865 of 2,408), and the improvement is positive in 5 of 6 years (2022: +255, 2024: +183, 2025: +520, 2026: +600; only 2021 is slightly negative in both engines equally, ~-16, consistent with small-sample noise rather than the fix failing). So while the strategy's absolute profitability leans heavily on catching favorable regimes like 2023, the target-floor fix's *relative* value is broadly consistent across years, not a 2023-specific artifact.
+
+**A more significant finding — the RQ-73A "continuous frontier" itself is substantially an artifact of 2023, not a stable structural property**: re-ran the R-multiple-by-lookback comparison (10d through 20d) split into 2023-only vs. all other years combined. **Within 2023 only, the frontier is real and steep** — R-multiple falls monotonically from 0.436 (10d) to 0.328 (20d), matching what was reported earlier. **Within all other years combined, R-multiple is nearly flat across the entire 10-20 day range** (10d: 0.069, 12d: 0.069, 15d: 0.066, 17d: 0.066, 20d: 0.068) — noise-level differences under 10% relative spread, no meaningful monotonic trend. The direction still marginally favors shorter lookbacks even outside 2023, but the *magnitude* of the whole "continuous risk/protection tradeoff" finding is overwhelmingly driven by one exceptional bull-regime year, not a stable property of the strategy across typical market conditions. This meaningfully tempers (not reverses) today's RQ-73A conclusion: the tradeoff is directionally real, but far weaker in ordinary years than the aggregate frontier suggested — meaning the stop-width decision matters much less in most years than 2023 made it appear, and a decision maker choosing a point on "the frontier" should weight the aggregate numbers accordingly, not treat them as representative of a typical year.
+
+**Checked whether the pure-ATR-anchor rejection is similarly a 2023 artifact — it is not, and if anything the rejection is stronger outside 2023.** Win rates for every ATR multiple tested (0.5x-2.0x) are severely depressed in both slices (27.8-46.3% outside 2023, 32.6-60.7% within it) and never approach the structural-low family's 53-55% baseline in either slice. The whipsaw failure mode is a robust, regime-independent finding, not an artifact of the dominant year.
+
+**Fragility audit, first pass, summary**: trade concentration (6.8% top-10, healthy), ticker concentration (20.9% top-10, broad-based, all 454 tickers contribute), and winner-removal stability (expectancy survives removing the top 50 winners) are all clean — no red flags. Time-period concentration is real and significant (48.6% of total profit from 2023 alone, a genuine, well-documented market regime) — the strategy's absolute profitability is regime-dependent, a real finding worth carrying forward, not a false alarm. The RQ-73A frontier's *direction* is regime-independent but its *magnitude* is substantially a 2023 artifact — a real, important qualifier on today's stop-construction conclusion. The ATR-anchor rejection is confirmed robust and regime-independent. Not yet checked: full market-regime split (beyond calendar year), bootstrap-style uncertainty bounds, and fragility of the RQ-77/stall-detector and would_confirm findings specifically — queued for continuation, not a rabbit hole to chase further right now.
+
+## Tier 1 begun — breach behavior, a major new finding, cleaner and more independent than would_confirm (2026-09-20)
+
+Per critic's backlog rebuild, started the breach-behavior thread: does the behavior of price around the intraday breach itself (not just whether the entry criteria pass) contain useful information about eventual outcome? Pulled real breach-day OHLCV for every Primed Gate entry in the settled (target-floor-corrected) population and computed overshoot (how far intraday High cleared the trigger), close-vs-trigger distance (does the close hold above the trigger by end of day, and by how much), close-position-in-range (did the day close near its high or its low), and volume z-score.
+
+**A major, clean, strongly monotonic result — the single strongest gradient found in the breach-behavior thread**: correlation(close_vs_trigger_pct, final pnl) = 0.2785, the strongest of the four features tested.
+
+**41.0% of all Primed Gate breaches fail to even hold the trigger by end of day** (Close < trigger) — and that group has **negative average expectancy** (44.6% win, -0.65% exp). The full gradient:
+
+| Close vs. trigger | n | Win | Exp |
+|---|---|---|---|
+| Below trigger (failed to hold) | 2,572 | 44.6% | -0.65% |
+| 0-1% above | 1,428 | 53.4% | +0.83% |
+| 1-3% above | 1,350 | 63.6% | +2.84% |
+| 3%+ above | 920 | 75.4% | +6.55% |
+
+Same clean, monotonic pattern on close-position-in-range (closed in bottom 30% of the day's range: 42.8% win/-0.78% exp; closed in top 30%: 60.6% win/+2.54% exp) and overshoot magnitude (barely cleared the trigger by ≤1%: 47.2% win/-0.39% exp; cleared by 7%+: 77.0% win/+7.33% exp).
+
+**Verified before trusting it, per standing rule**: outlier concentration is clean on both ends (strong bucket top-10 share 9.1%, weak bucket worst-10 share 15.3%, both well under the 40% danger threshold; weak-bucket median (-1.14%) is actually more negative than its mean, so the negative expectancy is broad-based, not outlier-inflated). **Checked whether this is just rediscovering Freshness or Delta in disguise — it is not**: correlation(close_vs_trigger_pct, fresh) = -0.090, correlation(close_vs_trigger_pct, is_delta) = 0.099, both very weak. This is genuinely new, independent information.
+
+**Relationship to the earlier would_confirm finding**: same general idea (same-day, end-of-day information distinguishing quality) but far more granular — would_confirm was a binary pass/fail on the full `entry_signal()`/regime-gated checklist (9.1% pass rate); this is a continuous measure of breach strength alone (close position relative to the trigger, no checklist), splitting nearly the whole population (not just 9%) into a clean four-step gradient from -0.65% to +6.55% expectancy.
+
+**Not yet treated as actionable** — per the same standing caution already established for would_confirm (the 2026-09-13 "Acceptance as an execution-state variable" precedent: a real quality gap doesn't mean intervening on the weak subgroup helps, since non-confirmation/weak-breach behavior is normal even in eventual winners). Logged as a pure, verified observation, per explicit instruction, before any consideration of turning it into a rule.
+
+**Mechanistic color, exit-reason mix by breach-quality bucket**: the weak-breach bucket (close below trigger) resolves mostly via `max_hold_cap` (82.7%) — it doesn't stop out fast, it just drifts to a mediocre-to-negative outcome by day 15 (avg 14.1 days held). The strong-breach bucket (close 3%+ above trigger) resolves faster overall (12.9 avg days) and shows both more target hits (7.9% vs 1.9%) *and* more stops (24.6% vs 14.5%) — strong initial moves apparently also see more real give-back some of the time, not purely more follow-through. Consistent with the give-back pattern already documented elsewhere in this project.
+
+**Checked whether the gradient is a repeat-entry artifact (echoing RQ-73A's already-rejected repeat-entry hypothesis) — it is not.** Recomputed `extension_days` directly for this population (23.6% are repeat breaches). The same monotonic close-vs-trigger gradient holds nearly identically in both subgroups: first breaches show -0.48%/+1.02%/+2.86%/+6.46% exp across the four buckets, repeat breaches show -1.24%/+0.13%/+2.77%/+6.77% — same shape, same direction, comparable magnitude (repeats slightly worse at the weak end, essentially identical at the strong end). This is a genuine, broad-based signal independent of first-vs-repeat status.
+
+**The standout finding of the whole breach-behavior thread — day+1 adverse movement, correlation 0.3417, stronger than close-vs-trigger itself.** Checked how far below entry (the trigger price) day+1's Low reaches: **64.8% of all trades see day+1's Low dip below entry** — an immediate pullback the very next day is the norm, not the exception. The gradient:
+
+| Day+1 Low vs. entry | n | Win | Exp |
+|---|---|---|---|
+| Drops >3% below entry | 1,094 | 34.8% | -2.70% |
+| Drops 1-3% below entry | 1,736 | 47.7% | +0.05% |
+| Drops 0-1% below entry | 1,231 | 55.2% | +1.17% |
+| Stays at/above entry | 2,209 | 71.3% | +4.89% |
+
+**Verified before trusting it**: outlier concentration is clean on both ends (best-bucket top-10 share 5.8%, worst-bucket worst-10 share 8.8%, both well under the 40% danger threshold); the worst bucket's median (-3.73%) is actually more negative than its mean (-2.70%) — the negative expectancy is broad-based, not tail-inflated — and spans 371 of 454 tickers, genuinely universal, not a handful of names. This is the strongest, cleanest signal found in the breach-behavior thread so far — makes intuitive sense (whether a fresh breakout immediately shows weakness the very next session is a direct read on real conviction), but like every other breach-quality finding today, **not yet treated as actionable**, logged as a pure, verified observation.
+
+## Status checkpoint — autonomous research stretch, pure observations only, nothing acted on (2026-09-20)
+
+Per explicit instruction (run the full fragility/robustness pass, keep going through the backlog, log pure observations, don't chase rabbit holes, no critic round-trip during this stretch since no one was available to relay responses). Summary of what this stretch covered, for continuation:
+
+**Tier 0 (fragility/robustness) — first pass complete**: trade concentration (6.8% top-10), ticker concentration (20.9% top-10, all 454 tickers contribute), and winner-removal stability (expectancy survives removing top 50 winners) all clean, no red flags. Time-period concentration is real (48.6% of total profit from 2023 alone, a genuine documented market regime, not an artifact) — the strategy's absolute profitability is regime-dependent. The RQ-73A frontier's magnitude (not direction) is substantially a 2023 artifact — nearly flat outside that year. The ATR-anchor rejection is confirmed robust and regime-independent. **Not yet done**: full market-regime split beyond calendar year, bootstrap-style uncertainty bounds, fragility of the RQ-77/stall-detector and would_confirm findings specifically.
+
+**Tier 1 (breach behavior) — strong start, one major new finding**: close-vs-trigger distance (correlation 0.28) and day+1 adverse movement (correlation 0.34, the strongest signal found) both show clean, monotonic, outlier-checked, non-Freshness/Delta-redundant gradients between breach quality and eventual outcome. Both confirmed robust across first vs. repeat breaches. **Not yet done**: the remaining items on critic's breach-behavior list (does a breach that immediately rejects intraday, before end of day, behave differently; volume-weighted breach quality beyond the weak raw vol_zscore correlation already checked at 0.069; distinguishable "bad breach" archetypes via clustering rather than single-feature buckets).
+
+**Tier 2 (options audit) — not started as a full pass, but one major, directly-actionable lead surfaced.** Direct user question: the day+1-adverse-movement finding above is useless for options specifically, since an options position is typically already resolved by day+1 open — is there a pattern knowable *at* the breach (or by end of the entry day) that matters for that short horizon instead?
+
+Checked two candidates. **Gap-through-at-open** (stock's Open already clears the trigger before the session starts, 10.0% of trades): real but modest signal (correlation with full-swing pnl only 0.07-0.09), win 65.1%/exp +4.14% vs. 54.1%/+1.20% for trades that had to climb intraday — some outlier influence (top-10 concentration 20.6%, still under the 40% danger threshold but higher than other checks today).
+
+**Far more important: the already-established close-vs-trigger signal, re-tested against the actual options-relevant horizon (entry at trigger, exit at day+1 open — the standard options recipe)**: correlation = **0.937**, near-deterministic. Worth being precise about why — a stock's next-day open closely tracks its prior close under normal overnight-gap behavior, so this is largely mechanical, not a mysterious new pattern. But the practical implication is direct and large:
+
+| Close vs. trigger (known by end of entry day) | Day+1-open win rate | Mean |
+|---|---|---|
+| Below trigger (41% of trades) | 23.4% | -0.92% |
+| 0-1% above | 88.7% | +0.74% |
+| 1-3% above | 98.2% | +2.29% |
+| 3%+ above | 99.6% | +6.46% |
+
+**Directly actionable for the options thread specifically, PENDING verification against real premiums (see correction below)** — the actual options mechanics (contract selection, liquidity, real premium behavior vs. this stock-price proxy) haven't been checked, which is the remaining Tier 2 work.
+
+## Correction — the above options claim was overstated, caught by testing against real option premiums with the correct exit convention (2026-09-20)
+
+Tested the close-vs-trigger → options-outcome relationship against real option data. **First attempt made a real, already-documented mistake**: used `simulate_option_trade()`'s built-in exit, which resolves close-to-close (exit at day+1's option *Close*) — but this project's own history (2026-09-14 methodology note) already flagged that the actual adopted day+1 recipe exits near day+1's *Open*, not its close, and that close-based day+1 exit is "dramatically worse" (documented then: 45.5% vs 82.0% win for ATM). Repeated that exact mistake initially — the first-pass result (n=585, correlation 0.084, overall win only 42.7%, median -3.82%) was measuring the wrong horizon entirely and is discarded.
+
+**Rebuilt correctly** using the established recipe from `research_archive/theta_bleed_check_open_exit.py`: entry at the entry day's option Close, exit at day+1's option Open. Same underlying 1,000-trade sample, n=557 successfully matched to real, liquid contracts (ATM, current expiry).
+
+| Close vs. trigger | n | Win | Mean | Median |
+|---|---|---|---|---|
+| Below trigger (weak) | 221 | 52.5% | **+0.28%** | +0.16% |
+| 0-1% above | 160 | 54.4% | +0.88% | +0.71% |
+| 1-3% above | 129 | 58.1% | +3.62% | +0.94% |
+| 3%+ above | 47 | 63.8% | +4.41% | +0.68% |
+
+Correlation(close_vs_trigger_pct, real option day+1-open pnl) = **0.137** — real and directionally consistent (the earlier stock-proxy claim wasn't fabricated, the direction holds), but nowhere near the 0.937 the flawed proxy suggested. **Most importantly, the "weak breach" bucket is not a loser on real options** — it's still mildly positive (+0.28% mean), unlike the stock-proxy's claim that it averaged -0.92%. This matches the project's own already-established finding that the day+1-open exit captures a real, fairly robust edge on its own ("the open isn't the ceiling, it's a safe floor") — breach quality is a genuine, real amplifier of that edge, not a hard gate that turns the trade into a loser.
+
+**Practical implication, revised**: waiting for close confirmation before entering options would modestly improve average outcomes (roughly +0.3pp to +4pp of amplification depending on how strict the bar), not rescue a losing population from being a loser — the overstated version of this claim is retracted. Still worth testing formally with a larger real-option sample and proper significance/concentration checks before treating even this corrected version as actionable.
+
+## RQ-90A — Close Quality Ladder, per critic's reframe (Bad Breakout Recognition, options-first) (2026-09-20)
+
+Critic's read on Update 89, a genuine project reframe: the stock swing side can tolerate "Type B" trades (breakout works initially, may give back later over 15 days — a P&L optimization problem), but options are dominated by "Type A" trades (breakout fails to establish momentum the same day, hurts immediately overnight — a risk-management problem, the user's actual stated pain). Proposed splitting stock and options research permanently, with a new thread, RQ-90 (Bad Breakout Recognition), starting with a no-intervention "close quality ladder": a binary checklist of same-day, pre-overnight-hold features, checking whether the checklist count is monotonic against both stock and options outcomes, before considering any actual filter.
+
+**Checklist (4 binary items, all known by market close on entry day)**: closed above trigger; closed in top 40% of the day's range; day's Low never dipped below trigger (held the whole day); volume z-score ≥1.5 (matching `entry_signal()`'s own volume-confirmation convention). Computed for the full settled population (n=6,270).
+
+**Stock swing outcome — clean, near-monotonic**: 0/4: 44.8% win/-0.97% exp → 1/4: 44.4%/-0.26% → 2/4: 56.9%/+1.60% → 3/4: 65.8%/+3.77% → 4/4: 84.8%/+7.89% (n=92 at the top, smaller but a strong, real gradient throughout).
+
+**Real options (day+1-open, correct recipe) outcome — a genuinely different shape, not a smooth ladder**: 0/4: 48.9% win/-0.65% mean (clearly worst, matches the stock story) → 1/4: 61.5%/+2.14% → 2/4: 60.6%/+2.07% → 3/4: 55.4%/+1.87% → 4/4: 40.0%/-2.53% (n=15, too small to trust). Checklist 1, 2, and 3 are roughly similar/overlapping (+1.87% to +2.14%), no clean ordering among them — **this looks like a threshold effect (clear the weakest bar or don't), not a continuous ladder**, at least at the very short day+1-open horizon. More quality clearly buys more 15-day swing edge, but doesn't obviously buy more overnight-specific edge past the first bar cleared. A real, useful distinction between the two products, not assumed from the stock-side pattern.
+
+## RQ-90B — Overnight Filter Simulation, options-first, per critic's exact test design (2026-09-20)
+
+Real option outcomes (day+1-open, correct recipe), n=1,382, four variants: skip close<trigger (A), skip worst-ranked 10%/20%/25% by close-vs-trigger distance (B/C/D).
+
+| Variant | Options: n / win / mean | Stock: n / win / mean |
+|---|---|---|
+| Baseline (hold all) | 1,382 / 58.3% / +1.93% | 1,382 / 56.3% / +1.14% |
+| A: skip close<trigger | 835 / 60.2% / +2.72% | 835 / 63.2% / +2.33% |
+| B: skip worst 10% | 1,244 / 59.6% / +2.32% | 1,244 / 58.2% / +1.46% |
+| C: skip worst 20% | 1,106 / 60.3% / +2.49% | 1,106 / 59.9% / +1.67% |
+| D: skip worst 25% | 1,037 / 60.7% / +2.66% | 1,037 / 61.4% / +1.96% |
+
+All four variants improve both win rate and mean on both products at once — the first result in this whole session to hit critic's "both improve — excellent" promotion bar simultaneously for stock and options.
+
+**Important correction, caught by checking what's actually skipped rather than trusting the aggregate improvement at face value**: the full "close<trigger" group (n=547, skipped by Variant A) is itself still net-positive (mean ≈+0.72%, median +0.76%) — not a losing population. The improvement in the kept group is partly a mechanical artifact: removing any below-average-but-still-positive subgroup raises the average of what remains, by simple arithmetic, regardless of whether that subgroup is genuinely bad. That's a legitimate capital-concentration effect, but a different, weaker claim than "these are Type A losers."
+
+**The more precise, honestly-defensible "true losers" signal is in the tail specifically**: Variant B's worst-ranked 10% (a smaller, more extreme cut than the full close<trigger group) genuinely averages **-1.58%** — real, net-negative, the actual Type A signal. Widening the cut toward 20-25% dilutes this back toward flat (skipped-group averages -0.34%, -0.26%). So the honestly-defensible filter is narrower than "skip anything below trigger" — closer to "skip the worst-ranked 10% specifically."
+
+**Concentration check on Variant A (kept group)**: top-10 share 27.9% (elevated but under the 40% danger threshold), median (2.25%) close to mean (2.72%), not wildly outlier-inflated.
+
+**Status**: real, promising, first result to clear critic's dual-promotion bar — but the precise mechanism (concentration effect vs. true loss-avoidance) needs to be stated correctly, and the narrower worst-10% version is the more defensible next candidate to test properly (larger sample, significance check) rather than the broader close<trigger cut. Not yet promoted — per the standing discipline, needs the same rigor (bigger real-option sample, proper significance/concentration checks) before treating even the corrected version as a live rule. Sent to critic (Update 90) for their read on the concentration-effect vs. loss-avoidance distinction and next steps.
+
+## Correct framing of the action, per direct user pushback, and a properly-powered significance check that weakens the worst-10% claim (2026-09-20)
+
+**Framing correction, important**: the "skip" decision above was mis-described as an options entry gate. The real intraday option price at breach time is unknowable (daily-bhavcopy-only data), so the established convention already treats the option's entry as happening at breach time in reality — the day's Close is only a backtest proxy for that unknown price, not a description of when the trade is actually placed. Since the user's real execution enters the option at breach time (same as the stock), by the time the close prints they're already holding the position — same timing constraint already established for the stock leg. **The correct, actionable framing: this is not an entry filter, it's an overnight-hold-vs-exit-at-close decision** — given the option is already held from breach time, at end of day you have a real, tradeable choice between selling now (at the close-time value) or holding through the gap to exit at tomorrow's open. The close-to-open pnl already measured is exactly the right quantity for this decision (it directly answers "does holding overnight gain or lose value relative to selling now"), and since it's built from real observed option prices (not a theoretical recompute), theta decay and IV changes are already fully embedded — no separate adjustment needed.
+
+**Properly-powered significance check, per direct request, before trusting the worst-10% number**: pulled a bigger real-option sample (n=2,436, up from 1,382) and tested each tail cut against zero.
+
+| Cut | n | Mean | p-value | Significant? |
+|---|---|---|---|---|
+| Worst 5% | 121 | -2.80% | 0.015 | Yes |
+| Worst 7% | 182 | -1.74% | 0.045 | Borderline |
+| Worst 10% | 243 | -1.26% | 0.086 | **No** |
+| Worst 15% | 365 | -0.79% | 0.221 | No |
+| Worst 20% | 487 | -0.63% | 0.249 | No |
+| Worst 25% | 609 | -0.08% | 0.863 | No |
+
+**The earlier worst-10% finding weakens and loses significance with the bigger sample** — mean shrinks from -1.58% (n=1,382) to -1.26% (n=2,436), bootstrap 95% CI [-2.70%, +0.11%] includes zero. Only the more extreme cuts (worst 5%, worst 7% borderline) remain genuinely significant. This is exactly why the significance check matters: the smaller sample made a noise-driven number look more solid than it actually is.
+
+**Corrected conclusion**: a real Type A signal exists, but it's narrower and more modest than previously stated — closer to the worst 5-7% of trades (mean -1.74% to -2.80%, holding through the gap for this subset genuinely loses money relative to exiting at the close), not the worst 10%+. Past that, the effect shrinks toward zero and isn't statistically distinguishable from noise. Correcting Update 90's framing before it goes further — this is a smaller, more precise finding than first reported, not a broad-brush filter.
+
+**Extended further (per explicit instruction to finish the list before sending another update, not report piecemeal) — pulled an even larger real-option sample (n=4,276, up from 2,436) and re-ran the boundary search at 1% granularity.** The picture stabilizes rather than shrinking further: a clear, contiguous significant band from **worst 5% through worst 11%** (all p<0.05, mean losses -1.2% to -2.3%), fading to non-significant from worst 12% onward. This is the expected pattern for a real but modest effect that was simply underpowered at the intermediate (n=2,436) sample size — not a reversal, a stabilization with more data.
+
+**Concentration check on the worst-10% band, and an important distributional nuance**: worst-10-trades' share of the band's total negative pnl is 18.3% (healthy, not outlier-driven). But **median in this band is nearly zero (+0.03%) while the mean is -1.42%** — meaning it is not that most trades in this group lose money; a real subset takes a genuinely bad loss, dragging the average down, while the typical trade is close to flat. This is better understood as a **tail-risk finding** (a real, identifiable elevated risk of a bad overnight loss concentrated in ~10% of trades) rather than "this whole subgroup is a loser" — a more precise, and arguably more directly useful, framing for a risk-management objective than an average-return framing.
+
+## RQ-90C — False Breakout Anatomy, descriptive characterization of the worst 5-11% band (2026-09-20)
+
+Characterized the entry-day candle shape and volume for the now-precisely-identified worst 5-11% band (n=376) against a clean comparison group well clear of the tail (n=4,389):
+
+| | Worst band | Healthy comparison |
+|---|---|---|
+| Body as % of day's range | 30.8% | 61.8% |
+| Upper wick as % of range | 51.4% | 22.8% |
+| Volume z-score | 2.48 | 5.76 |
+| Overnight gap % | 0.69% | 0.79% |
+
+A coherent, textbook "false breakout" shape: small real body, a large upper rejection wick (2.3x the healthy group's) — a classic shooting-star/rejection candle — and notably lower volume (less than half the healthy group's) despite still clearing the minimum entry threshold. Gap size at the open isn't a differentiator between the two groups. This is descriptive, not independent of the close-vs-trigger/close-position signals already found (a small body with a big upper wick mechanically implies a weak close position), but it gives a concrete, visual characterization of what the tail-risk group actually looks like — consistent with, not contradicting, the earlier findings.
+
+## RQ-91A — Price+OI Quadrant, first read, inconclusive (2026-09-20)
+
+Built the full 4-quadrant classical framework (long buildup: price↑/OI↑; short covering: price↑/OI↓; short buildup: price↓/OI↑; long unwinding: price↓/OI↓) from real front-month futures data (trailing 3-day window ending on entry day, EOD-only, matching the already-existing `oi_buildup_bullish()` convention), tested against real option day+1-open outcomes, n=1,121.
+
+Since this is a long-only breakout strategy, the sample is heavily skewed toward "price up" quadrants (long_buildup n=359, short_covering n=745) — the "price down" quadrants are far too small to read anything from (n=7, n=10) and are excluded from interpretation entirely.
+
+Between the two viable quadrants, short covering showed a nominally *better* option outcome than long buildup (59.3%/+2.43% vs 56.0%/+1.19%) — the opposite of what the classical framework would predict (fresh long buildup is usually considered the more bullish, durable signal). **Checked before trusting it: not statistically significant (p=0.147), and short_covering's top-10 trade concentration is 35.0%** (close to the 40% danger threshold) — the apparent edge could easily be a handful of large winners rather than a real quadrant effect.
+
+**Honest conclusion: no trustworthy signal from this OI classifier at this sample size.** Not a rejection of the underlying idea (RQ-48's history already showed this exact classifier flipping between rejected/reversed depending on conditioning), but a clean, appropriately-caveated null result for now — needs a bigger sample before drawing any real conclusion, and even then the "obvious" classical direction isn't showing up.
+
+## Status checkpoint — full RQ-90 arc complete (A/B/C), RQ-91A first read done (2026-09-20)
+
+Per explicit instruction to finish the list before sending another consolidated update. Summary: RQ-90A (close quality ladder, stock vs. options shape difference), RQ-90B (overnight filter simulation, corrected framing to overnight-hold-vs-exit-at-close, properly significance-tested to a stable worst-5-11% band across n=4,276 real option trades), RQ-90C (false breakout candle anatomy) are all complete. RQ-91A (price+OI quadrant) has a first, inconclusive read. RQ-91B (futures OI long-buildup vs. short-covering in isolation, without the full quadrant framework), RQ-91C (IV percentile/expansion/crush), and RQ-91D (combine breach quality + derivatives confirmation) are not yet started.
+
+## Direct follow-up: is there a pattern *before or at* the breach itself (not after it) that flags the bad 41%, or a short-term pullback regardless of eventual swing outcome? (2026-09-20)
+
+Sharper version of the same question: the close-vs-trigger and day+1 signals above are only knowable *after* the breach day develops — too late to avoid the trade, and irrelevant to someone who'd want to skip the entry altogether or worry that even an eventual swing winner could still hurt an options position via an early pullback. Checked systematically, honest negative result on most fronts.
+
+**Pre-entry (prior-day-only, before the breach) technicals — no meaningful signal.** Correlation of each against both the close-vs-trigger outcome and a short-term (day 1-3) maximum-adverse-excursion metric (regardless of eventual swing result): freshness (-0.09 / -0.14), RSI14 (-0.08 / -0.10), volume z-score (0.03 / -0.05), ATR% (0.05 / -0.15), prior distance to trigger (0.005 / 0.13), is_delta (0.10 / 0.07). All weak, none above ~0.15. None of the standard, already-computed technicals meaningfully distinguish which breaches will fail before the breach actually happens.
+
+**Genuine intraday check, using real 5-minute data (the only ~3-month window, June-September 2026, where it exists; n=417 matched entries)**: volume on the exact 5-minute bar where price first crosses the trigger shows essentially zero signal (correlation ~0.02 with both the day's close-vs-trigger outcome and final pnl). Whether price ever dips back below the trigger within an hour of the initial cross is too common to be useful as a filter (93.5% of trades do this at some point — normal wobble around a freshly-broken level, not a meaningful weak-breach signal). The small subset that holds immediately with zero pullback in that first hour (27 of 417, ~6.5%) does show a real gap (81.5% win/+4.77% exp vs. 50.5%/+0.85% for the rest) — but the sample is too small to trust on its own, and confined to one recent 3-month window, not tested across regimes.
+
+**Honest overall conclusion**: no reliable way found to identify the bad 41% (or a short-term-pullback-prone trade generally) before or at the moment of the breach. The market appears to genuinely decide over the course of the breach day itself — via real order flow, follow-through, and close — not something visible in advance from static pre-entry setup or the crossing instant. The one hint worth more data (immediate, zero-pullback holds) is flagged for continuation with a larger intraday sample if/when more history becomes available, not treated as a finding yet.
+
+**Tier 3 (Freshness capacity, max-hold descriptive re-audit) — not started**, intentionally deferred behind Tier 0/1 per critic's revised sequencing.
+
+**Nothing from this stretch has been proposed as an actionable rule** — every finding (breach-quality gradients, day+1 adverse-movement gradient, the 2023 regime-dependency, the frontier-magnitude qualifier) is logged as a verified observation only, consistent with the explicit instruction and the standing 2026-09-13 precedent against reflexively acting on a real quality gap. No critic update drafted for this stretch — queued for the next round when critic can actually weigh in on sequencing and which of these threads to pursue further.
+
+**Confirms the pattern already established on the deprecated Entry-Gate population, now on the correct, real Primed Gate population — not a new finding, a reproduction.** Legacy wins on raw portfolio $/day at every step; each change trades some of that away for a different, real benefit (New SL: smaller/safer losses, stop-exit avg −11.97%→−10.85%; New Target: higher win rate and faster resolution, 63.7%→71.4%; Trail-new: dramatically smaller stop-outs, −9.42%→−3.57%, the same offsetting-effects shape as everything else this weekend). Not sent to the critic as its own update — confirmatory, not novel, doesn't meet the "new/unexpected finding" bar for a check-in on its own.
+
+## RQ-93 — Current-engine Breach rebuild, per critic's explicit sequencing after the Type A/Type B reframe (2026-09-20)
+
+Critic's concrete next-step instruction: rebuild the breach study under the CURRENT SL/target architecture (Primed Gate + ATR0 structural stop + ZigZag target with R_FLOOR=1.0 + swing-low trail + MAX_HOLD=15), since every prior breach finding predates the target-floor/R-floor fixes. Froze this exact mechanism as the control population (n=6,201, matches the R_FLOOR=1.0 table from earlier today within noise) and recomputed breach-day (entry-day) OHLCV features fresh: overshoot, close/high/low-vs-trigger %, close-position-in-range, body/wick %, volume z-score, gap-at-open. Trigger-recross-count and time-of-breach were NOT recomputed — both require intraday data, and the only available intraday window (3-month, already tested 2026-09-20) already showed no usable signal there; not worth re-deriving from a sample that can't grow.
+
+**Outcome A (stock swing, current engine) — the close-vs-trigger gradient reproduces cleanly, if anything slightly stronger than before the rebuild.** Full 10-decile ladder: win 35.4%→77.4%, expectancy -2.29%→+7.76%, R-multiple -0.14→+0.55, all monotonic. Confirms breach quality still matters exactly as before under the new stop/target mechanics — the earlier finding wasn't an artifact of the pre-fix architecture.
+
+**A new sub-finding, only visible at full population scale**: only 3.0% of trades (188/6,201) have a day where the Low never dips back below the trigger at all intraday. That small group is dramatically better than the rest: 80.9% win/+8.04% exp/0.58R vs. 54.3%/+1.34%/0.10R for the 97% that do dip. This scales up (188 vs. the earlier 27-trade hint) and confirms the same "immediate, zero-pullback hold is a real edge" signal flagged as too-thin-to-trust on 2026-09-20's intraday check — now visible in the full daily-bar population too, not just the narrow 3-month intraday window. Still very rare (3% of trades), so not something to build a live gate around, but a real, confirmed pattern.
+
+**Outcome B (real options, day+1-open, current engine) — pulled the full population (n=3,383 matched, the largest single option pull this project has run) and reproduces RQ-90A/B almost exactly.** Correlation with close_vs_trigger_pct drops to a weak 0.053 (vs. 0.281 for the stock outcome) — confirms RQ-90A's "threshold effect, not a ladder" finding: decile 0 (worst) is clearly worst (49.3% win/-1.74% mean), deciles 1-9 overlap with no clean ordering (55.7-66.9% win, +0.69% to +3.55% mean). No other breach feature (overshoot, wick %, volume z-score, gap-at-open) shows a meaningfully stronger correlation with options outcome (all under 0.08) — close-vs-trigger remains the standout signal.
+
+**Worst-tail significance reproduces the RQ-90B band almost exactly on the fresh current-engine sample**: worst 5% through 12% all significant (p<0.05, mean -1.4% to -2.4%), fading outside that range (worst 3-4%: not significant, too few trades; worst 15%+: mean shrinks toward zero, not significant). Median inside the band stays ≈0% throughout while mean is meaningfully negative — same tail-risk shape as before, now confirmed on an independently-rebuilt population under the corrected SL/target mechanics rather than carried over from before the rebuild.
+
+**Critic's requested gap-attribution validation, done**: for the worst 5-11% band specifically (n=203 after matching to daily stock data), split day+1's real stock gap into gap-down (<-0.5%), flat, gap-up (>+0.5%):
+
+| Gap category | n | Freq | Mean opt pnl | Median opt pnl |
+|---|---|---|---|---|
+| Gap-down | 28 | 13.8% | **-12.40%** | -8.48% |
+| Flat | 127 | 62.6% | -1.19% | +0.27% |
+| Gap-up | 48 | 23.6% | **+5.92%** | +4.24% |
+
+This answers critic's exact question directly. **Most of the band's negative mean comes from the 13.8% that gap down catastrophically** (-12.4% mean, a real, severe overnight-gap loss) — the mechanism the "exit at close" rule is specifically meant to avoid, and it would. **But the rule is not a free lunch**: 23.6% of the same band gaps up strongly (+5.92% mean) — real winners that an unconditional "exit the worst band at close" rule would also kill. The majority (62.6%) is roughly flat either way. Net effect of the rule on this band would be trading away a real +5.92%-mean subgroup to avoid a real -12.40%-mean subgroup — asymmetric in the right direction for a risk-averse objective (removes a fat left tail at the cost of some right-tail upside), but not without cost, exactly as critic anticipated.
+
+**Concentration check, an honest caveat**: worst-10-trades' share of the band's total negative pnl is 33.7% (up from 18.3% on the earlier, larger 4,276-sample pull) — elevated, closer to the 40% danger threshold than before, though not over it. With n=203 for this specific 5-11% sub-band (smaller than the full worst-band samples pulled earlier), a handful of large losers matter more; worth another look if the sample grows further.
+
+**Independence check, current engine**: close_vs_trigger_pct correlation with fresh (-0.17), initial_risk_pct (-0.11), is_delta (0.13) — all still weak, confirms this remains genuinely new information, not a restatement of an existing filter.
+
+**Conclusion**: RQ-93 confirms the entire RQ-90 arc survives the current-engine rebuild essentially unchanged in shape and magnitude — nothing from the target-floor/R-floor fixes invalidated the earlier breach-quality findings. The one genuinely new piece of information is the gap-attribution result: the worst-5-11% overnight signal is real and is substantially (though not entirely) a gap-down phenomenon, but an unconditional "exit at close" rule on that band would also sacrifice a non-trivial gap-up subgroup — a real, quantified trade-off for critic/the user to weigh before promoting the rule, not a clean win.
+
+## RQ-91B — exact reconstruction of the old bullish/bearish OI-buildup signal, retested against the current weak-breach gap-down/gap-up question (2026-09-20)
+
+Per critic's explicit instruction: research archaeology first, not a new indicator, and not a repeat of RQ-91A's quadrant framework.
+
+**Step 1 — recovered the exact old definition, from the codebase's own history and docstrings, not from memory.** `oi_buildup_bullish(ticker, date)` (`option_backtest.py`): front-month FUTURES price and open interest, trailing `OI_BUILDUP_WINDOW=3` trading-day window ending ON `date` itself (uses that day's own EOD bhavcopy — computed AFTER close of the entry/breach day, never intraday). Pure binary: `last_price > first_price and net_oi_chg > 0` (magnitude-weighting was tested 2026-09-17 and rejected — binary formulation wins). Returns `None` (not `False`) when no real futures data exists (non-F&O ticker or pre-2024 bhavcopy gap, which carries no futures OI columns at all) — this distinction was the exact bug that caused the original 2026-09-06 rejection (58.8-60.9% of trades were silently misclassified "absent" when the honest answer was "no data"). History: rejected 2026-09-06 (backwards result, data-bug-contaminated) → revived and reversed 2026-09-17 under corrected freshness/concentration/options methodology (RQ-48) → promoted to **Audit-Gate telemetry only, never a live gate** (EOD-only, structurally can't be intraday) → reversed AGAIN within the true-Unique(15d) tail specifically (2026-09-20, this weekend's RQ-52 spot-check) → RQ-91A's quadrant framework found it inconclusive (p=0.069). Critic's own read on this history stands: "this exact classifier flipping between rejected/reversed depending on conditioning."
+
+**Step 2 — reproduced the original "useful" result before touching anything new.** Recomputed summary stats directly from the still-existing `runs/oi_buildup_retest.csv` (n=2,579, the exact population RQ-48's promotion was based on): Freshness-only 58.9% win/+0.237% swing exp → buildup present (n=684) 61.1%/+0.725% → buildup absent (n=1,895) 58.0%/+0.061%. Matches the FINDINGS.md-recorded numbers (686/60.9%/+0.715%) within rounding noise (3 rows were patched for a stale-cache bug after original publication). **Confirmed: the code and cached data reproduce the historical result cleanly** — no drift, no need to investigate a decay/bug before proceeding.
+
+**Step 3 — retested against the actual current problem: does OI buildup distinguish the gap-down tail from the gap-up/right-tail within RQ-93's weak-breach band?** Computed the real, current `oi_buildup_bullish()` (not the frozen historical reconstruction) for the full RQ-93 real-option population (n=3,383) — 69.6% real coverage (2,353 resolved True/False, 1,030 `None` for no-data).
+
+**(a) Population-level, this sample: the signal reverses yet again.** Buildup present (n=749): 56.7% win/+1.39% mean vs. buildup absent (n=1,604): 59.2%/+2.24% — buildup PRESENT now underperforms, opposite of RQ-48's original direction. One more data point for the same "flips depending on conditioning" pattern, not a new phenomenon.
+
+**(b) Within the worst 5-11% band (n=149 with known buildup status): same reversed direction, more pronounced.** Buildup present (n=53): 49.1% win/**-3.01%** mean vs. buildup absent (n=96): 47.9%/**-0.42%** mean. If bullish OI buildup meant anything like "genuine support, not dangerous," presence should make the weak-breach band's outcome *better* — it does the opposite here.
+
+**(c) The literal killer question — gap-down vs. gap-up within the band, buildup-conditioned (n=149 known-buildup, matched to real stock gaps):**
+
+| Gap category | Buildup | n | Mean opt pnl | Median |
+|---|---|---|---|---|
+| Gap-down | False | 13 | -8.77% | -6.95% |
+| Gap-down | **True** | 8 | **-19.08%** | -19.28% |
+| Flat | False | 66 | -1.14% | 0.00% |
+| Flat | True | 30 | -2.54% | +0.09% |
+| Gap-up | False | 17 | **+8.76%** | +5.29% |
+| Gap-up | **True** | 15 | +4.61% | +4.78% |
+
+**Consistently wrong-signed in all three gap categories**: bullish OI buildup presence makes the gap-down subgroup's loss WORSE (-19.08% vs -8.77%), and makes the gap-up subgroup's gain SMALLER (+4.61% vs +8.76%) — the opposite of the hoped-for mechanism ("buildup present distinguishes a genuinely-supported, likely-gap-up move from an unsupported, dangerous one"). Checked the gap-down+buildup=True group (n=8) isn't a single-outlier artifact before trusting it: 5 of 8 individual trades lose more than -13% (POLYCAB -30.4%, BIOCON -34.4%, IPCALAB -35.9%, NATIONALUM -25.0%, ANGELONE -13.6%), median -19.28% close to the mean — broad-based within the tiny group, not one blown-up trade.
+
+**Honest conclusion, appropriately caveated for sample size (each cell is n=8-17): the original bullish/bearish OI-buildup signal does NOT solve the gap-down-vs-gap-up separation problem, and if anything points consistently in the wrong direction across all three gap categories.** Not a confident rejection — samples this thin (n=8-17 per cell) can't support a strong claim either way — but a clean, internally consistent, non-cherry-picked negative result across every subgroup tested, using the exact signal and methodology that was previously found useful in a different, unconditioned context. Matches the now well-established pattern (RQ-48/RQ-52/RQ-91A) that this classifier's direction depends heavily on what population it's conditioned on, and within tail/weak-breach populations specifically, it has now reversed sign three separate times (Unique(15d) tail, RQ-91A's quadrant framework trending the "wrong" direction, and now this gap-attribution test).
+
+## Prospective close-time carry-vs-exit economic validation, per critic's Update 94 directive — a real, out-of-time-robust candidate found (2026-09-20)
+
+Critic's exact ask: not another worst-N%-selection significance test, but a full economic accounting (avoided downside vs. sacrificed upside) across regions derived from the feature's own distribution, then validated out-of-time/across regimes, before calling anything a candidate.
+
+**Setup**: `opt_pnl_pct` (entry-day option Close → day+1 option Open) IS already the exact "hold overnight vs. exit at close" quantity, since the entry-day Close is the backtest's own close-time-value proxy — no new metric needed. For each region: mean/median pnl, 5th-percentile tail loss, gap-down/gap-up frequency (real stock day+1 gap, matched for the full n=3,383 population this time, not just the earlier 203-trade sub-sample), winners-sacrificed (n and $-sum of positive-pnl trades that an exit-at-close rule would kill), avoided-loss-sum (total negative pnl an exit rule would recover), and net exit value (avoided-loss minus sacrificed-upside, netted — positive means exiting the region is a net economic win).
+
+**Fixed, meaningful regions first (the original close-vs-trigger bucket scheme, not reverse-engineered from outcomes)**: below-trigger (n=1,367), 0-1% (n=957), 1-3% (n=766), 3%+ (n=293). **Every single one of these is net-negative to exit** (net values -1,646.6, -2,557.2, -2,022.3, -603.3) — the broad "close below trigger" cut from the original RQ-90B first pass was never actually a good rule on full economic accounting, consistent with that finding's own later correction (the whole below-trigger group is itself net-positive).
+
+**Finer deciles reveal exactly one region that's genuinely net-positive to exit**: decile 0 only (net value **+590.5**), every other decile (1-9) net-negative (-234.5 to -1,201.2). Decile 0 = close_vs_trigger_pct < -1.16% (100% below-trigger, but a much narrower, more extreme cut than the full below-trigger bucket) — n=339, mean -1.74%, gap-down freq 11.2%, gap-up freq 23.9%, winners-sacrificed 167 trades/+1,203.1 vs. avoided-loss -1,793.6.
+
+**Out-of-time / regime robustness, checked before calling this a candidate**:
+- Chronological split (first half vs. second half by entry_date): both net-positive (+388.2 and +202.3) — no reversal.
+- Every individual year 2022-2026 independently net-positive (+106.7, +122.8, +163.9, +57.1, +140.1) — genuinely consistent across 5 separate years, not one lucky year.
+- **2023-regime-dependency check (given this project's own documented 2023-concentration caveat) comes back clean here**: non-2023 years contribute *more* net value (+467.7) than 2023 alone (+122.8) — unlike several earlier findings this weekend, this one is NOT a 2023 artifact.
+- Concentration check: worst-10-losers' share of decile 0's total negative pnl is 21.1% (healthy, well under the 40% danger threshold).
+
+**Conclusion: this is a genuine, out-of-time-validated candidate** — a close-time carry/exit rule specifically at "stock closes more than ~1.16% below the trigger by end of day" (roughly the worst 10% by this metric) recovers more real value than it sacrifices, consistently across time, regime, and concentration checks. Narrower and more precise than any of the fixed round-number buckets, and specifically NOT derived by searching for where the worst outcomes happened — it emerged from a systematic decile scan of the same already-validated feature. Per critic's own decision tree: this clears the "works → validate robustness" bar — ready to discuss as an actual candidate rule, not just telemetry.
+
+## RQ-95 promoted, local threshold stability confirmed; RQ-96 (intraday deterioration exit) hits a real, structural data blocker (2026-09-20)
+
+**Local threshold stability around -1.16%, per critic's explicit ask before treating it as more than a lucky spike** — cumulative net exit value ("exit everything with close_vs_trigger_pct below this threshold") across a neighborhood of cuts:
+
+| Threshold | n | Mean | Net exit value |
+|---|---|---|---|
+| -0.50% | 785 | -0.23% | +178.9 |
+| -0.75% | 586 | -0.68% | +399.4 |
+| -1.00% | 424 | -1.21% | +512.0 |
+| **-1.16%** | 337 | -1.73% | **+584.5** |
+| -1.25% | 301 | -1.71% | +513.7 |
+| -1.50% | 210 | -2.14% | +449.1 |
+| -1.75% | 146 | -2.18% | +318.4 |
+| -2.00% | 109 | -1.90% | +206.8 |
+| -2.50% | 52 | -5.58% | +290.3 |
+| -3.00% | 30 | -9.24% | +277.2 |
+
+**Positive across the entire neighborhood, never crosses zero, peaks around -1.0% to -1.16%** — a genuinely stable extreme-weak-close regime, not a lucky boundary at exactly -1.16%. Confirms RQ-95 as a real candidate, not calibration-dependent. **RQ-95 formally promoted to candidate status**, per critic: "at EOD, if close_vs_trigger_pct < ~-1.16%, do not carry the long option overnight; exit at close" — architecture unchanged (Primed Gate → breach → enter → hold → EOD carry decision → Day+1 open), not a new entry filter.
+
+**RQ-96 (does exiting at the first INTRADAY breach of the -1.16% level beat waiting for EOD) hits a real, structural data blocker, not a sample-size problem alone.** Two separate issues, both material:
+
+1. **No intraday option price data exists anywhere in this project.** NSE's F&O bhavcopy (the only options data source used throughout) is EOD-only — confirmed repeatedly this session (RQ-91A's fetch investigation, the whole day+1-open-vs-close-to-close methodology). There is no way to compute a real option premium at an arbitrary intraday moment. Any intraday-exit economics would have to use a stock-price-proportional proxy for the option move — exactly the approximation this project has already twice found unreliable this session (the flawed stock-proxy correlation of 0.937 for close-vs-trigger collapsed to a real 0.137 once actual option premiums were used). Building RQ-96 on that same proxy would repeat a mistake already caught and corrected twice.
+2. **The available intraday stock data is far too thin to even attempt the stock-only half of the question properly.** The only 5-min intraday cache covers a single 3-month window (2026-06-10 to 2026-09-18, already flagged as thin/single-regime in the 2026-09-20 breach-behavior check). Of the full 3,383-trade population, only 21 land in this window AND qualify for the -1.16% weak-close gate. A quick check of all 21 found "crosses the breach level intraday" trivially true 100% of the time, with 14/21 crossings timestamped at the very first 09:15 bar — a red flag that the check isn't correctly sequencing the crossing relative to when the trigger was actually touched (a stock that gaps up through the trigger and pulls back within the same opening range can show its day's Low below the breach level in the very first bar, before the "entry" that supposedly precedes any "deterioration" has meaningfully happened). Fixing that sequencing bug wouldn't fix the sample-size problem (n=21, one regime).
+
+**Honest conclusion, not forced through with an inferior proxy**: RQ-96 as scoped cannot be properly answered with current data. This is a genuine data-availability gap (no intraday option prices exist in this project, ever) plus a genuine sample-size gap (n=21 in the only intraday window available), not something more analysis effort can route around. The EOD close-time gate (RQ-95) is the ceiling of what the current data can support — an intraday version would need either real intraday option pricing (a different, unavailable data source) or a much larger intraday stock cache before even the stock-only half of the question could be tested honestly.
+
+## RQ-95's real-world firing frequency, and a second, failed attempt at RQ-96 via a calibrated stock-price approximation (2026-09-20)
+
+**Firing frequency, a real operational question worth stating plainly**: the -1.16% gate is not a rare tail event — it fires on **15.3%** of the full Primed Gate population (n=6,201) and **10.0%** of the real-option-matched subsample (n=3,383, the population all the RQ-95 net-value numbers were computed on). Roughly 1 in 7-10 trades. The earlier net-value numbers already reflect this full firing rate — not diluted by rarity, not a lucky-tiny-sample artifact.
+
+**Second attempt at RQ-96 (intraday deterioration exit), per direct user instruction to try an approximation rather than declare it unanswerable outright.** Built a per-trade calibrated linear scaling factor from real same-day data — `(option's entry-day Close − Open) / (stock's entry-day Close − Open)` — applied to the stock's real intraday price at the actual crossing moment (properly sequenced this time: the crossing must occur strictly after the bar where the stock's High first touches the trigger, fixing the earlier sequencing bug that let a gap-through-then-pullback masquerade as a false "crossing" before entry). n=19 (of 53 weak-close candidates in the one available intraday window, most lost to no-real-option-match).
+
+**Result: the approximation is uninformative, not just noisy.** Correlation between the approximated "exit at crossing" pnl and the real overnight outcome (`opt_pnl_pct`) is **0.0004** — statistically zero. Several individual values are implausible on inspection (e.g., TMPV's interpolation implies the option was worth *more* at the intraday crossing than at the day's open, despite both the stock and option ultimately closing lower that day).
+
+**Why it fails, not just that it does**: a straight line between only two points (the entry day's Open and Close) is a poor model of an option's actual intraday path — real option prices move on gamma (an accelerating/decelerating relationship to the stock as it moves), vega (intraday IV wobble), and a generally choppy, non-monotonic path over a multi-hour session, none of which a 2-point linear interpolation can capture. It doesn't add bounded noise to a real signal — it points in essentially random directions relative to the true path, actively misleading rather than merely imprecise.
+
+**Honest conclusion, unchanged from the first attempt but now with a concrete method-level reason why**: RQ-96 (intraday deterioration exit) cannot be answered with a linear approximation over this data — the problem isn't the concept, it's that a 2-point interpolation is the wrong tool for path-dependent option pricing. A meaningfully better approximation would need either (a) a mid-session anchor point beyond just Open/Close (not available — no intraday option data exists at any granularity), or (b) a real options-pricing back-out (Black-Scholes using known strike/spot/DTE, assuming a flat or entry-day-implied IV) — a materially heavier build than a quick script, not attempted here, flagged to critic as a real infra question rather than pushed through.
+
+## RQ-96 parked (blocked on data, per critic); severity-curve check on RQ-95's left tail, per critic's follow-up question (2026-09-20)
+
+**RQ-96 formally parked**: "EOD option data cannot identify whether an intraday -1.16% breach should trigger an earlier exit. Stock-only interpolation and two-point option scaling were tested and rejected as invalid proxies. Reopen only if genuine intraday option quote/trade data becomes available." Not pursuing a Black-Scholes back-out per critic's explicit reasoning (would model the exact unknown the research is trying to discover — self-referential risk).
+
+**Severity curve, per critic's exact ask: does the economic damage accelerate as the close gets further below trigger, or is -1.16% just separating a bad population from the rest?** Marginal (non-cumulative) bands, real option data (n=3,383), plus each band's share of the full Primed Gate population:
+
+| Band | n (options) | % of full Primed Gate | Mean opt pnl | Median | Gap-down | Gap-up | Net exit value |
+|---|---|---|---|---|---|---|---|
+| 0 to -1% | 943 | 23.3% | +2.29% | +1.98% | 7.2% | 27.8% | -2,158.6 |
+| -1 to -1.5% | 214 | 6.2% | -0.29% | +0.40% | 14.5% | 24.8% | +62.9 |
+| -1.5 to -2% | 101 | 4.3% | -2.40% | -0.20% | 8.9% | 20.8% | +242.3 |
+| -2 to -3% | 79 | 4.0% | +0.89% | +0.28% | 6.3% | 30.4% | -70.4 |
+| -3 to -5% | 25 | 2.3% | -9.40% | -11.47% | 24.0% | 16.0% | +235.1 |
+| < -5% | 5 | 0.8% | -8.43% | 0.00% | 40.0% | 40.0% | +42.2 |
+
+**Honest answer: neither story cleanly wins.** It is NOT a smooth, accelerating deterioration curve — the "-2 to -3%" band flips back net-positive (+0.89% mean, net exit value -70.4, i.e. holding beats exiting there), breaking a monotonic-severity story. But it's also not simply flat/noise — mild weakness (0 to -1%, by far the largest band at 23.3% of the whole population) is clearly, robustly a *good* outcome (+2.29% mean, strongly net-negative to exit), while every band beyond -1% is at or near net-positive-to-exit. **Most likely honest read: the marginal bands beyond -1% are individually too small (n=214 down to n=5) to resolve a clean shape — real sampling noise, not a real "recovery zone" at -2 to -3%.** The cumulative view from the earlier threshold-stability check (which pools all these noisy bands together) is the more trustworthy signal and remains solidly positive throughout -0.75% to -3%.
+
+**On "is -1.16% a meaningful transition point or just a common failure mode"**: the population-share column is the clearer answer here. Share drops sharply right around this boundary — 23.3% for mild weakness (0 to -1%, and this large group is *not* dangerous) down to 6.2% for -1 to -1.5%, continuing to shrink from there (4.3%, 4.0%, 2.3%, 0.8%). So -1% does mark a real transition in *prevalence* (ordinary noise gives way to a much smaller, minority regime) even though the per-band economics curve itself is too small-sample-noisy beyond that point to call a clean accelerating gradient. **Conclusion: -1.16% is closer to marking the start of a genuinely less-common regime than to being an arbitrary cut through a smooth continuum — but the fine-grained shape inside that regime can't be resolved with the current sample size.** No new threshold search follows from this — consistent with critic's explicit instruction not to turn this into a cutoff hunt.
+
+## RQ-95A — deterioration-severity shape, with the 5th-percentile tail and cumulative population share added, per critic's exact spec (2026-09-20)
+
+Same frozen 3,383-trade real-option population, no new model, no parameter search — just the requested table with p5 added:
+
+| Band | n | Mean | Median | p5 | Net exit value | % of full Primed Gate |
+|---|---|---|---|---|---|---|
+| 0 to -1% | 943 | +2.29% | +1.98% | -14.73% | -2,158.6 | 23.3% |
+| -1 to -1.5% | 214 | -0.29% | +0.40% | -18.46% | +62.9 | 6.2% |
+| -1.5 to -2% | 101 | -2.40% | -0.20% | -26.63% | +242.3 | 4.3% |
+| -2 to -3% | 79 | +0.89% | +0.28% | -17.41% | -70.4 | 4.0% |
+| -3 to -5% | 25 | -9.40% | -11.47% | -40.52% | +235.1 | 2.3% |
+| < -5% | 5 | -8.43% | +0.00% | -26.04% | +42.2 | 0.8% |
+
+**Cumulative "below -X%" population share (full Primed Gate, n=6,201)**: below -1% = 17.6%, below -2% = 7.05%, below -3% = 3.06%, below -5% = 0.76%. A classic decaying-tail failure distribution — each doubling of severity roughly halves (or better) the population share, matching critic's hypothesized "normal-looking failure distribution with a progressively smaller severe tail" almost exactly.
+
+**Which of the three outcomes: none of them cleanly, but closest to (3) messy, with one real exception.** Not (1) clean monotonic deterioration — the mean bounces (0.89% at -2 to -3%, better than -1 to -1.5% and -1.5 to -2%). Not (2) a clean step function either — the bands below -1% range from +0.89% to -9.40%, not a uniform "similarly bad" level. **But the 5th-percentile column tells a more consistent story than the mean does**: -14.73% → -18.46% → -26.63% → -17.41% → -40.52% — not perfectly monotonic either, but the tail clearly widens with severity in a way the mean doesn't (roughly 3x worse by -3 to -5% than at 0 to -1%). Consistent with the standing tail-risk framing already established for RQ-90B/95 (median near zero, mean dragged down by a real minority) — the marginal bands are individually too small (n shrinking 943→214→101→79→25→5) to resolve the mean's fine shape cleanly, but the widening tail risk is visible even at this sample size.
+
+**Honest conclusion, per critic's own framing**: -1.16% doesn't represent a clean "deterioration mechanism" with an accelerating gradient, nor is it an arbitrary cut through flat noise — it sits at a real, sharp drop in population share (23.3%→6.2% just past -1%) with a genuinely widening tail-risk beyond it, but the marginal mean's shape inside that regime is not resolvable at current sample size. RQ-95 remains a valid, independently-demonstrated empirical candidate on its own economic accounting (already validated via the earlier out-of-time robustness checks) — the more defensible framing per critic: "extreme close deterioration carries real, widening tail risk; -1.16% is where the accounting first turns net-positive, not a discovered natural boundary of a smooth mechanism." No new threshold search follows from this, per critic's explicit instruction.
+
+## RQ-90→RQ-95 arc formally closed by critic; Freshness capacity-constrained validation — the deferred test finally run, decisive result (2026-09-20)
+
+Critic closed the whole arc: RQ-90 close (stock ladder + options tail-risk), RQ-91A park/closed, RQ-91B close, RQ-93 close, **RQ-95 promoted to candidate** ("EOD close deterioration below ~-1.16% → exit option rather than carry overnight"), RQ-95A close (tail evidence real, mean shape not resolvable, no further threshold search), RQ-96 parked/data-blocked. Explicit instruction: stop tuning -1.16%, move to the next queue item — Freshness capacity-constrained validation ahead of Type-B/max-hold research, since Freshness already has a partially-established signal and an explicit prior deferral (2026-09-20 Update-75 verdict: "should NOT be chased into a capacity test right now... doing so now would be optimizing entry filtering before seeing how the new SL and target actually work" — that condition is now satisfied, the whole target-floor/R-floor/Primed Gate architecture has since settled).
+
+**Reused the exact deterministic max-N-concurrent-positions methodology** (2026-09-07 Risk-of-Ruin precedent, FCFS chronological admission, no ranking, already used to correctly reject then re-validate Fixed-R) — on the CURRENT settled architecture (`rq128_breach_merged.csv`, n=6,182 with valid fresh+r_multiple), comparing three populations: No filter, Fresh≤0.40 (current), and the parked two-sided variant (Fresh≤0.20 OR ≥0.80, which looked best on unconstrained per-trade/total metrics back on 2026-09-20's original U-shape investigation):
+
+| Slots | No filter (admitted/cumR/maxDD/streak) | Fresh≤0.40 (admitted/cumR/maxDD/streak) | Two-sided (admitted/cumR/maxDD/streak) |
+|---|---|---|---|
+| 3 | 240 / +33.33R / -4.32R / 4-−3.51R | 242 / **+37.17R** / -8.09R / 5/-4.72R | 239 / +28.94R / -12.02R / 6/-3.84R |
+| 5 | 397 / +53.34R / -8.64R / 7/-5.26R | 397 / **+62.47R** / -12.52R / 8/-6.98R | 393 / +59.09R / -11.45R / 6/-4.52R |
+| 10 | 787 / +117.32R / -15.74R / 11/-8.11R | 771 / **+144.36R** / -11.55R / 8/-6.64R | 764 / +127.96R / -12.46R / 9/-6.17R |
+| 20 | 1,524 / +196.26R / -23.62R / 12/-9.60R | 1,474 / **+242.79R** / -25.75R / 12/-9.22R | 1,425 / +215.47R / -23.81R / 10/-8.68R |
+| 50 | 3,343 / +435.55R / -64.05R / 20/-15.40R | 3,066 / **+448.67R** / -55.60R / 16/-12.84R | 2,756 / +387.21R / -48.73R / 20/-14.45R |
+
+**Decisive, robust result: current Fresh≤0.40 beats BOTH no-filter AND the two-sided variant on cumulative R at every single slot count tested (3, 5, 10, 20, 50)** — this is the opposite conclusion from the earlier unconstrained-total-sum check (which favored no-filter purely by raw trade count). The mechanism: at low-to-moderate capacity, the number of trades actually admitted is nearly identical across all three populations (capacity, not candidate-pool size, is the binding constraint — there's always a queue) — so restricting the candidate pool to higher-quality setups doesn't cost admitted trade count the way it did for the throughput-sensitive Fixed-R/MAX_HOLD_DAYS questions; it just changes WHICH trades fill the same number of slots, and Fresh≤0.40's average R per admitted trade is higher.
+
+**Drawdown/streak are genuinely mixed and capacity-dependent, same pattern already documented for Fixed-R**: Fresh≤0.40 is worse (deeper drawdown, costlier streak) than no-filter at low capacity (3, 5 slots) but better at higher capacity (10, 20, 50 slots) — plausibly a diversification effect (fewer candidates at very low slot counts means less opportunity to offset a bad stretch with an unrelated concurrent position).
+
+**The two-sided variant, which looked like the strongest per-trade candidate in the original unconstrained U-shape investigation, does NOT survive this test** — it underperforms current Fresh≤0.40 on cumulative R at every slot count (e.g. slots=10: 127.96R vs 144.36R) and shows the worst max drawdown of the three at low capacity (slots=3: -12.02R). **Conclusion: the current one-sided Fresh≤0.40 filter is validated under a realistic capacity constraint — it was never actually a throughput trap the way Fixed-R/MAX_HOLD_DAYS tightening was, and the two-sided "fix" proposed back on 2026-09-20 is rejected, not adopted.** This closes the "unresolved per-trade-quality-vs-total-output trade-off" flagged at the time — the current production Freshness gate stands as-is, no change needed.
+
+## Production gap audit + RQ-95 execution-timing decision, weekend freeze (2026-09-20)
+
+**Audit, before any implementation work starts**: checked the real code (`backtest.py`, `daily_scan.py`, `monitor_positions.py`) rather than assume the weekend's settled architecture was already live. It is not — everything this weekend (ATR0, ZigZag+R_FLOOR target, swing-low trail, Freshness-as-capacity-filter, RQ-95) exists only in scratchpad research scripts. Production still runs: `STRUCTURAL_STOP_ATR_BUFFER=1.0` (not ATR0), `resistance_target()` pivot-point target (not ZigZag+R_FLOOR), `SMA21`-based trail (not K=2 swing-low). `MAX_HOLD_DAYS=15` and `TRAIL_ENGAGE_PCT=1.08` do match. `daily_scan.py`'s own candidate list still calls the close-based `detect_entry()`/`entry_signal()` — real intraday Primed Gate tracking exists only in `live_checkpoint.py`'s separate monitoring path. Freshness≤0.40 has no live enforcement anywhere (backtest-only convention). This is a real, scoped implementation task for whenever picked up next — not a config change.
+
+**RQ-95 execution timing, user's own operational call, overriding my first-pass 3:20-3:28 PM suggestion**: check and act **2:45-3:15 PM**, not later. Reasoning: RQ-95's candidate population is specifically the weak-breach/deteriorating group, which RQ-90C already showed carries materially lower volume all day (z-score 2.48 vs 5.76 for healthy trades) — this is exactly the population where option liquidity is most likely to thin further into the last 15 minutes of the session, compounding the risk of a bad fill right when trying to exit. Trading a small amount of estimation accuracy on the exact final close for a materially safer, more liquid execution window is the right call given the objective is avoiding a bad overnight outcome, not optimizing the last few paise of the close price. Recorded as the answer to critic's own production-validation checklist item #5 ("EOD option exit is actually executable with available liquidity").
+
+## Production gap #1 closed — `primed_engine.py` built, verified against research, wired into `monitor_positions.py` with RQ-95 (2026-09-20)
+
+Built a new module, `primed_engine.py`, rather than modify `backtest.py` in place — the existing test suite (72 tests) exercises `backtest.py`'s legacy `detect_entry()`/`check_exit()`/`current_stop_level()`/`resistance_target()` directly, and those serve VCP/coiled_spring plus legacy comparisons, per the standing 2026-09-20 governance decision ("detect_entry()/Entry Gate is legacy-only... retained only for legacy comparisons and regression testing"). Zero changes to `backtest.py` itself — `primed_engine.py` imports its shared constants (`MAX_HOLD_DAYS`, `TRAIL_ENGAGE_PCT`, `STRUCTURAL_LOOKBACK_BC`, `CLIMAX_*`) and adds the settled mechanism: `detect_primed_entry()` (base_filters_pass + real intraday trigger touch, no regime gate — matches `daily_scan.py`'s own `_passes_primed_checks()` convention), `find_zigzag_target()` (scipy, R_FLOOR=1.0 invariant), `check_primed_exit()`/`current_primed_stop_level()` (ATR0 stop, K=2 swing-low trail).
+
+**Verified against the weekend's own research before wiring anything live**: spot-checked `simulate_primed_ticker()` against `rq128_breach_merged.csv` (the already-validated RQ-93 population) on the 15 most-traded tickers, 500 trades — 497 exact matches. The 3 differences: 2 are a cosmetic exit-reason label only ("open" vs "still_open" for a position still open at the data boundary — fixed, relabeled to match), 1 (TITAN) is a deliberate, correct difference — the research script never evaluated exit conditions on the very last cached day (a backtest-only safety convention for possibly-incomplete data), but a live position monitor should evaluate today's own stop/target, which `primed_engine.py` does. `python3 -m pytest tests/ -q` still 72/72 after the change, as expected — `backtest.py` untouched.
+
+**Wired into `monitor_positions.py`, additively, not by repointing an existing label**: real open positions right now (`open_positions.csv`) include 3 live `breakout_cont` trades (GRANULES, ANANDRATHI, VIJAYA) and 1 `coiled_spring` (AEGISLOG) — their real broker stop-loss orders were set from the legacy mechanism (1.0x ATR buffer, pivot-point target, SMA21 trail). Repointing `breakout_cont` at the new engine would have silently changed this tool's displayed stop for those open positions to a number that no longer matches what's actually resting at the broker — a real, avoidable risk. Instead, added a new pattern label, `primed_bc`, dispatched separately in `monitor()`; `breakout_cont`/`coiled_spring` behavior is byte-identical to before (confirmed by running `monitor_positions.py` against the real `open_positions.csv` before and after — output unchanged for all 4 existing positions). Log new entries as `primed_bc` going forward to get the settled architecture; the 4 existing ones stay on their original mechanism until they close naturally.
+
+**RQ-95 (EOD overnight-option-carry gate) implemented as `primed_engine.overnight_carry_recommendation()`**, wired into `monitor()`: for any `primed_bc` position whose `entry_date` is the most recent cached trading day (i.e., checked on the evening it was entered), prints the `close_vs_trigger_pct` and a carry/exit recommendation against the `-1.16%` threshold. Advisory only for the options decision — does not touch the stock position's own exit logic in any way. Smoke-tested end to end (both the normal day-N stop/target path and the entry-day overnight-check path) against real cached data before considering this done.
+
+**Explicitly NOT changed, flagged as the next open decision rather than silently done**: `daily_scan.py`'s own candidate-generation (`scan()`) still calls the legacy, close-based `detect_entry()`, not `detect_primed_entry()` — the daily candidate list a user reviews is not yet using the real intraday-touch Primed Gate mechanism for pattern/stop/target display. This is a more visible, higher-blast-radius change (it changes which stocks appear as candidates each day and what stop/target they're shown with) than the additive `monitor_positions.py` change above, and wasn't made without explicit confirmation first.
+
+**Freshness stays telemetry-only, per explicit instruction** — no live admission gate was added despite tonight's capacity-constrained validation; that result is recorded as a research finding only, not wired into `shortlist_primed()`/`scan()`/anywhere live.

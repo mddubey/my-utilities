@@ -105,8 +105,11 @@ MAX_HOLD_DAYS = 15           # (2026-09-14) real trading-days cap, both patterns
                               # earlier "cutting early always loses" verdicts were partly an artifact of
                               # comparing against an implicitly-positional alternative, not a clean
                               # rejection of early exits in general.
-TRAIL_ENGAGE_PCT = 1.03      # Both patterns (2026-08-30, was VCP-only) — give a normal pivot retest
-                              # room before trailing tightens onto the 21-EMA (VCP) / SMA21 (BC, below)
+TRAIL_ENGAGE_PCT = 1.08      # Both patterns (2026-09-20, was 1.03) — RQ-68/sweep found engaging later
+                              # is monotonically better up to a clean plateau at 1.08 (no gain 1.08-1.20),
+                              # independent of the stop-buffer width (confirmed at both 1.0x and 0.0x ATR).
+                              # 1.03 was leaving ~26-32% of eventual MFE unprotected before the trail even
+                              # engaged (RQ-68). See FINDINGS.md "TRAIL_ENGAGE_PCT sweep" for the full sweep.
 STRUCTURAL_LOOKBACK_BC = 20  # (2026-09-15) Breakout Continuation's new initial stop, promoted after
                               # the "Family C" research thread: structural_low = lowest Low over the
                               # 20 trading days BEFORE entry (returned by detect_entry, stored at

@@ -72,6 +72,15 @@ def load_day_futures(ymd):
     if not path.exists():
         return None
     df = pd.read_csv(path, parse_dates=["TradDt", "XpryDt"])
+    # Real gap, not a defensive guess: bhavcopy files before ~2024-01 only ever cached
+    # the STO (options) rows, never STF (futures) -- confirmed directly (2026-09-20)
+    # across a spread of dates from 2022-06 through 2026-08. Older files are missing
+    # the futures-only columns entirely (e.g. PrvsClsgPric, ChngInOpnIntrst), so the
+    # column-select below would raise KeyError instead of the documented "no data ->
+    # None" contract oi_buildup_bullish() already relies on. Check for the columns
+    # (not just FinInstrmTp) so a genuinely futures-free day is None, not a crash.
+    if not set(FUT_COLS).issubset(df.columns):
+        return None
     return df[df.FinInstrmTp == "STF"][FUT_COLS]
 
 

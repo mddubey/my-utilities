@@ -3,3 +3,6 @@ numpy>=2.0
 yfinance>=1.2
 requests>=2.31
 pytest>=8.4
+scipy>=1.13  # 2026-09-20: scipy.signal.find_peaks for swing-high/swing-low detection
+             # (distance + prominence) -- battle-tested peak-finding instead of a
+             # hand-rolled ZigZag, after two real bugs in the hand-rolled version
