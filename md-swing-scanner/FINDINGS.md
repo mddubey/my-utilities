@@ -4194,3 +4194,72 @@ Caught by direct user question while reviewing the refreshed primed list ("wasn'
 **Real effect on today's primed list, worth being direct about since it's the opposite of what was expected going in**: correcting the value made the list slightly BIGGER, not smaller — 39→46 tickers, 11→14 F&O names (added ADANIPORTS, BHEL, MAXHEALTH). The intuition that fixing this would shrink the F&O count was wrong; EMA34=2 is a *looser* persistence requirement (2 of the last 10 days rising, vs. 9 of 10), so it structurally admits more candidates, not fewer, exactly as its own research characterized it ("captures a large, genuinely distinct population... 82.7% of Delta").
 
 **Standing follow-up, not yet done**: any research script still setting `signals.EMA34_RISING_DAYS_MIN = 9` at the end of its run (the "restore the default" pattern used throughout this weekend) is now restoring the wrong value — should be corrected to restore 2 the next time any of those scripts are touched, not fixed proactively across all of them right now (per the project's own "fix forward, don't re-litigate everything at once" discipline).
+
+## Research Integrity Rule #8 adopted (2026-09-21, critic-proposed) — Structural Independence
+
+Surfaced during an in-progress base-count/stage-count investigation (not itself
+logged here yet, pending a decision — see the user's own instruction to hold
+that specific research out of FINDINGS.md until settled). The rule itself is a
+real, generalizable methodology finding independent of that investigation's
+outcome, and is adopted now on its own:
+
+**When a trade-level result is conditioned on a slower-moving structural or
+contextual feature, trades sharing the same underlying structural state are not
+automatically independent observations.** Before any bootstrap, significance
+test, correlation, or similar statistical inference: (1) identify the true
+observational unit, (2) determine whether repeated trades share that unit, (3)
+either aggregate to that unit or use inference that explicitly accounts for the
+clustering (a cluster bootstrap, not a plain one). **Trade count is not
+automatically sample size.**
+
+Concretely discovered via `primed_engine`'s trade-level backtest re-entering the
+same ticker on the *same* unresolved base whenever a position exits (via
+`max_hold_cap` — the majority cause — or a real stop, both before the base
+itself has resolved) — a naive bootstrap on the raw trade rows produced an
+apparently-significant result that vanished once corrected to one row per
+independent (ticker, base-structure) occurrence. Two different corrections
+apply depending on the question: a **descriptive** question about the
+setup itself ("does this structure exist and how does it behave") should
+de-duplicate to one independent trial per structural occurrence; an
+**execution-level** question ("does each individual attempt succeed") should
+keep every trade but treat the shared structure as the cluster for
+cluster-robust inference, not drop rows.
+
+(Numbered #8, not #7 — Rule #7, "Metric Integrity Before Optimization," already
+exists in this sequence and covers a related but distinct family of bugs:
+measurement-point validity, not observational independence.)
+
+**Follow-up, scoped as research infrastructure, not a new trading RQ**: a
+targeted audit of FINDINGS.md is warranted, limited to findings that joined
+trade-level rows to a slower-moving structural/contextual feature (base
+structure, freshness, sector/regime context, etc.) *and* then reported a
+bootstrap CI, significance claim, correlation, or similar distributional
+inference on the result — not a blanket re-run of everything in this file.
+
+**First pass of that audit done (2026-09-21), two real candidates flagged**:
+1. **RQ-90/93's `close_vs_trigger_pct` significance band (worst 5-11%) and the
+   RQ-95 EOD overnight-carry gate promotion built on it** — highest priority,
+   since `RQ95_CARRY_THRESHOLD_PCT` is live in
+   `primed_engine.overnight_carry_recommendation()`, actively used on real
+   positions.
+2. **The liquidity-bucket concentration bootstrap** (the 75-100cr bucket's
+   35.4-45.2% CI, backing the standing ₹100cr floor decision) — liquidity/
+   traded-value is a near-ticker-level property that barely moves trade-to-
+   trade. **Not yet re-checked.**
+
+**Item 1 re-checked (2026-09-21), survives — a real, useful negative-audit
+result**: recomputed `close_vs_trigger_pct` for the full current-engine
+population (n=6,216) and the worst-11% band (n=683, spanning **310 unique
+tickers**, max repeat count 9/683). Compared a plain bootstrap (rows treated
+independent) against a ticker-clustered bootstrap (per this rule's own
+prescription for an execution-level question): **[-3.00%, -1.35%] vs.
+[-2.99%, -1.36%]** — virtually identical. Unlike the base-count investigation's
+n=17-41 late-stage bucket, this population is large and diffuse enough that
+non-independence doesn't materially distort the result. **This check was done
+on the swing-side pnl only** (the same population already cached from the
+base-count work) — the actual RQ-95 promotion decision used real option
+day+1-open pnl, which would need joining `options_cache/` data the same way
+the original RQ-90/93 research did, not yet done. Given how cleanly the
+swing-side check passed, the options-side is expected to behave similarly, but
+that is an expectation, not a verified fact — flagged as the one remaining gap
+if this ever needs to be revisited with full rigor.
