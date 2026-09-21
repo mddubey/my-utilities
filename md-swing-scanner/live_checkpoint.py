@@ -827,8 +827,20 @@ def _print_tier(label, df, note, price_col, price_label):
             gates.append("VCP")
         if r.get("bc_qualified"):
             gates.append("BC")
-        gate = f"  gate=[{'+'.join(gates)}]" if gates else "  gate=[none]"
         stack = r.get("sma_stack_ok")
+        if gates:
+            gate = f"  gate=[{'+'.join(gates)}]"
+        elif stack is None:
+            gate = "  gate=[none, no trend data]"
+        elif stack:
+            # (2026-09-21) neither pattern gate matched, but the multi-day trend
+            # itself is intact (sma_stack_ok=True) -- this is the case that looks
+            # most tempting live (real RS, real move) despite being unvalidated,
+            # flagged directly rather than printed identically to a genuinely weak
+            # "none" (broken trend riding a volume spike, e.g. PATANJALI/TEGA).
+            gate = "  gate=[none, CAUTION: trending but unvalidated]"
+        else:
+            gate = "  gate=[none]"
         smastack = f"  sma_stack={'OK' if stack else 'no'}" if stack is not None else ""
         rsr = r.get("rs_rating")
         rsrating = f"  rs={rsr:.0f}" if rsr is not None and pd.notna(rsr) else ""

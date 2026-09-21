@@ -225,7 +225,21 @@ def _print_tier_card(label, df, note, price_col, price_label, held):
             gates.append("VCP")
         if r.get("bc_qualified"):
             gates.append("BC")
-        pattern = f"  pattern=[{'+'.join(gates)}]" if gates else "  pattern=[none]"
+        stack = r.get("sma_stack_ok")
+        if gates:
+            pattern = f"  pattern=[{'+'.join(gates)}]"
+        elif stack is None:
+            pattern = "  pattern=[none, no trend data]"
+        elif stack:
+            # (2026-09-21) neither pattern gate matched, but the multi-day trend is
+            # intact -- the case that looks most tempting live (real RS, real move)
+            # despite being unvalidated; flagged directly rather than printed
+            # identically to a genuinely weak "none" (broken trend on a volume
+            # spike, e.g. PATANJALI/TEGA). See live_checkpoint.py's own printer,
+            # same fix applied there.
+            pattern = "  pattern=[none, CAUTION: trending but unvalidated]"
+        else:
+            pattern = "  pattern=[none]"
         oic = r.get("oi_confidence")
         confidence = f"  confidence={'n/a' if pd.isna(oic) else 'Bullish' if oic else 'Bearish'}"
         print(f"  {ticker_label:18s} band=[{r.trigger_low:.2f},{r.trigger_high:.2f}]  "
