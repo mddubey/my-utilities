@@ -10,7 +10,7 @@ HIGH_52W_MAX_MULT = 0.75  # price must be within 25% of its 52-week high (i.e. >
 def stage2_trend_breakdown(row, ticker, date, live_closes=None):
     """The individual Stage-2 sub-conditions, exposed separately (2026-09-16) so a live
     monitoring tool can show WHICH conditions passed and by what margin, not just the
-    collapsed True/False stage2_trend_template() returns -- same reasoning as detect_entry/
+    collapsed True/False stage2_trend_template() returns -- same reasoning as detect_entry_eod/
     check_exit being the single source of truth elsewhere in this project: one place
     computes these conditions, stage2_trend_template() below is now a thin wrapper over
     this, not a second copy.

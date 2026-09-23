@@ -1,13 +1,13 @@
 """Run once/day, after refreshing data_cache (`python3 fetch_prices.py`) and the Nifty
 regime cache (`python3 market_regime.py`) for today. Scans the full NIFTY 500 universe
 (the pure-swing default, see relative_strength.py's UNIVERSE_FILE comment) for a NEW
-entry signal as of the latest cached trading day — reuses backtest.py's detect_entry()
+entry signal as of the latest cached trading day — reuses backtest.py's detect_entry_eod()
 directly, so this can never drift from what the validated backtest actually tested.
 
 Default output is now three sections: "Tradable Today" (gate-respecting, real
 signals), "Watchlist — fails only on regime" (2026-08-31, pattern fired, only the ADX/
 200-SMA gate blocked it — computed automatically, no flag needed, cheap since it only
-costs one extra detect_entry(require_regime=False) call per ticker that didn't
+costs one extra detect_entry_eod(require_regime=False) call per ticker that didn't
 already pass), and "Near-miss — intraday High cleared resistance, Close didn't
 confirm" (2026-09-03, a Breakout-Continuation-only, LOW-WEIGHT ranking signal — see
 signals.near_miss_high_breakout's docstring for the full backtest numbers behind it;
@@ -42,7 +42,7 @@ a handful can plausibly fire on any given day):
     JUST the Pass-1 shortlist, aggregated into one synthetic "today, as of cutoff" OHLCV
     bar per ticker (default cutoff 14:45 IST — most of the day's volume is typically
     already in by then). That partial bar goes through load_with_extra_row() into the
-    EXACT same build_indicators()/detect_entry() as any real day — no separate
+    EXACT same build_indicators()/detect_entry_eod() as any real day — no separate
     partial-day formula, per explicit instruction. Real caveat, not swept under the
     rug: the volume figure is only what's traded so far, so vol_zscore understates the
     eventual full-day value — accepted as an approximation, not corrected for.
@@ -77,7 +77,7 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
-from backtest import (load, load_with_extra_row, detect_entry, resistance_target,
+from backtest import (load, load_with_extra_row, detect_entry_eod, resistance_target,
                       stage2_trend_template, current_stop_level, MAX_INITIAL_RISK_PCT)
 from signals import base_filters_pass, entry_signal, near_miss_high_breakout
 from vcp import base_pivot, vcp_breakout, _vcp_vol_zscore
@@ -245,7 +245,7 @@ def _fo_tickers():
 
 def _also_qualifies_other_pattern(ticker, pattern, rows, i):
     """Checked independently of whichever pattern actually claimed the day (2026-09-01)
-    — detect_entry() itself short-circuits (Breakout Cont checked first, first match
+    — detect_entry_eod() itself short-circuits (Breakout Cont checked first, first match
     wins, VCP's own check never runs if BC already fired), so this re-runs the OTHER
     pattern's raw condition just for reporting. NOT a validated confidence signal:
     checked directly against 1430 v28 trades, only 40 (2.8%, all on the BC side — no
@@ -325,7 +325,7 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
     blocked them (2026-08-31) — always computed, regardless of require_regime, so a
     normal run shows both "what's tradable today" and "what to keep an eye on" without
     needing a separate --ignore-regime invocation. Cheap: only costs one extra
-    detect_entry(require_regime=False) call, and only for tickers that didn't already
+    detect_entry_eod(require_regime=False) call, and only for tickers that didn't already
     pass with the gate on.
 
     near_miss (2026-09-03): a THIRD, lower-priority bucket, unrelated to the regime
@@ -364,14 +364,14 @@ def scan(tickers, require_regime=True, live=False, cutoff_ist=LIVE_CUTOFF_DEFAUL
         if row.corp_action_day:
             continue  # today's own data looks like a corporate-action glitch — skip
         lc = live_closes if ticker in live_bars else None
-        result = detect_entry(ticker, rows, i, require_regime=require_regime, live_closes=lc)
+        result = detect_entry_eod(ticker, rows, i, require_regime=require_regime, live_closes=lc)
         if result is not None:
             pattern, structural_low = result
             candidates.append(_annotate(ticker, pattern, structural_low, row, rows.iloc[i - 1],
                                          live=(ticker in live_bars), rows=rows, i=i))
             continue
         if require_regime:
-            ungated = detect_entry(ticker, rows, i, require_regime=False, live_closes=lc)
+            ungated = detect_entry_eod(ticker, rows, i, require_regime=False, live_closes=lc)
             if ungated is not None:
                 pattern, structural_low = ungated
                 watchlist.append(_annotate(ticker, pattern, structural_low, row, rows.iloc[i - 1],

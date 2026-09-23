@@ -1,12 +1,12 @@
 """Primed Gate execution engine (2026-09-20) — the settled Breakout Continuation
 architecture from this weekend's research, promoted from scratchpad scripts into a real,
 reusable module so backtest and live share the exact same functions (same reason
-backtest.py's detect_entry()/check_exit() were pulled out of simulate_ticker's loop).
+backtest.py's detect_entry_eod()/check_exit() were pulled out of simulate_ticker's loop).
 
 Deliberately separate from backtest.py, not a modification of it: per the 2026-09-20
-governance decision ("Primed Gate is canonical for research going forward; detect_entry()/
+governance decision ("Primed Gate is canonical for research going forward; detect_entry_eod()/
 Entry Gate is legacy-only... retained only for legacy comparisons and regression testing"),
-backtest.py's own detect_entry()/check_exit()/current_stop_level()/resistance_target() stay
+backtest.py's own detect_entry_eod()/check_exit()/current_stop_level()/resistance_target() stay
 exactly as they are (legacy Entry Gate + VCP/coiled_spring, both untouched, both still
 covered by the existing test suite). This module implements ONLY the Breakout Continuation
 leg, on the mechanism this weekend actually validated:
@@ -70,7 +70,7 @@ def detect_primed_entry(ticker, rows, i):
     """Returns (trigger_price, structural_low) if a Primed Gate breach fires at rows.iloc[i],
     else None. trigger_price IS the entry price — real intraday execution at the trigger
     touch, not row.Close. Caller is responsible for skipping corp_action_day rows same as
-    backtest.detect_entry()'s callers already do."""
+    backtest.detect_entry_eod()'s callers already do."""
     row = rows.iloc[i]
     if pd.isna(row.high10_prior):
         return None

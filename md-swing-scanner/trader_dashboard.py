@@ -1,6 +1,6 @@
 """trader_dashboard.py -- one entry point for the daily workflow validated this
 session, tying together four already-independently-validated tools rather than
-reimplementing any of their logic (same reasoning as detect_entry()'s own docstring:
+reimplementing any of their logic (same reasoning as detect_entry_eod()'s own docstring:
 two copies of "what counts as a signal" drifting apart over time is a real risk):
 
   evening   -- tonight's candidate list: ticker, trigger price, stop, quality score.
@@ -88,7 +88,7 @@ def run_evening(tickers, fo_tickers):
             pattern, structural_low = "coiled_spring", (bp[1] if bp else None)
         else:
             # (2026-09-15) breakout_cont's own structural low, same 20-day-lookback
-            # convention as detect_entry() in backtest.py -- current_stop_level() now
+            # convention as detect_entry_eod() in backtest.py -- current_stop_level() now
             # needs a real value here too (used to be harmless when None since BC's
             # pre-engagement stop didn't touch structural_low at all).
             pattern = "breakout_cont"

@@ -3,7 +3,7 @@ import pytest
 
 import backtest
 from backtest import (
-    resistance_target, support_level, current_stop_level, check_exit, detect_entry,
+    resistance_target, support_level, current_stop_level, check_exit, detect_entry_eod,
     TRAIL_ENGAGE_PCT, CLIMAX_MIN_GAIN_PCT, CLIMAX_WEAK_CLOSE_PCT,
     STRUCTURAL_STOP_ATR_BUFFER, SMA21_TRAIL_BUFFER_PCT,
 )
@@ -173,7 +173,7 @@ def test_climax_does_not_fire_on_strong_close():
     assert reason != "climax"
 
 
-# --- detect_entry: branching order and regime gating (heavier deps monkeypatched) ---
+# --- detect_entry_eod: branching order and regime gating (heavier deps monkeypatched) ---
 
 def test_detect_entry_prefers_breakout_cont_when_both_could_fire(monkeypatch):
     monkeypatch.setattr(backtest, "entry_signal", lambda row: True)
@@ -183,7 +183,7 @@ def test_detect_entry_prefers_breakout_cont_when_both_could_fire(monkeypatch):
     # (2026-09-15) BC now computes a real structural_low (20-day pre-entry Low.min(),
     # falling back to Close*0.9 when there isn't enough history before the entry bar).
     rows = pd.DataFrame([{"Date": pd.Timestamp("2024-01-01"), "Close": 100.0}])
-    result = detect_entry("TEST", rows, 0)
+    result = detect_entry_eod("TEST", rows, 0)
     assert result == ("breakout_cont", 90.0)
 
 
@@ -193,7 +193,7 @@ def test_detect_entry_falls_through_to_vcp_when_breakout_signal_absent(monkeypat
     monkeypatch.setattr(backtest, "stage2_trend_template", lambda *a, **k: True)
     monkeypatch.setattr(backtest, "vcp_breakout", lambda *a, **k: (100, 90))
     rows = pd.DataFrame([{"Date": pd.Timestamp("2024-01-01")}])
-    result = detect_entry("TEST", rows, 0)
+    result = detect_entry_eod("TEST", rows, 0)
     assert result == ("coiled_spring", 90)
 
 
@@ -201,14 +201,14 @@ def test_detect_entry_blocked_by_regime_gate_even_if_pattern_would_fire(monkeypa
     monkeypatch.setattr(backtest, "entry_signal", lambda row: True)
     monkeypatch.setattr(backtest, "market_trending", lambda *a, **k: False)  # regime gate closed
     rows = pd.DataFrame([{"Date": pd.Timestamp("2024-01-01")}])
-    assert detect_entry("TEST", rows, 0) is None
+    assert detect_entry_eod("TEST", rows, 0) is None
 
 
 def test_detect_entry_none_when_neither_pattern_fires(monkeypatch):
     monkeypatch.setattr(backtest, "entry_signal", lambda row: False)
     monkeypatch.setattr(backtest, "stage2_trend_template", lambda *a, **k: False)
     rows = pd.DataFrame([{"Date": pd.Timestamp("2024-01-01")}])
-    assert detect_entry("TEST", rows, 0) is None
+    assert detect_entry_eod("TEST", rows, 0) is None
 
 
 # --- simulate_ticker: corp-action right-censoring (integration test) ---
@@ -233,13 +233,13 @@ def test_corp_action_day_right_censors_open_position(monkeypatch):
 
     call_count = {"n": 0}
 
-    def fake_detect_entry(ticker, rows, i, require_regime=True):
+    def fake_detect_entry_eod(ticker, rows, i, require_regime=True):
         call_count["n"] += 1
         if i == 0:
             return "breakout_cont", 90.0  # a real structural_low, not None
         return None  # never re-enter after the forced close
 
-    monkeypatch.setattr(backtest, "detect_entry", fake_detect_entry)
+    monkeypatch.setattr(backtest, "detect_entry_eod", fake_detect_entry_eod)
     trades = backtest.simulate_ticker("TEST", df, use_resistance=True)
 
     assert len(trades) == 1

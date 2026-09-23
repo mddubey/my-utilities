@@ -32,7 +32,7 @@ def _monitor_legacy(ticker, entry_date, entry_price, pattern, rows, entry_idx):
         structural_low = max(structural_low, entry_price * (1 - MAX_INITIAL_RISK_PCT))
     else:
         # (2026-09-15) breakout_cont's own structural low, same convention as
-        # detect_entry() in backtest.py -- 20-day pre-entry lookback minimum.
+        # detect_entry_eod() in backtest.py -- 20-day pre-entry lookback minimum.
         lo = max(0, entry_idx - STRUCTURAL_LOOKBACK_BC)
         structural_low = rows.iloc[lo:entry_idx].Low.min() if entry_idx > lo else entry_price * 0.9
 

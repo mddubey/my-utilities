@@ -112,7 +112,7 @@ TRAIL_ENGAGE_PCT = 1.08      # Both patterns (2026-09-20, was 1.03) — RQ-68/sw
                               # engaged (RQ-68). See FINDINGS.md "TRAIL_ENGAGE_PCT sweep" for the full sweep.
 STRUCTURAL_LOOKBACK_BC = 20  # (2026-09-15) Breakout Continuation's new initial stop, promoted after
                               # the "Family C" research thread: structural_low = lowest Low over the
-                              # 20 trading days BEFORE entry (returned by detect_entry, stored at
+                              # 20 trading days BEFORE entry (returned by detect_entry_eod, stored at
                               # entry, does NOT trail with peak_close -- a fixed invalidation floor,
                               # not a chandelier). Replaces the old peak_close-relative 3xATR trail
                               # for BC's pre-engagement stage only.
@@ -263,7 +263,7 @@ def support_level(entry_price, row):
     return None
 
 
-def detect_entry(ticker, rows, i, require_regime=True, live_closes=None):
+def detect_entry_eod(ticker, rows, i, require_regime=True, live_closes=None):
     """Two fully independent entry gates, checked in this order only because
     entry_signal() is cheap and VCP's trend-template + zigzag scan is not; first match
     wins (a ticker can't be both on the same day). Returns (pattern, structural_low) if
@@ -361,7 +361,7 @@ def check_exit(pattern, state, row, use_resistance=True):
     (exit_reason_or_None, updated_state) — a pure function, no side effects, so both the
     historical backtest loop and a live daily position-monitor share the exact same exit
     logic without risk of the two quietly drifting apart (pulled out of simulate_ticker
-    2026-08-30, same reason as detect_entry above).
+    2026-08-30, same reason as detect_entry_eod above).
 
     Exit rule for BOTH patterns: a hard structural stop, then an ATR trail (Breakout
     Continuation) or 21-EMA trail (VCP, published Minervini practice) once the trade is
@@ -416,7 +416,7 @@ def simulate_ticker(ticker, df, use_resistance, min_rr=0.0, require_regime=True)
     swing edge on its own (checked directly, 2026-08-30 — v12's numbers had both a
     contract-availability filter on entry and an expiry-driven forced exit baked in).
 
-    require_regime=False (2026-08-31): threads through to detect_entry() to disable the
+    require_regime=False (2026-08-31): threads through to detect_entry_eod() to disable the
     Nifty regime gate for BOTH patterns in this run — used for the gate-isolation
     experiment (is the SMA200 gate pulling its weight for Breakout Continuation too, or
     only VCP). Default True preserves the exact v25 behavior for the real backtest."""
@@ -445,7 +445,7 @@ def simulate_ticker(ticker, df, use_resistance, min_rr=0.0, require_regime=True)
             prev_row = row
             continue  # don't evaluate a fresh entry off a corrupted day either
         if not in_position:
-            candidate = detect_entry(ticker, rows, i, require_regime=require_regime)
+            candidate = detect_entry_eod(ticker, rows, i, require_regime=require_regime)
             if candidate is not None:
                 pattern_candidate, structural_low = candidate
                 target = resistance_target(row.Close, row) if use_resistance else None
