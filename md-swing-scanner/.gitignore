@@ -14,3 +14,4 @@ calibration_audit_raw.csv
 reference/strykex/*.pdf
 positions.csv
 nifty_index/nifty_index_position.json
+swing_qs_07a/event_matrix.csv
