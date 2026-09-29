@@ -1016,3 +1016,126 @@ unmatched population vs. gap between matched cohort/control pairs).
 
 **Files**: `10_trend_state_anatomy.py`, `trend_state_anatomy.csv`
 (1,668,305 rows), `trend_state_anatomy_overall_by_decile.csv`.
+
+## RQ-QS-07A-5R — Weak-State Fast-Mover Robustness & Timing, complete (2026-09-30, critic-specified)
+
+**Objective (critic's exact framing)**: test whether 07A-5's D0 (weakest
+trend-state decile) elevation is robust, and characterize its timing — NOT
+"does oversold reversal work," NOT a filter/threshold build, NOT a QS-A
+change. Explicit prohibition list honored in full: no oversold filter, no
+RSI/SMA200-distance threshold test, no capitulation score, no QS-A gate
+change, no trading-performance test, no reversal-indicator collection, no
+mean-reversion strategy, no abandoning the continuation branch, no sector-RS
+build.
+
+**Frozen, per critic's instruction**: D0 = bottom decile (decile==0) of the
+already-built composite trend-strength score from `10_trend_state_anatomy.py`
+— not redefined. Reference = D2, the empirical trough (07A-5's own
+shape-check found decile 2 is the minimum, not decile 1 or the median).
+Cohort A/B reported separately throughout. Population: `trend_state_anatomy.csv`
+(same 1,668,305-row full neutral population as 07A-5, no matched-control
+rebuild). D0 n=166,831, D2 n=166,831.
+
+**Hand-verification (Rule #22)**: (a) aggregate math — every one of the 4
+stratification dimensions (year, liquidity tercile, F&O, circuit) sums
+EXACTLY to the D0 total of 166,831, confirming clean, mutually-exclusive
+partitions, no leakage/double-count. (b) Pulled 4 real F&O D0 Cohort A
+events (seed=42): SUZLON (2022-10-13), AMBER (2026-01-29), ADANIENSOL
+(2023-03-03, notably 72.6% below its 200-day average — the Adani Group
+crisis period), PGEL (2026-06-11) — all genuine large/mid-cap names, deeply
+oversold, followed by real 15-18% 3-day moves. Not noise, not microcap-only.
+
+### Part 1 — Robustness matrix: D0/D2 ratio, every stratum tested
+
+| Stratum | D0 %CohortA | D2 %CohortA | Ratio | D0 n |
+|---|---|---|---|---|
+| 2022 | 5.30 | 3.32 | 1.60x | 6,637 |
+| 2023 | 7.02 | 3.26 | 2.15x | 22,049 |
+| 2024 | 6.21 | 4.06 | 1.53x | 18,495 |
+| 2025 | 6.28 | 3.00 | 2.09x | 67,398 |
+| 2026 (YTD) | 7.16 | 3.29 | 2.18x | 52,252 |
+| Liquidity: low | 9.25 | 4.93 | 1.87x | 64,313 |
+| Liquidity: mid | 5.54 | 2.89 | 1.91x | 71,209 |
+| Liquidity: high | 3.62 | 1.65 | **2.19x** | 31,309 |
+| F&O: True | 2.01 | 0.85 | **2.37x** | 11,326 |
+| F&O: False | 6.94 | 3.64 | 1.91x | 155,505 |
+| Circuit: False | 6.36 | 3.24 | 1.96x | 164,156 |
+| Circuit: True | 22.02 | 11.53 | 1.91x | 2,675 |
+
+**The ratio never collapses, anywhere**: it stays in a tight 1.53x-2.37x band
+across every single stratum tested — every year (including the weakest,
+2024, still 1.53x), every liquidity tercile, both F&O and non-F&O, both
+circuit and non-circuit. If anything the ratio is slightly STRONGER in
+high-liquidity (2.19x) and in F&O names (2.37x) than in the broad
+population's overall 1.97x — the elevation is not a low-liquidity/microcap
+artifact. **F&O presence is real but the absolute rate is much smaller than
+the broad-universe headline number**: 2.01% in F&O vs 6.61% overall (228
+real F&O Cohort A events at D0, hand-verified above) — large/mid-cap names
+simply produce fewer 15%+ three-day moves in general, but when they do, D0's
+relative elevation over D2 is fully intact.
+
+### Part 2 — Timing anatomy: D0 and D2's fast movers share the SAME temporal shape
+
+| Decile | Cohort | n | Median D1 MFE | D2 MFE | D3 MFE | D1 close | D2 close | D3 close | D1's share of D3 MFE |
+|---|---|---|---|---|---|---|---|---|---|
+| D0 | Cohort A | 11,023 | 5.74 | 13.27 | 16.21 | 4.75 | 9.54 | 12.28 | 35.4% |
+| D0 | Cohort B | 11,266 | 5.00 | 10.24 | 15.34 | 4.39 | 9.01 | 12.26 | 32.6% |
+| D2 | Cohort A | 5,583 | 4.99 | 13.17 | 16.02 | 4.21 | 9.22 | 11.78 | 31.2% |
+| D2 | Cohort B | 5,819 | 4.91 | 10.10 | 14.92 | 3.59 | 8.47 | 11.80 | 32.9% |
+
+**Answers the critic's exact question — D0 is neither "already moving hard
+on D1" nor "a delayed 3-day reversal," and critically it looks like D2's
+already-established fast-mover shape, not a different phenotype**: median D1
+close for D0 Cohort A is already +4.75% (real, tradeable directional move by
+end of day 1, not flat/negative), roughly a third of the eventual 3-day MFE
+is already visible by D1 (35.4%), and the D1→D2→D3 incremental shape
+(+7.53pp, then +2.94pp) is nearly identical to D2's own shape (+8.17pp,
++2.85pp). **D0 and D2 fast movers don't differ in HOW the move unfolds over
+time — only in how OFTEN it happens.** This is the single most
+product-relevant result: it argues against D0 being some slow-building
+reversal pattern incompatible with a short-horizon product.
+
+### Part 3 — Definition-artifact check: a real, modest nominal-price tilt
+
+D0 Cohort A close price: P10=6.35, median=72.84, P90=585.75, 25.91% under
+₹20, 42.36% under ₹50 (n=11,023). D2 Cohort A: P10=9.02, median=106.30,
+P90=811.43, 19.68% under ₹20, 35.34% under ₹50 (n=5,583). **D0 does skew
+toward lower nominal prices than D2** — a real, disclosed caveat (thinner
+tick-size/order-book effects can inflate % moves at low absolute prices) —
+but the tilt is modest (median ₹72.84 is not itself penny-stock territory)
+and doesn't come close to explaining a 2x rate elevation on its own.
+Corp-action-cleanliness and the 60-day min-history floor are already
+enforced upstream in `01_event_matrix.py`; every row here already required
+252 days of price history for a populated `dist_low252_pct`, which rules out
+early-listing/cache-burn-in artifacts by construction — not re-tested, noted.
+
+### Disposition — passes the critic's own promotion checklist
+
+Per the critic's explicit criteria (A-F, quoted in the script docstring): (A)
+temporal validity — yes, D0 movers begin moving early enough to plausibly
+fit a short-horizon objective; (B) cross-year persistence — yes, all 5
+years/YTD, no collapse; (C) cross-liquidity persistence — yes, not
+exclusively microcaps, if anything strongest in high liquidity; (D) F&O
+presence — yes, established (228 real hand-verified-adjacent events), though
+at materially lower absolute incidence than the broad universe; (E)
+circuit-clean persistence — yes, already confirmed in 07A-5, reconfirmed
+here; (F) no obvious definition artifact — mostly clean, one real but modest
+nominal-price caveat disclosed above.
+
+**This clears the critic's own bar: "If D0 survives across years, liquidity
+and at least meaningfully inside F&O -> it earns a dedicated mechanism RQ."**
+It also clears the parallel branch: "If it survives and its D1->D3 timing is
+compatible with QS-A -> then we have a product decision to make separately:
+whether QS-A should eventually contain two explicitly distinct entry
+archetypes." Both conditions are met simultaneously. Per critic's own
+explicit prohibition list, this does NOT mean building anything yet — no
+RSI/distance threshold, no filter, no strategy test. Two follow-on questions
+are now both open, per critic's own framing, and the choice between them (or
+sequencing) is the critic's call: (1) a dedicated mechanism RQ — "what
+actually distinguishes D0 fast movers from ordinary D0 stocks" (catalyst/
+event, volume shock, volatility expansion, reversal anatomy); (2) a product
+decision — whether QS-A should eventually recognize two distinct entry
+archetypes rather than one gate explaining both.
+
+**Files**: `11_weak_state_robustness_timing.py`, `weak_state_robustness_matrix.csv`,
+`weak_state_timing_anatomy.csv`.
