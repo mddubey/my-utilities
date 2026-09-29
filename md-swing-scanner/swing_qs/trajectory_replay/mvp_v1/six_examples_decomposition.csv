@@ -1,0 +1,8 @@
+ticker,trade_id,mfe_r,time_to_mfe_min,time_to_half_mfe_min,giveback_from_mfe_r,recovered_after_deepest_giveback_r,num_new_daily_closing_highs,daily_close_r_sequence,higher_high_each_day
+TECHM,0,2.966,9975.0,5650.0,0.792,0.0,4,"[np.float64(0.44), np.float64(-0.05), np.float64(0.3), np.float64(0.59), np.float64(2.11), np.float64(2.2)]","[True, False, False, True, True, True]"
+TECHM,7,2.966,9975.0,5650.0,0.792,0.0,4,"[np.float64(0.44), np.float64(-0.05), np.float64(0.3), np.float64(0.59), np.float64(2.11), np.float64(2.2)]","[True, False, False, True, True, True]"
+LODHA,13,4.225,10065.0,6960.0,1.23,0.28,6,"[np.float64(0.3), np.float64(0.64), np.float64(1.87), np.float64(2.81), np.float64(2.97), np.float64(3.28)]","[True, True, True, True, True, True]"
+SONACOMS,43,2.411,8500.0,5620.0,1.192,0.311,4,"[np.float64(-0.1), np.float64(0.86), np.float64(1.3), np.float64(2.11), np.float64(1.83), np.float64(1.53)]","[True, True, True, True, False, False]"
+PPLPHARMA,46,1.905,10200.0,2840.0,0.687,0.242,5,"[np.float64(0.63), np.float64(0.79), np.float64(1.06), np.float64(1.18), np.float64(1.05), np.float64(1.48)]","[True, True, True, True, False, True]"
+INDGN,69,2.02,4595.0,4405.0,1.117,0.33,2,"[np.float64(-0.04), np.float64(1.8), np.float64(1.45), np.float64(1.16), np.float64(1.16), np.float64(1.23)]","[True, True, False, False, False, False]"
+HINDZINC,87,4.899,10090.0,3020.0,1.184,0.117,4,"[np.float64(-0.06), np.float64(1.23), np.float64(3.98), np.float64(3.42), np.float64(4.47), np.float64(3.83)]","[True, True, True, False, True, False]"

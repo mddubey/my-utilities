@@ -1,0 +1,8 @@
+trade_id,ticker,entry_date,reason
+3,INDUSINDBK,2026-06-15,fewer than 5 complete prior 1H sessions
+8,SBIN,2026-06-12,fewer than 5 complete prior 1H sessions
+18,PIDILITIND,2026-06-10,fewer than 5 complete prior 1H sessions
+45,CONCORDBIO,2026-07-31,fewer than 5 complete prior 1H sessions
+77,ABSLAMC,2026-06-10,fewer than 5 complete prior 1H sessions
+90,CASTROLIND,2026-06-15,fewer than 5 complete prior 1H sessions
+99,MRPL,2026-06-10,fewer than 5 complete prior 1H sessions

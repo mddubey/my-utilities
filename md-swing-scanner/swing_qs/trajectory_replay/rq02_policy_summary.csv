@@ -1,0 +1,4 @@
+policy,n_trades,mean_r,median_r,win_pct,total_r,n_replaced
+never_replace,46572,0.1776,-1.0,35.9,8268.6,0
+replace_unresolved,48331,0.159,-1.0,35.5,7685.4,1568
+replace_underwater,46574,0.1775,-1.0,35.9,8267.2,3
