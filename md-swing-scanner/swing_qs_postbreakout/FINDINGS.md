@@ -209,3 +209,75 @@ framing the way 04B closed the "holds-above-A pause" framing.
 **Not yet done**: any performance/return numbers anywhere in this line; any subset
 isolation/anatomy beyond the coarse novel/re-accel split; any promotion of the
 15d/40d windows or the 3x/5% Layer A trigger.
+
+## RQ-QS-05A, Layer A0 — Established Base/Range precondition (2026-09-29, caught by direct user pushback)
+
+**Why this exists**: user pushback, verbatim in spirit — "that just means some of the
+bases we have not cleared." Layer A's "novelty" (no comparable volume spike recently)
+is NOT the same claim as "this stock was actually sitting in a genuine sideways range
+beforehand" — the critic's own diagram has ESTABLISHED BASE/RANGE as its own first box,
+and this line skipped straight to novelty + decay without ever building it. A stock can
+be novel-by-volume while still grinding in a trend with no real structure at all.
+
+**Two measures, both trailing-only, both literature-anchored, two pre-declared windows
+(40/90 trading days) before looking at results**:
+- `prior_range_over_atr` — (max High - min Low) over the window / atr14, reusing
+  RQ-QS-04A's own ATR-normalized width convention applied to the PRE-breakout period.
+- `sma_slope_pct` — % change in sma50 across the window, Weinstein's own framing of
+  Stage 1 as a flattening moving average, a different claim than "tight range."
+
+**Anchors**: JUSTDIAL's 90d window: range_over_atr 6.8x (near the tight end, P10-P25 of
+the population), sma_slope -22.2% (was declining, then flattened into the breakout —
+not a perfectly flat multi-month base, a real, if imprecise, match). GOCLCORP's 90d
+window: range_over_atr 13.7x (loose, near P90), sma_slope +50.1% (clearly already
+trending hard) — correctly flags GOCLCORP as NOT a real base, consistent with
+everything else known about it.
+
+**Full-population cross-cut (14,032 episodes) — honest, somewhat deflating result:
+NEITHER single dimension discriminates outcomes on its own.** Tercile of
+range-tightness: holds-above-prebreakout_40d is 31.6% (tightest) / 31.8% (mid) / 32.0%
+(loosest) — statistically indistinguishable. Tercile of flatness: 32.2% / 32.2% / 31.0%
+— same story. A likely mechanism for why range-tightness in particular fails to
+discriminate: ATR itself is elevated for a stock that's ALREADY volatile/trending (as
+GOCLCORP's own history shows), so "tight relative to ATR" can mean "consistently
+volatile in its own already-active regime," not "genuinely calm" — the normalization
+doesn't cleanly separate the two cases the way it does for RQ-QS-04A's post-breakout
+pauses (where it was validated on a cleaner population).
+
+**Only the full intersection (novel_252d AND flattest tercile AND tightest-range
+tercile) shows a real but modest lift**: n=123, holds-above-prebreakout_40d=38.2%
+vs. the full-population baseline of 31.8% (+6.4pp), subsequent-expansion_40d=37.4%
+(vs ~58% baseline — genuinely less likely to spike again soon, consistent with these
+being less "serially active" names). Neither single-condition novel-only cut (by
+range tercile alone or flatness tercile alone) showed this cleanly — mid/loosest
+terciles within novel_252d were noisy and non-monotonic (n=123 per tercile, thin).
+
+**Rule #22 hand-verification of 3 real examples from the n=123 intersection, spanning
+different years and outcomes — all 3 computationally exact against raw bars (episode
+dates/prices/volumes, and the 40-day min-Low-vs-prebreakout-close figure matched to
+the decimal)**:
+- MAZDOCK (2022-04-04): +1.9% — barely held, marginal.
+- ADANIPORTS (2022-04-26): **-24.0%** — a real, hard loss, during the broad April-May
+  2022 market correction (checked the calendar distribution of the full n=123: 26% fall
+  in 2022, elevated vs an even ~20%/year spread but not dominated by one event — 20 of
+  123 in April-May 2022 specifically, worth flagging as a real regime concentration,
+  not disqualifying but a caution against reading the aggregate lift as clean of
+  regime effects).
+- AIAENG (2022-05-23 to 05-31, a 5-day flagpole): +13.1% — held well.
+
+**Honest disposition**: the user's instinct is directionally right but the effect is
+much narrower and weaker than "bases not cleared explains the whole picture" would
+imply. It takes ALL THREE conditions together (genuinely novel, genuinely flat,
+genuinely tight) to show ANY lift, the lift is modest (+6.4pp, not dramatic), the
+sample is thin (n=123), real outcomes inside that n=123 are still a mixed bag
+(confirmed by hand, not just asserted), and there's a real, uninvestigated regime
+concentration (April-May 2022) that could be inflating or deflating the number in
+either direction. This is a LEAD, not a finding — per Rule #19, needs robustness
+checks (different tercile boundaries, the 40d base-window instead of 90d, excluding
+the April-May 2022 cluster to see if the lift survives) before being trusted further,
+and per this project's standing practice should go to the critic before any more
+compute is spent chasing it.
+
+**Not yet done**: robustness sweep on the tercile boundaries/windows; a regime-excluded
+re-check; any performance/return numbers (still none anywhere in this whole line);
+any promotion of novel/flat/tight as a combined gate.
