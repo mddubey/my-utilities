@@ -264,7 +264,21 @@ gap is stop-width, not weak price action" section (2026-09-27).
 
 ---
 
-## 9. RQ-QS-04B onward — Post-Breakout Consolidation Anatomy, structure not yet confirmed
+## 9. RQ-QS-04B onward — Post-Breakout Consolidation Anatomy — 04B RUN, answer is NO, awaiting critic's close/continue call
+
+**Status update 2026-09-29 (afternoon)**: step 1 (04B) is done — `swing_qs_bpc/08_rq04b_anatomy.py`,
+full writeup in `swing_qs_bpc/FINDINGS.md` "RQ-QS-04B". The data says the 8,403 subset is
+NOT a recognizable tight continuation structure: 61% pause for at most 2 bars, median
+close-to-close range 0.48%, no volume dry-up, longer pauses are wider not tighter, and B
+closes above the consolidation high only 45.6% of the time. Step 2 vocabulary from the
+data: "impulse rest", not consolidation/base/VCP. Per the pre-declared decision tree the
+branch should close; steps 3-6 below are NOT to be started unless the critic explicitly
+overrides with a pre-declared cell. Hand-checks (IRB/IREDA/IDEA/HINDUNILVR) all matched.
+One methodological note carried forward: 04A's consolidation_low includes B's own bar,
+which must be redefined (pause bars before B only) before any structural-stop work.
+
+Original entry, kept for the record:
+
 
 **What**: `swing_qs_bpc/` found a real, distinct 8,403-event subset (A's whose
 post-breakout pause holds its low ABOVE A's own entry price — 18.0% of 46,776 A's,

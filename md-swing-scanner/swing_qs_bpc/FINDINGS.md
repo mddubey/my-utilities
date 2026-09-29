@@ -334,3 +334,119 @@ replay of the holds-above-A subset yet. No decision on which of the 4+ candidate
 conventions this line should adopt going forward. **Full next-session sequencing
 (critic-specified, 6 steps, explicit decision tree, explicit do-NOT-do list) is in
 `../PARKING_LOT.md`, item #9 — start there, don't reorder or skip ahead.**
+
+## RQ-QS-04B — Anatomy of the holds-above-A population (2026-09-29, step 1 of PARKING_LOT #9, observational only)
+
+**Question (critic's exact framing)**: is the 8,403-event holds-above-A subset from
+RQ-QS-04A a recognizable tight continuation structure, or merely a 1-2 day pause
+followed by another new high? No returns, no R, no gate, no winner-filtering.
+
+**Method**: `08_rq04b_anatomy.py`. Population read straight from
+`rq04a_consolidation_anatomy.csv` (detected AND low-basis holds-above-A), not
+re-derived. Raw bars re-walked only to add descriptive fields 04A didn't have: B-day
+Close/Open vs the consolidation high, close-basis vs low-basis holds, low-above-A in
+ATR, per-bar range/ATR during the pause, B-day volume. Integrity: the bar at
+`a_entry_i` is asserted to carry the same date as 04A recorded — 58 of 46,750 rows
+(12 of the 8,403) failed that check because `data_cache` was re-adjusted for those
+tickers since 04A ran; skipped, so n=8,391 here. Rule #22: four deterministic
+examples across the duration range (IRB 1d, IREDA 2d, IDEA 4d, HINDUNILVR 8d) were
+hand-checked against raw OHLC — every field matched.
+
+**[1] Three tiers of "holds above A" on the full detected population (n=46,692)**
+
+| Definition | n | % |
+|---|---|---|
+| low-basis: min(Low) of pause > A entry (04A's subset) | 8,391 | 18.0% |
+| close-basis: min(Close) > A entry, intraday lows may pierce | 13,018 | 27.9% |
+| ends-above: last Close of the pause > A entry | 19,148 | 41.0% |
+
+9.9% hold on a close basis but get shaken out intraday; a further 13.1% end above A
+but closed below it at least once. "Stays entirely above A" (18%) and "merely ends
+above A" (41%) are very different populations — the 04A subset is the strict one.
+
+**[2]-[4] Shape of the pause (holds-above-A, n=8,391)**
+
+| Metric | P25 | P50 | P75 | P90 |
+|---|---|---|---|---|
+| duration (days) | 1 | 2 | 4 | 9 |
+| duration, resolved only (n=7,622) | 1 | 2 | 3 | 6 |
+| range width, % of A entry | 2.91% | 4.33% | 6.68% | 10.17% |
+| range width / ATR14 at A | 1.01x | 1.36x | 2.01x | 2.92x |
+| **close-to-close range, %** | **0.00%** | **0.48%** | **2.50%** | 5.30% |
+| median daily bar / ATR during pause | 0.68x | 0.85x | 1.09x | 1.34x |
+| A's own breakout-day bar / ATR | 1.01x | 1.40x | 1.90x | 2.51x |
+| consolidation_high above A entry | 4.70% | 7.22% | 11.39% | 17.08% |
+| consolidation_low above A entry | 0.89% | 2.16% | 4.78% | 8.43% |
+| consolidation_low above A, in ATR | 0.29x | 0.72x | 1.52x | 2.60x |
+| pause start day | D2 | D3 | D4 | D6 |
+
+Duration distribution: **1 day = 43.2%**, 2 days = 17.6% (cumulative 60.8%), 3-4 days
+= 16.0%, 5-7 days = 10.5%, 8+ days = 12.6%.
+
+**[5] Volume**: pause avg vol / prior-10d avg P50 = 1.29x (P25 0.87x); only 14.2%
+below 0.7x. No dry-up, same as 04A and every other volume check this line has run.
+B-day vol P50 = 1.64x prior-10d, 0.78x of A's own breakout day.
+
+**[6] Does B actually break the consolidation high? (resolved n=7,622)**: B's Close
+finishes above the consolidation high only **45.6%** of the time; median B Close vs
+the high is **-0.13%** — more than half of the "B breakouts" are intraday pokes that
+close back inside the range. 9.0% gap open above it. B High exceeds the high by P50
+1.11%. Structural risk from B to consolidation_low P50 = 5.19% (P25 3.61%, P75 7.48%).
+
+**[7] Duration x width matrix (% of population)**
+
+| | <2% | 2-4% | 4-6% | 6-10% | 10%+ |
+|---|---|---|---|---|---|
+| 1d | 7.1 | **21.8** | 9.5 | 4.2 | 0.6 |
+| 2d | 1.0 | 8.0 | 4.6 | 3.2 | 0.8 |
+| 3-4d | 0.5 | 5.0 | 5.2 | 4.3 | 0.9 |
+| 5-7d | 0.0 | 1.5 | 2.8 | 4.0 | 2.3 |
+| 8+d | 0.0 | 0.3 | 1.9 | 4.4 | 6.0 |
+
+Mass sits in the 1-day row (43%) and the 2-4% column (37%). **Longer pauses are
+WIDER, not tighter**: 5-7d and 8+d rows have essentially zero <2% cells and their mass
+is in 6-10% and 10%+. Resolve rate falls with duration (8+d x 10%+ = 24%) but that is
+largely D15-window censoring — a pause starting D3 has at most 12 days to resolve — not
+a finding about the structure. B-close-above-high rate is flat 41-53% across almost
+every cell (no cell where B is a decisively "clean" break).
+
+**[8] Undercuts-A complement for contrast (n=38,301)**: duration P50 7 (P75 13, P90
+14 — mostly window-censored), width P50 7.24% / 2.37x ATR, high above A P50 only
+1.66%, low P50 4.70% BELOW A. Resolved 62.5%, B-close-above 46.4% (same as the
+holds-above-A subset — B quality does not differ between the tiers).
+
+**Answer to the 04B question — the data says NO, this is not a recognizable tight
+continuation structure as a population.** It is predominantly a 1-2 day rest inside an
+ongoing impulse: 61% of the subset pauses for at most two bars; the median
+close-to-close range is 0.48% (the 4.33% "range width" is almost entirely the intraday
+extent of one or two bars, not a multi-day base); per-bar ranges during the pause
+(0.85x ATR) are only modestly smaller than normal and nowhere near contraction; volume
+does not dry up; the pauses that DO last 5+ days are wide (6-10%+), the opposite of
+VCP-style tightening; and B is a genuine close-above break less than half the time.
+The 04A "tighter, faster, 90.7% resolve" reading was real but is explained by the
+population being mostly one-bar pauses in strong trends — a fast, tight pause resolves
+quickly because the impulse hadn't stopped, not because a base formed.
+
+**Step 2 (vocabulary from the data)**: the honest label is **"impulse rest"** or
+"one-to-two-bar pause within an extension" — not consolidation, not tightening, not
+VCP-like contraction, not a continuation base. The literature prior (Minervini/O'Neil/
+Strike VCP and handle structures) describes multi-day, contracting, volume-drying
+ranges; this population does not exhibit any of those three properties in aggregate.
+
+**Per the pre-declared decision tree ("04B anatomy -> is this genuinely a distinct
+structure? No -> close the branch")** this branch should CLOSE unless the critic wants
+one specific, pre-declared cell examined. The only cells that even resemble a base are
+3-7 days x 2-6% (n=1,216, 14.5% of the subset, 2.6% of all A's) — noted for the
+record, NOT proposed as a follow-up: selecting that cell after seeing this table would
+be exactly the post-hoc cherry-pick the checklist forbids (Rule #19, #21).
+
+**Methodological note for any future structural-stop work (Rule #20 family)**: 04A's
+`consolidation_low` includes B's own bar's Low. For a live rule the stop under "the
+range" is only knowable as of B's open, i.e. from the pause bars BEFORE B. In the IRB
+example that is 25.31 vs 25.21 — small here, but it must be redefined before any
+structural-stop comparison (step 4) is built.
+
+**Not done, by design**: no returns, no R, no replay (step 3 is gated on a YES at step
+1, which the data did not give). Files: `08_rq04b_anatomy.py`, `rq04b_holds_above_a_anatomy.csv`
+(the 8,391 with new fields), `rq04b_detected_enriched.csv` (all 46,692, for the tier
+comparison), `rq04b_run.log`.
