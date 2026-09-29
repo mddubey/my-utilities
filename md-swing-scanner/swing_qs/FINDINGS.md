@@ -2582,3 +2582,93 @@ this project's own established Observe -> Measure -> Decide discipline.
 
 **Files**: `trajectory_replay/rq_qs_06_early_monetization_envelope.py`,
 `trajectory_replay/rq_qs_06_envelope.csv` (46,613 rows).
+
+## RQ-QS-06B — Favorable-State Trajectory Anatomy (2026-09-29, critic-specified)
+
+**Why**: RQ-06 established that QS-A visits favorable territory fast (median MFE
++0.80R by D5) while the median CLOSE stays flat across the WHOLE population — but
+didn't say what happens on the path AFTER a trade first reaches a given state, or
+whether "wick then flat" is the typical shape of an individual winning trade, or an
+artifact of averaging fast winners together with the majority that never gets
+anywhere. Critic's exact framing: separate H1 (entry finds the right stocks, but
+holding/monetization philosophy is mismatched to their early behavior) from H2 (no
+sufficiently predictable state exists after the excursion, need a different entry).
+
+**Method**: same 46,613 frozen QS-A positions as RQ-06 (read directly from
+`rq_qs_06_envelope.csv`, not re-walked), extended to the FULL MAX_TRACK_DAYS=15
+window this time (RQ-06 capped at D5). Independently re-walked day-by-day rather
+than trusting `walk_ticker()`'s own `cur["max_r"]`/`exit_i`, using the same stricter
+local 25% corp-action check RQ-06 already needed. **Caught a second bug before
+trusting results**: the first giveback formula anchored to the STATIC level just
+touched, producing nonsensical values (-246% to +303%) once price kept climbing past
+that level after the touch. Fixed to anchor giveback to the RUNNING PEAK as of the
+future day being measured (matching RQ-06's own convention) — re-ran once, all
+downstream numbers below are post-fix.
+
+**State table — conditional on first reaching level X, what happens SAME DAY**:
+
+| Level | N | Median day | Close positive | Close persists (>=half of X) | Ever returns to entry | Reaches next level | Gives back >=50% of X by final exit |
+|---|---|---|---|---|---|---|---|
+| 0.25R | 34,716 | 1 | 78.7% | 68.2% | 77.1% | 87.6% | 53.8% |
+| 0.5R | 30,394 | 1 | 89.6% | 75.8% | 70.1% | 87.2% | 49.8% |
+| 0.75R | 26,489 | 2 | 95.1% | 83.1% | 61.8% | 87.4% | 45.5% |
+| 1.0R | 23,141 | 2 | 97.2% | 87.4% | 53.0% | 76.1% | 41.2% |
+| 1.5R | 17,614 | 4 | 98.9% | 92.5% | 38.5% | 77.0% | 33.6% |
+| 2.0R | 13,561 | 5 | 99.4% | 95.2% | 28.0% | n/a | 28.2% |
+
+**Important refinement to RQ-06's flat-close finding — SAME-DAY persistence is
+actually good, once you condition on reaching a level.** 75.8% of trades that touch
+0.5R still close that same day above 0.25R; by 1.5R, 92.5% do. RQ-06's population-
+wide "median close stays flat" was mostly dilution from the majority of trades that
+never reach a meaningful level at all, not evidence that reaching a good level
+typically evaporates same-day. Wick-and-vanish on the SAME day is a real but
+minority pattern (24.2% at the 0.5R level).
+
+**But giveback happens fast over the following days, then roughly plateaus.**
+Giveback-from-running-peak after first touching 0.5R: median 46.3% by D+1, 50.1% by
+D+2, 50.2% by D+3 — most of the eventual giveback has already happened by the very
+next day, and doesn't meaningfully worsen after that. This is a genuinely useful,
+actionable shape: the deterioration is front-loaded, not a slow multi-day bleed.
+
+**Archetype breakdown (simple, disclosed, rule-based, not claimed exhaustive)**:
+
+| Archetype | n | % | Median eventual exit R | Median eventual 15D peak |
+|---|---|---|---|---|
+| unclassified | 27,275 | 58.5% | -1.00R | +0.35R |
+| **burst_then_exhaustion** | **7,860** | **16.9%** | **-0.04R** | **+2.34R** |
+| persistent_continuation | 5,705 | 12.2% | +3.03R | +4.02R |
+| slow_oscillation | 3,971 | 8.5% | -1.00R | +0.81R |
+| wick_and_fail | 1,802 | 3.9% | -1.00R | +0.69R |
+
+Rule #22: hand-verified one example of each of the two most decision-relevant
+archetypes against raw bars — 360ONE 2022-01-12 (wick_and_fail: touches +0.60R on
+D3, closes only +0.19R, stopped D4) and 360ONE 2023-07-04 (persistent_continuation:
+climbs to +2.38R peak by D10, closes D15 at +1.43R) — both matched exactly.
+
+**The economically important group is `burst_then_exhaustion`: 16.9% of the whole
+population (n=7,860) reaches a REAL median peak of +2.34R and ends up at essentially
+breakeven (-0.04R).** That's real money made intraday and thrown away by the current
+holding mechanism, not a weak setup to begin with — the entry clearly found genuine
+opportunity in this group; it's specifically HOW the trade is held afterward that
+converts a real +2.34R median excursion into nothing. `persistent_continuation`
+(12.2%, n=5,705) is the other economically important group — it keeps roughly 75% of
+its own peak (+3.03R exit vs +4.02R peak) and needs to NOT be disturbed by any future
+intervention. The majority `unclassified` bucket (58.5%) mostly never develops real
+momentum at all (+0.35R median peak) — this group is not where a harvesting
+mechanism has much to work with.
+
+**Answer to H1 vs H2: this result supports H1.** The entry is finding real
+opportunity — burst_then_exhaustion alone represents a genuine, identifiable,
+sizeable (16.9%) population with a real median +2.34R excursion that the current
+holding approach fails to monetize. This is not evidence of "no predictable state
+exists" (H2) — there IS a predictable state (same-day persistence is real and
+improves with level; giveback is front-loaded and largely resolves by D+1). The
+open question for RQ-QS-06C, NOT decided here: can `burst_then_exhaustion` be
+distinguished from `persistent_continuation` EARLY (i.e., at or shortly after the
+peak, not only visible in hindsight at D15), without damaging
+`persistent_continuation`'s own outcome by intervening too early or too often. No
+exit rule proposed or tested in this script, per critic's explicit instruction —
+Observe step only, same discipline as RQ-06.
+
+**Files**: `trajectory_replay/rq_qs_06b_favorable_state_trajectory.py`,
+`trajectory_replay/rq_qs_06b_state_trajectory.csv` (46,613 rows).
