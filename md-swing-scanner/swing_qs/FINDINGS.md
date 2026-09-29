@@ -2484,3 +2484,101 @@ evidence gathered so far. **What exactly makes a breakout suitable for a short-d
 continuation trade, if neither daily structure nor a lower-timeframe swing reliably
 distinguishes it — that is the standing, unresolved question for whenever this research
 resumes.**
+
+## RQ-QS-06 — QS-A Early Monetization Envelope (2026-09-29, critic-specified, answers the real-stakes question)
+
+**Why this exists**: after BPC (D3), the impulse-rest population (04A-C), and the
+base-quality triple-cut (05A) all closed negative or failed robustness, critic's
+explicit pivot: stop inventing new entries, ask instead whether the ALREADY-REAL
+QS-A edge (never rejected on entry quality, only judged too slow for options)
+contains a genuine early, options-compatible monetization window. Pre-declared
+decision tree: (A) little early movement -> QS-A is structurally a slow
+continuation edge, stop forcing it into options; (B) real early movement that
+gets given back -> exit/harvesting becomes the frontier, AEGISLOG-style; (C) real,
+persistent early movement -> stop searching for entries, move to OX1/execution.
+
+**Method**: frozen inputs only, exactly as specified — reused `walk_ticker()` from
+`rq_qs_01_opportunity_cost.py` VERBATIM (imported, not reimplemented): same raw
+10D/20D/40D trigger, same v0.1 gate (`passes_v01_gate`), same S1b stop, same
+single-position walk. No new filter, no new pattern, no parameter optimization —
+this script adds ONLY a D1-D5 measurement layer on top (MFE/MAE, first-hit day per
+R level, giveback, unresolved%). n=46,613 frozen QS-A positions, full nifty500
+universe, all three lookbacks.
+
+**Bug caught and fixed before trusting the aggregate (Rule #22)**: hand-verifying
+the two most extreme giveback rows found TRENT's 2025-12-24 entry showing a
+fabricated -17.26R "loss" on D5 — a real 33.04% overnight bonus-issue drop that
+slipped past production's shared `corp_action_day` column, whose 35% threshold
+missed this specific ratio. Added a stricter, independent 25% check inside this
+script (not a change to the shared production column) — 64 of 46,613 rows
+truncated as a result. Aggregate percentiles barely moved (they were already
+fairly robust to ~74 outliers out of 46,613), but this needed fixing and
+disclosing regardless. A remaining 65 rows with |close_r_D5|>10R were checked and
+are real, not artifacts: entries with an unusually tight S1b stop (~0.5% initial
+risk) turning an ordinary 7-9% move into a 15-27R multiple — a known tail of the
+S1b risk-unit convention, not a bug.
+
+**Result — clear, substantial early movement exists (rules out Outcome A)**:
+
+| R threshold | reached by D5 | median day |
+|---|---|---|
+| 0.25R | 76.4% | 1 |
+| 0.5R | 63.9% | 1 |
+| 0.75R | 52.2% | 1 |
+| 1.0R | 41.7% | 2 |
+| 1.5R | 26.8% | 2 |
+| 2.0R | 17.4% | 3 |
+
+Median running MFE (High-based, cumulative) climbs steadily: **+0.35R by D1**,
++0.49R by D2, +0.61R by D3, +0.71R by D4, **+0.80R by D5**. This directly refutes
+"little early movement" — most of a 15-day QS-A trade's eventual favorable
+excursion is already visible intraday within the first 1-2 days.
+
+**But the median CLOSE stays near flat every single day** (close_r_D1..D5 medians:
+-0.03R, -0.02R, -0.01R, -0.01R, -0.00R) — a striking, separate finding from the
+giveback stat below: even though the running peak grows every day, the typical
+trade's own daily CLOSE never shows a real gain through D5. Whatever favorable
+excursion happens intraday round-trips back to roughly breakeven by the time a
+close-based decision point would even see it, for the median trade. This is the
+sharpest single fact for an OPTIONS product specifically, which needs a real edge
+AT the decision moment, not merely "the stock touched a good price sometime."
+
+**Giveback (Outcome B, confirmed) — among the 63.9% that touch >=0.5R at some
+point by D5**:
+
+| | |
+|---|---|
+| Median giveback from D5's own peak | **55.6%** |
+| Give back >=50% of peak | 54.1% |
+| Give back >=80% of peak | 35.3% |
+| Give back the ENTIRE move (close<=0 despite touching 0.5R+) | **27.2%** |
+
+**MAE is symmetric and fast too**: median running MAE is already -0.34R by D1,
+-0.73R by D5; 37.1% are stopped out (-1R, S1b) by D5, median day 2. Real risk
+shows up just as fast as real opportunity.
+
+**Unresolved (no stop yet, no 1R yet)**: 68.3% at D1 falling to 27.9% by D5 — QS-A
+genuinely resolves fast, consistent with its own "quick swing" self-description;
+by D5 roughly 72% of positions have already either proven out (>=1R) or stopped.
+
+**Answer to the pre-declared branching question: Outcome B, not A or C.** Real,
+fast, substantial early movement clearly exists (median +0.80R MFE by D5, 63.9%
+touch a meaningful 0.5R excursion within 5 days) — QS-A is NOT structurally a slow
+continuation edge with nothing to monetize early. But the median trade gives back
+more than half of that peak by D5's close, and over a quarter give back the whole
+thing. Per critic's own pre-declared decision tree, this makes **exit/harvesting
+the legitimate next research frontier** — not another entry search, and not yet a
+specific exit rule (none chosen here, per the explicit "don't immediately test
+another stock exit" instruction). AEGISLOG (real, live, not research — see the
+same-session trade-monitoring note) is a motivating real-world instance of exactly
+this shape (real early continuation to +2.86% at a valid signal, later a much
+larger peak, then a full round-trip below entry) but is NOT being used as a rule
+here, per critic's own caution against treating one example as the answer.
+
+**Not yet done, by design**: no exit rule, no threshold on WHEN to harvest, no
+options translation (OX1), no comparison to the existing MAX_HOLD_DAYS=15/S1b/
+ZigZag mechanics already used elsewhere. This is the "Observe" step only, matching
+this project's own established Observe -> Measure -> Decide discipline.
+
+**Files**: `trajectory_replay/rq_qs_06_early_monetization_envelope.py`,
+`trajectory_replay/rq_qs_06_envelope.csv` (46,613 rows).
