@@ -56,15 +56,23 @@ def _last_cached_date(ticker):
     return df.index.max() if len(df) else None
 
 
-def _chunked_download(yf_tickers, chunk_size=CHUNK_SIZE, pause=CHUNK_PAUSE_SEC, **dl_kwargs):
+def _chunked_download(yf_tickers, chunk_size=CHUNK_SIZE, pause=CHUNK_PAUSE_SEC, progress=False, **dl_kwargs):
     """yf.download in sequential chunks, not one call across the whole batch — see
     CHUNK_SIZE's comment for why. Returns {ticker_without_.NS_suffix: per-ticker
     DataFrame}, using an empty DataFrame for any ticker missing from a chunk's
     response (yfinance drops a ticker from its own MultiIndex entirely rather than
     returning an empty frame for it, in some failure cases — this normalizes both
-    to the same 'empty, caller decides what that means' shape)."""
+    to the same 'empty, caller decides what that means' shape).
+
+    progress=True prints a chunk-by-chunk line — for a large one-off fetch (e.g.
+    RQ-QS-07U's ~1,600-ticker net-new universe pull) this call runs silently for
+    20-40+ minutes otherwise, violating this project's own standing convention that
+    any background run over ~30s needs live, unbuffered progress output."""
     out = {}
+    total = len(yf_tickers)
     for i in range(0, len(yf_tickers), chunk_size):
+        if progress:
+            print(f"  fetch chunk {i}-{min(i+chunk_size, total)}/{total}", flush=True)
         chunk = yf_tickers[i:i + chunk_size]
         data = yf.download(chunk, threads=True, progress=False, auto_adjust=False, **dl_kwargs)
         is_multi = isinstance(data.columns, pd.MultiIndex)
@@ -109,7 +117,7 @@ def _recover_safe_today(tickers, safe_today):
     return recovered
 
 
-def fetch_all(tickers):
+def fetch_all(tickers, progress=False):
     """Returns {'new': [...], 'updated': [...], 'current': [...], 'empty': [...],
     'stale': [...]} — 5 distinct buckets. 'stale' (2026-09-29, PARKING_LOT #10) is
     the honest addition: an existing ticker that's genuinely behind safe_today but
@@ -127,7 +135,7 @@ def fetch_all(tickers):
 
     if new_tickers:
         yf_tickers = [f"{t}.NS" for t in new_tickers]
-        dfs = _chunked_download(yf_tickers, period=PERIOD, interval="1d", group_by="ticker")
+        dfs = _chunked_download(yf_tickers, period=PERIOD, interval="1d", group_by="ticker", progress=progress)
         need_recovery = []
         for t in new_tickers:
             # dropna(subset=["Close"]), not how="all" — a row fetched while the market's
@@ -178,7 +186,7 @@ def fetch_all(tickers):
         else:
             yf_tickers = [f"{t}.NS" for t in existing_tickers]
             dfs = _chunked_download(yf_tickers, start=start.strftime("%Y-%m-%d"), interval="1d",
-                                      group_by="ticker")
+                                      group_by="ticker", progress=progress)
             need_recovery = []
             for t in existing_tickers:
                 df = dfs.get(t, pd.DataFrame())

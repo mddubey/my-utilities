@@ -354,7 +354,16 @@ stop → performance test.
   CLOSED-negative (2026-09-21), not parked. Don't reopen without new
   evidence.
 
-## 10. fetch_prices.py — silent partial-batch failure, needs chunking + honest "current" bucket
+## 10. fetch_prices.py — silent partial-batch failure — RESOLVED 2026-09-29 (kept for history)
+
+**Resolution**: hardened as designed below, during RQ-QS-07U's universe build (which
+needed to fetch 1,635 new tickers and would have hit this at 10x scale otherwise).
+`_chunked_download()` (25/chunk, 2s pause) + a new honest `stale` bucket, gated on
+whether OTHER tickers in the same batch got real data (a mixed result is the real
+failure signature; everyone-empty means a genuine weekend/holiday, not a failure —
+caught this exact false-positive against the project's own weekend test before
+trusting the fix). 91/91 tests pass, dedicated regression test added for the
+mixed-batch case. Full detail: `swing_qs/FINDINGS.md`'s "RQ-QS-07U" section.
 
 **What happened (2026-09-29)**: a full-universe refresh left 198 of ~700 tickers stuck
 2-13 days behind (last cached 09-16/09-17 while 501 others reached 09-28), discovered

@@ -2892,3 +2892,95 @@ or tested in this script.
 
 **Files**: `trajectory_replay/rq_qs_06e_deterioration_anatomy.py`,
 `trajectory_replay/rq_qs_06e_deterioration.csv` (30,394 rows).
+
+## RQ-QS-07U — Historical Market Universe (2026-09-29, critic-specified infrastructure)
+
+**Why**: 07A's own population definition surfaced a real, previously-undisclosed
+issue: `nifty500_universe.csv` is a single, current-membership snapshot (committed
+once, 2026-08-30) applied unchanged across the full 2021-2026 backtest window —
+survivorship-biased (drops out invisible to the whole history) and, separately,
+excludes ~1,600 real NSE-listed equities entirely. Critic's refined architecture,
+adopted: don't build "11 historical NIFTY snapshot files" — build a proper
+historical SECURITY universe (real listing date, NIFTY-500/F&O membership as
+metadata, not the population definition), and don't let 07A run on the known-
+biased population as its canonical result.
+
+**v1 scope, explicitly disclosed, per user's direction ("ignore that")**: fixes
+the listing-date side only (a stock's history now starts at its own real listing
+date, not before). Does NOT yet include a delisted-companies backfill — NSE's
+official delisted-companies list sits behind a JS-rendered page this project
+can't currently scrape (its only static file link is a different document, a
+quarterly regulatory report, not the actual delisted list); the exact opposite-
+direction bias (real historical constituents dropped since, invisible to the
+whole history) remains open, known, and un-fixed. Revisit only with a working
+data source for it — not attempted further tonight per explicit user direction.
+
+**Source, live-verified, not assumed**: NSE's own `EQUITY_L.csv` (fetched
+directly from `nsearchives.nseindia.com`), 2,587 total listed securities,
+filtered to the 2,327 in the standard `EQ` series (ordinary equity, normal
+settlement) — `BE`/`BZ` series (260 names, trade-to-trade/surveillance-
+restricted) explicitly excluded, per critic's "exclude instruments that aren't
+ordinary equity candidates." Includes symbol, company name, listing date, ISIN
+for every row — no unparseable listing dates (0 of 2,327). Saved as
+`nse_equity_universe.csv`.
+
+**Population growth is real and expected, not a red flag**: 1,086 of 2,587
+current listings (42%) postdate 2021-01-01 — the usable universe naturally grows
+across the 5-year window rather than staying flat, since nearly half the current
+market didn't exist as a public company at the window's start.
+
+**fetch_prices.py hardened first** (closes PARKING_LOT #10, the exact same
+silent-batch-failure risk found earlier tonight on a much smaller scale) —
+chunked downloads (25/chunk, 2s pause), a new honest `stale` result bucket
+distinguishing a real silent failure from a genuine no-new-trading-day case
+(gated on whether OTHER tickers in the same batch got real data — a mixed
+result is the real anomaly signature; a full weekend means nobody gets
+anything, which isn't a failure). Caught and fixed a false-positive against
+this project's own existing weekend test before trusting it; added a dedicated
+regression test for the mixed-batch case. 91/91 project tests pass.
+
+**Fetch run**: 1,635 net-new tickers (full 5y history) + 692 already-cached
+(incremental top-up), 6.6 minutes total. Self-reported: 0 stale, 0 empty — but
+this was NOT taken at face value (Rule #22): two tickers logged real errors
+mid-run (a curl timeout, a yfinance-internal TypeError) that the automatic
+retry cleared successfully, confirmed by direct inspection, not just trusting
+the summary line.
+
+**A real, second bug caught by hand-verification, not by the retry logic**:
+A2ZINFRA (listed 2010-12-23, a real 15-year-old company) ended up with exactly
+1 cached row — the retry logic only re-fetches a result that's fully EMPTY, but
+a malformed per-ticker response (from that same yfinance-internal error) can
+leave ONE valid row behind, which reads as "not empty" and slips through
+looking like a thin-but-real history. Found by directly checking the two
+tickers that had logged errors, not by trusting `stale=0/empty=0`. Deleted and
+re-fetched cleanly: 1,240 rows, full 2021-09-29 to 2026-09-29 history, verified.
+
+**Built `validate_universe_cache.py`**, a reusable post-fetch check (row count
+vs. listing date, conservative floor to avoid false-positives on genuinely new
+listings) — NOT folded into `fetch_prices.py` itself (keeps the generic fetcher
+from needing to know about listing-date metadata, a research-layer concern).
+Run against the full 1,435 tickers listed >5 years ago after the A2ZINFRA fix:
+**0 missing, 0 suspiciously incomplete — clean.**
+
+**A separate, real, disclosed data-quality observation, NOT a fetch bug**: 82
+tickers in `nse_equity_universe.csv` share the exact listing_date `2026-04-20`
+(confirmed via the raw source file, not assumed) — small/obscure names
+(SHRIKRISH, KIRANVYPAR, PML, and others), each with only ~28-30 cached rows
+since then. Likely a real NSE data-field characteristic for this specific
+cluster (a bulk symbol/series-migration or re-registration date rather than a
+true original listing date, and/or genuinely thin, sporadic trading) rather
+than a fetch failure — cross-checked against the genuinely-broken case
+(A2ZINFRA) and confirmed structurally different (that one had a real, distinct
+2010 listing date and 1 row; this cluster has a suspicious SHARED date and a
+consistent ~28-30 row count across all 82, the signature of a real data
+characteristic, not a random fetch failure). Flagged for anyone using this
+cluster in future research — not investigated further tonight.
+
+**Not yet done**: the delisted-companies backfill (known open gap, disclosed
+above); any point-in-time NIFTY-500/F&O-membership metadata attachment (planned
+next, per critic's architecture — membership as metadata, not the population
+definition); RQ-07A's actual event matrix (gated on this being locked, per
+critic's exact sequencing — this IS that lock).
+
+**Files**: `nse_equity_universe.csv` (2,327 rows), `fetch_prices.py` (hardened),
+`validate_universe_cache.py` (new, reusable).
