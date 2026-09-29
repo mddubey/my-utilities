@@ -274,6 +274,7 @@ closes above the consolidation high only 45.6% of the time. Step 2 vocabulary fr
 data: "impulse rest", not consolidation/base/VCP. Per the pre-declared decision tree the
 branch should close; steps 3-6 below are NOT to be started unless the critic explicitly
 overrides with a pre-declared cell. Hand-checks (IRB/IREDA/IDEA/HINDUNILVR) all matched.
+04C (20-vs-20 replay, run at user's direction 2026-09-29) agrees: B is a late entry (median 2 ATR above A), 12/20 stopped by D5, 6/20 D5-positive, dominant archetype poke-and-fade; pre-B pause low equals the S1b stop in 14/20 pairs (no multi-bar structure to anchor a distinct stop). A-side of that replay is future-conditioned, not comparable. Recommend closing; steps 4-6 not started.
 One methodological note carried forward: 04A's consolidation_low includes B's own bar,
 which must be redefined (pause bars before B only) before any structural-stop work.
 

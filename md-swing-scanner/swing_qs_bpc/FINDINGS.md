@@ -450,3 +450,60 @@ structural-stop comparison (step 4) is built.
 1, which the data did not give). Files: `08_rq04b_anatomy.py`, `rq04b_holds_above_a_anatomy.csv`
 (the 8,391 with new fields), `rq04b_detected_enriched.csv` (all 46,692, for the tier
 comparison), `rq04b_run.log`.
+
+## RQ-QS-04C — 20-vs-20 trajectory replay, A vs post-pause breakout B (2026-09-29, run on user's explicit direction)
+
+**Gating note**: the pre-declared tree made 04C conditional on 04B confirming a distinct
+structure; 04B said it did not. Run anyway at the user's direction ("we are only working
+on BPC items"), so read as a trajectory sanity look at the 04B population, not a
+promotion step. No expectancy, no gate, no ranking. Script `09_rq04c_replay.py`.
+
+**Setup**: pool = holds-above-A AND resolved, deduped ticker+date, A dated 2026-06-10..
+09-01 (n=237). Deterministic 5 early/5 mid/5 late/5 random, seed 42, drawn before looking.
+B entry = intraday touch of the consolidation high (fill = max(high, B open)). **Stop
+convention declared (Rule #20): S1b (prior day's Low) for both A and B**, same as the
+frozen QS baseline. Pre-B pause low (decision-time-safe, min Low from pause start through
+the day BEFORE B) reported as reference only. Plot: `plot_04c_pairs.png`. Per-pair data:
+`rq04c_pairs.csv`.
+
+**Rule #22 hand-checks**: HAL, ACMESOLAR, ANANDRATHI re-walked from raw bars — B entry,
+S1b stop, stop-day and D5 close R all matched to the rupee (e.g. HAL: entry 4485.00, stop
+4385.70, stopped on B+2 at low 4309.10, D5 close 4381.20 = -1.05R).
+
+**Big caveat, read before any number below: the A side is conditioned on the future.**
+The population is defined by the pause low staying above A's entry, so A's own path
+through the pause is selected to be good (A stopped by D5 = 0/20, A MAE positive). A's
+D5 numbers here are NOT comparable to B's and no A-vs-B verdict should be drawn from
+them. Only B's own trajectory is informative, and n=20.
+
+| B trajectory (n=20, descriptive) | Value |
+|---|---|
+| B entry above A entry | median 6.1% / 2.05 ATR; 14 of 20 are >=5% above A |
+| B stopped by D5 (daily lows) | 12 of 20; 8 within the first two days |
+| B D5 close positive | 6 of 20 |
+| B D5 close, median | -0.77R = -2.23% (S1b risk median 3.0%) |
+| B reached +1R (D1-D5 high) | 5 of 20 |
+| B closed above the consolidation high | 9 of 20; only 3 of those 9 had positive D5 |
+
+**What the plots show**: three archetypes. (1) **Poke and fade**, the majority — B day
+touches the pause high, often closes back inside on a long upper wick, then stalls or
+gives back into the stop (ACMESOLAR, HAL, GAIL, M&MFIN, NH, CRISIL, COCHINSHIP,
+KOTAKBANK, BEML, CONCORDBIO). (2) **Clean continuation**, a minority — ANANDRATHI,
+SONACOMS, FEDERALBNK, SAPPHIRE; these are ordinary strong trends where A itself already
+captured most of the move (A D5 +3.0R for ANANDRATHI). (3) **Late and flat** — B fires 5
+to 8% above A after the impulse has already run, then chops (GLAND, M&M, SAIL, NATIONALUM).
+
+**Structural stop observation**: for 14 of 20 pairs the pre-B pause low IS the S1b stop
+(identical risk); where they differ the pause low is lower (wider). Because the median
+pause is 1 to 2 bars, "the low of the consolidation" collapses to yesterday's low. This
+is the same 04B finding seen from the stop side: there is no multi-bar structure to
+anchor a distinct structural stop to.
+
+**Verdict**: does not support a distinct post-breakout-consolidation entry. B is a late,
+extended entry (median 2 ATR above A) whose defining behaviour is poke-and-fade, and the
+cases that work are trend continuation A would already have held. Consistent with 04B,
+independent of the A-side conditioning caveat, which only weakens what can be said about
+A. Small n (20), stop-width sensitivity applies (a 3% stop under a 2-ATR-extended entry
+gets stopped by ordinary noise), so this is a look, not a measurement. Recommend closing
+the branch per the pre-declared tree; steps 4 to 6 (structural-stop comparison, QS
+product-fit, performance test) not started and not justified by 04B or 04C.
