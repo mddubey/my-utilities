@@ -38,7 +38,14 @@ Read `open_positions.csv` in the project directory — these are real, currently
 trades, not research artifacts. Treat them accordingly (see the project's own standing
 data-handling caution around live position/trade data).
 
-### Step 5: Give ONE consolidated orientation summary, then stop
+### Step 5: Check the Parking Lot
+
+Read `PARKING_LOT.md` in the project directory in full — this is where deferred
+research/implementation items live (things intentionally not done yet, each with
+enough context to pick up cold), separate from FINDINGS.md's append-only log of
+what's already done. It's short enough to read in full each time.
+
+### Step 6: Give ONE consolidated orientation summary, then stop
 
 Structure it as:
 - **Last closed/decided** — the most recent research conclusion or implementation
@@ -47,6 +54,10 @@ Structure it as:
   framing from memory/FINDINGS.md rather than paraphrasing loosely — an open item's
   precise wording (e.g. a specific RQ number and its exact unresolved question) is
   often load-bearing.
+- **Parking lot** — list each item currently in `PARKING_LOT.md` by name (one line
+  each — what it is, not the full context), so the user can pick one to resume without
+  re-reading the whole file themselves. If they pick one, use that entry's own "next
+  step" as the starting point, not a fresh guess.
 - **Uncommitted work / loose ends** — anything `git status` or the memory file flags.
 - **Real positions** — what's currently open, if anything, from `open_positions.csv`.
 

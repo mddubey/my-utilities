@@ -109,8 +109,33 @@ EMA34_RISING_DAYS_MIN = 2      # (2026-09-20) promoted to the live default — c
                                 # production population matches the research population, not to re-prove
                                 # the finding itself. Out of trailing 10 days -- persistent trend, not
                                 # just "currently above."
-MIN_TRADED_VALUE = 1_000_000_000  # Rs.100cr, 20-day avg Close*Volume — liquidity floor
+MIN_TRADED_VALUE = 1_000_000_000  # Rs.100cr, 20-day avg Close*Volume — RETIRED from
+                                    # base_filters_pass() (2026-09-25, BC v2 promotion,
+                                    # see FINDINGS.md "Final disposition -- BC v2
+                                    # promoted"): three independent research passes
+                                    # (2026-08-30 original ablation, RQ-48 bucket
+                                    # decomposition, this session's raw-population
+                                    # re-check) all agree the removed cohort is as good
+                                    # or better than the kept cohort on pnl/R terms —
+                                    # never a real quality filter, only ever a workload/
+                                    # UX control and an options-tradability proxy.
+                                    # Constant kept for reference/history, not read by
+                                    # base_filters_pass() anymore.
 MOMENTUM_20D_MIN = 1.05        # close must be >=5% above its level 20 trading days ago
+AD_FRACTION_MIN = 0.567        # O'Neil Accumulation/Distribution floor (2026-09-25, BC v2
+                                # promotion) — fraction of the 20 days' volume STRICTLY
+                                # BEFORE today (excludes today entirely) occurring on
+                                # up-days vs down-days. Below this, a stock is
+                                # distribution-heavy, not accumulation-heavy. Bottom-20%
+                                # threshold from the original Cell C Priority A discovery,
+                                # transferred here after clearing every promotion bar
+                                # (necessity, stacking, regime stability) on BC's own
+                                # 10-day pivot this session — see FINDINGS.md.
+
+# RSI band (RSI_MIN < rsi14 < RSI_MAX) — RETIRED from base_filters_pass() (2026-09-25, BC
+# v2 promotion): regime-conditional, reverses direction in 2023 vs 2024-26 on BC's own
+# population; the exact "current-regime-only" pattern this project explicitly does not
+# want baked into a hard gate. Constants kept below for reference/history.
 
 
 def ema(series, span):
@@ -134,6 +159,91 @@ def atr(df, period=14):
         (df.Low - df.Close.shift()).abs(),
     ], axis=1).max(axis=1)
     return tr.ewm(alpha=1 / period, adjust=False).mean()
+
+
+# Freshness/Fragility (moved here from live_checkpoint.py, 2026-09-25, BC v2 promotion —
+# see FINDINGS.md "Final disposition -- BC v2 promoted"): Fragility is now a real
+# base_filters_pass() gate condition, not just live-dashboard telemetry, so its
+# computation belongs in the same module as the other gates it's ANDed with.
+# live_checkpoint.py imports _freshness_score/_fragility_risk from here — single source
+# of truth, no duplicated logic. Percentile breakpoints are the real empirical quantiles
+# (0/5/10/.../100%) of yesterday's RSI14 and 20-day momentum across a fixed reference
+# population — a fixed lookup table, not recomputed live.
+RSI_PCT_BREAKS = [41.28, 56.97, 59.22, 60.73, 62.01, 63.1, 64.02, 64.94, 65.8, 66.59, 67.45,
+                  68.33, 69.17, 70.01, 70.9, 71.86, 72.9, 74.05, 75.4, 77.23, 93.83]
+MOMENTUM_PCT_BREAKS = [-10.2, 3.46, 4.87, 5.89, 6.77, 7.61, 8.37, 9.17, 9.98, 10.86, 11.76,
+                       12.68, 13.72, 14.86, 16.15, 17.59, 19.5, 21.93, 25.42, 31.67, 155.28]
+_PCT_STEPS = [i / 20 for i in range(21)]  # 0.00, 0.05, ..., 1.00 -- matches the breaks above
+
+
+def _percentile_from_breaks(value, breaks):
+    if value <= breaks[0]:
+        return 0.0
+    if value >= breaks[-1]:
+        return 1.0
+    for i in range(1, len(breaks)):
+        if value <= breaks[i]:
+            lo, hi = breaks[i - 1], breaks[i]
+            frac = (value - lo) / (hi - lo) if hi > lo else 0.0
+            return _PCT_STEPS[i - 1] + frac * (_PCT_STEPS[i] - _PCT_STEPS[i - 1])
+    return 1.0
+
+
+def _freshness_score(row):
+    """Lower = fresher (less extended). None if RSI/momentum aren't computable."""
+    if pd.isna(row.rsi14) or pd.isna(row.close_20ago) or not row.close_20ago:
+        return None
+    rsi_pct = _percentile_from_breaks(row.rsi14, RSI_PCT_BREAKS)
+    momentum_20d = (row.Close / row.close_20ago - 1) * 100
+    mom_pct = _percentile_from_breaks(momentum_20d, MOMENTUM_PCT_BREAKS)
+    return 0.5 * rsi_pct + 0.5 * mom_pct
+
+
+# Fragility risk -- built from the two pre-entry features (freshness_score, body_atr)
+# that research found actually predict it, using their real empirical quartile fragile
+# rates as a lookup, not an arbitrary formula. PROMOTED from live-dashboard-only
+# telemetry to a real base_filters_pass() gate (2026-09-25, BC v2): the 2026-09-17
+# "NOT a filter/gate" ruling below is explicitly superseded for the "Precise" cohort
+# specifically -- this session's stacking/necessity/regime audits (FINDINGS.md) found
+# excluding it clears every promotion bar cleanly, strongest in the 2024-26 regime. The
+# original ruling's concern (fragile trades include real winners, e.g. PAYTM-style
+# explosions) is still valid as a reason NOT to exclude "Watch" -- only "Precise" is
+# gated out below, not "Watch".
+FRESHNESS_FRAGILE_BREAKS = [0.027, 0.2036, 0.4306, 0.6452, 0.9553]  # quartile edges, winners only
+FRESHNESS_FRAGILE_RATES = [12.4, 20.2, 19.2, 26.0]                  # fragile rate % per quartile
+BODY_ATR_FRAGILE_BREAKS = [0.0, 0.1002, 0.1894, 0.3332, 1.5366]
+BODY_ATR_FRAGILE_RATES = [25.7, 19.2, 20.2, 12.5]                   # reversed: bigger body = less fragile
+
+
+def _fragility_quartile_bin(value, breaks):
+    if value is None or pd.isna(value):
+        return None
+    if value <= breaks[1]:
+        return 0
+    if value <= breaks[2]:
+        return 1
+    if value <= breaks[3]:
+        return 2
+    return 3
+
+
+def _fragility_risk(freshness_score, body_atr):
+    """Returns (label, estimated_fragile_pct) or (None, None) if neither input is
+    available. label in {"Robust", "Watch", "Precise"} -- execution-risk framing.
+    Thresholds (16%/22%) split the ~12-26% real range roughly into thirds around the
+    population's own 16.5% base fragile rate."""
+    f_bin = _fragility_quartile_bin(freshness_score, FRESHNESS_FRAGILE_BREAKS)
+    b_bin = _fragility_quartile_bin(body_atr, BODY_ATR_FRAGILE_BREAKS)
+    rates = []
+    if f_bin is not None:
+        rates.append(FRESHNESS_FRAGILE_RATES[f_bin])
+    if b_bin is not None:
+        rates.append(BODY_ATR_FRAGILE_RATES[b_bin])
+    if not rates:
+        return None, None
+    est_pct = sum(rates) / len(rates)
+    label = "Robust" if est_pct < 16 else "Precise" if est_pct > 22 else "Watch"
+    return label, est_pct
 
 
 def build_indicators(df):
@@ -161,6 +271,20 @@ def build_indicators(df):
     df["ema34_rising10"] = (df.ema34 > df.ema34.shift(1)).rolling(10).sum()
     df["traded_value_sma20"] = (df.Close * df.Volume).rolling(20).mean()
     df["close_20ago"] = df.Close.shift(20)
+    df["body_atr"] = (df.Close - df.Open).abs() / df.atr14  # entry day's own candle,
+                                                               # NOT lagged -- matches how
+                                                               # RSI/EMA34-persistence/
+                                                               # momentum already use
+                                                               # today's own EOD values
+                                                               # in base_filters_pass()
+    # ad_fraction: O'Neil Accumulation/Distribution, fraction of the 20 days' volume
+    # STRICTLY BEFORE today (excludes today entirely, more conservative than every other
+    # base_filters_pass() field) occurring on up-days vs down-days.
+    _up_vol = df.Volume.where(df.Close > df.Close.shift(1), 0.0)
+    _down_vol = df.Volume.where(df.Close < df.Close.shift(1), 0.0)
+    _up_vol_20 = _up_vol.rolling(20).sum().shift(1)
+    _down_vol_20 = _down_vol.rolling(20).sum().shift(1)
+    df["ad_fraction"] = _up_vol_20 / (_up_vol_20 + _down_vol_20)
     # Minervini-style long-term trend template inputs, for the VCP/Coiled Spring rebuild
     df["sma50"] = df.Close.rolling(50).mean()
     df["sma150"] = df.Close.rolling(150).mean()
@@ -191,13 +315,39 @@ def checklist_pass(row):
 
 
 def base_filters_pass(row):
-    """Universal gates applying to every entry, regardless of which pattern fires."""
+    """Universal gates applying to every entry, regardless of which pattern fires.
+
+    BC v2 (2026-09-25, see FINDINGS.md "Final disposition -- BC v2 promoted"): RSI band
+    and the stock-liquidity floor (MIN_TRADED_VALUE) are RETIRED -- both repeatedly
+    failed as quality filters across independent research passes this project (RSI is
+    regime-conditional, reverses direction between 2023 and 2024-26; liquidity's removed
+    cohort consistently performs as well or better than its kept cohort, never a real
+    quality signal, only a workload/UX and options-tradability proxy -- keep liquidity as
+    a separate candidate-list-size/tradability control elsewhere if needed, not here).
+    Replaced with Volume Quality (ad_fraction, O'Neil Accumulation/Distribution) and
+    Fragility (excluding "Precise" only, not "Watch") -- both cleared every promotion bar
+    (necessity, stacking, regime stability, implementation-parity, golden-dataset audits)
+    on BC's own 10-day pivot this session, Fragility's contribution strongest specifically
+    in the 2024-26 regime.
+
+    CORRECTION (2026-09-25, same day, caught by the canonical real-exit-engine
+    reconstruction): the promotion above was validated against `backtest.py`'s LEGACY
+    exit engine by mistake (a research-script bug, not a `base_filters_pass()` issue --
+    see FINDINGS.md "CANONICAL REAL-EXIT-ENGINE RECONSTRUCTION"). Rebuilt against the
+    REAL Primed exit engine (`primed_engine.py`'s actual `check_primed_exit`/ZigZag/K=2
+    trail, not reimplemented) and Volume Quality REVERSES: its removed (distribution-
+    heavy) cohort clearly outperforms the kept cohort on win/median/meanR/cumR@10 under
+    the real mechanics. DROPPED from the gate as a result -- `ad_fraction` stays computed
+    in build_indicators() (harmless, kept for telemetry/future research) but is no longer
+    checked here. EMA34/Momentum/Fragility all independently re-verified against the same
+    real-engine canonical dataset and survive; see FINDINGS.md for the full marginal
+    audit of all four."""
     trend_bullish = row.Close > row.ema34 and row.ema8 > row.ema34
-    rsi_band = RSI_MIN < row.rsi14 < RSI_MAX
     ema34_persistent = row.ema34_rising10 >= EMA34_RISING_DAYS_MIN
-    liquid_enough = row.traded_value_sma20 >= MIN_TRADED_VALUE
     momentum_20d = row.Close >= MOMENTUM_20D_MIN * row.close_20ago
-    return trend_bullish and rsi_band and ema34_persistent and liquid_enough and momentum_20d
+    fragility_label, _ = _fragility_risk(_freshness_score(row), row.body_atr)
+    fragility_ok = fragility_label != "Precise"
+    return trend_bullish and ema34_persistent and momentum_20d and fragility_ok
 
 
 VOL_ZSCORE_MIN = 1.5  # replaces a flat "1.5x avg volume" ratio — verified via a full

@@ -88,7 +88,7 @@ from backtest import load
 from daily_scan import shortlist_primed, fetch_live_bars, LIVE_CUTOFF_DEFAULT, _load_primed_cache_if_fresh, _fo_tickers
 from sector_strength import sector_rs
 from vcp import stage2_trend_breakdown, base_pivot
-from signals import base_filters_pass
+from signals import base_filters_pass, _freshness_score, _fragility_risk
 import intraday_cache
 import option_backtest
 
@@ -360,96 +360,12 @@ def _fresh_setup(row):
     return bool(rsi_fresh or momentum_fresh)
 
 
-# Continuous Freshness score (2026-09-12, critic response-21 Part 3/11): the boolean
-# fresh_setup above collapses "RSI=38, momentum=poor" and "RSI=62, momentum=strong" into
-# the same pass/fail bucket -- real information thrown away, since RSI and momentum only
-# correlate at 0.52 (not 1.0). Freshness = mean(RSI_percentile, momentum_percentile),
-# lower = fresher, checked directly against the boolean OR on the full 14,225-trade
-# population: at the SAME 25% population size, Freshness scores 65.0% win/+0.52% median
-# vs OR's 62.4%/+0.43% at a full 36.5% -- strictly more efficient, not just "as good".
-# Percentile breakpoints below are the real empirical quantiles (0/5/10/.../100%) of
-# yesterday's RSI14 and 20-day momentum across that same population -- a fixed lookup
-# table (same pattern as FIRE_RATE_BY_DISTANCE above), not recomputed live, so this
-# doesn't depend on today's small candidate pool the way a live cross-sectional rank
-# would. Interpolated linearly between breakpoints for anything in between.
-RSI_PCT_BREAKS = [41.28, 56.97, 59.22, 60.73, 62.01, 63.1, 64.02, 64.94, 65.8, 66.59, 67.45,
-                  68.33, 69.17, 70.01, 70.9, 71.86, 72.9, 74.05, 75.4, 77.23, 93.83]
-MOMENTUM_PCT_BREAKS = [-10.2, 3.46, 4.87, 5.89, 6.77, 7.61, 8.37, 9.17, 9.98, 10.86, 11.76,
-                       12.68, 13.72, 14.86, 16.15, 17.59, 19.5, 21.93, 25.42, 31.67, 155.28]
-_PCT_STEPS = [i / 20 for i in range(21)]  # 0.00, 0.05, ..., 1.00 -- matches the breaks above
-
-
-def _percentile_from_breaks(value, breaks):
-    if value <= breaks[0]:
-        return 0.0
-    if value >= breaks[-1]:
-        return 1.0
-    for i in range(1, len(breaks)):
-        if value <= breaks[i]:
-            lo, hi = breaks[i - 1], breaks[i]
-            frac = (value - lo) / (hi - lo) if hi > lo else 0.0
-            return _PCT_STEPS[i - 1] + frac * (_PCT_STEPS[i] - _PCT_STEPS[i - 1])
-    return 1.0
-
-
-def _freshness_score(row):
-    """Lower = fresher (less extended). None if RSI/momentum aren't computable."""
-    if pd.isna(row.rsi14) or pd.isna(row.close_20ago) or not row.close_20ago:
-        return None
-    rsi_pct = _percentile_from_breaks(row.rsi14, RSI_PCT_BREAKS)
-    momentum_20d = (row.Close / row.close_20ago - 1) * 100
-    mom_pct = _percentile_from_breaks(momentum_20d, MOMENTUM_PCT_BREAKS)
-    return 0.5 * rsi_pct + 0.5 * mom_pct
-
-
-# Fragility risk (2026-09-17, critic-promoted to live telemetry, see FINDINGS.md's
-# "Fragility Margin" section) -- NOT the real Fragility Margin itself, which is a day+1
-# outcome (exit price vs. trigger) only knowable in hindsight. This is a live ESTIMATE
-# built from the two pre-entry features that `fragility_margin_check.py` found actually
-# predict it (freshness_score, body_atr), using their real empirical quartile fragile
-# rates from that research (n=491 winners) as a lookup, not an arbitrary formula.
-# Individual spreads are modest (12.4%-26.0% freshness, 12.5%-25.7% body_atr) -- this is
-# a directional estimate for execution-risk awareness, explicitly NOT a filter/gate (the
-# critic was explicit: fragile trades include real winners, e.g. PAYTM-style explosions --
-# skipping them would repeat the exact mistake the acceptance/pullback/Body-ATR gates
-# already made and got rejected for).
-FRESHNESS_FRAGILE_BREAKS = [0.027, 0.2036, 0.4306, 0.6452, 0.9553]  # quartile edges, winners only
-FRESHNESS_FRAGILE_RATES = [12.4, 20.2, 19.2, 26.0]                  # fragile rate % per quartile
-BODY_ATR_FRAGILE_BREAKS = [0.0, 0.1002, 0.1894, 0.3332, 1.5366]
-BODY_ATR_FRAGILE_RATES = [25.7, 19.2, 20.2, 12.5]                   # reversed: bigger body = less fragile
-
-
-def _fragility_quartile_bin(value, breaks):
-    if value is None or pd.isna(value):
-        return None
-    if value <= breaks[1]:
-        return 0
-    if value <= breaks[2]:
-        return 1
-    if value <= breaks[3]:
-        return 2
-    return 3
-
-
-def _fragility_risk(freshness_score, body_atr):
-    """Returns (label, estimated_fragile_pct) or (None, None) if neither input is
-    available. label in {"Robust", "Watch", "Precise"} -- execution-risk framing, not a
-    win/loss call (2026-09-17 rename, critic-proposed: "Precise" reads as "execute
-    carefully/don't FOMO the fill", not "bad trade" -- a fragile trade is still a real
-    winner, just execution-sensitive). Thresholds (16%/22%) split the ~12-26% real
-    range roughly into thirds around the population's own 16.5% base fragile rate."""
-    f_bin = _fragility_quartile_bin(freshness_score, FRESHNESS_FRAGILE_BREAKS)
-    b_bin = _fragility_quartile_bin(body_atr, BODY_ATR_FRAGILE_BREAKS)
-    rates = []
-    if f_bin is not None:
-        rates.append(FRESHNESS_FRAGILE_RATES[f_bin])
-    if b_bin is not None:
-        rates.append(BODY_ATR_FRAGILE_RATES[b_bin])
-    if not rates:
-        return None, None
-    est_pct = sum(rates) / len(rates)
-    label = "Robust" if est_pct < 16 else "Precise" if est_pct > 22 else "Watch"
-    return label, est_pct
+# Continuous Freshness score and Fragility risk -- MOVED to signals.py (2026-09-25, BC
+# v2 promotion, see FINDINGS.md "Final disposition -- BC v2 promoted"): Fragility is now
+# a real base_filters_pass() gate condition, not just live-dashboard telemetry, so its
+# computation (and freshness_score, which it depends on) now lives there as the single
+# source of truth. `_freshness_score`/`_fragility_risk` are imported from `signals` at
+# the top of this file -- same functions, same constants, unchanged behavior here.
 
 
 def _oi_confidence(ticker, as_of_date, fo_tickers):

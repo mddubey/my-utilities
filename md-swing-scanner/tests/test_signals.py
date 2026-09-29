@@ -58,8 +58,13 @@ def test_checklist_pass_false_when_close_not_near_high():
 # --- base_filters_pass ---
 
 def _passing_base_row(**overrides):
-    base = dict(Close=110, ema34=100, ema8=105, rsi14=(RSI_MIN + RSI_MAX) / 2,
-                ema34_rising10=10, traded_value_sma20=2_000_000_000, close_20ago=100)
+    # BC v2 (2026-09-25, corrected same day against the real Primed exit engine --
+    # Volume Quality/ad_fraction was dropped from the gate entirely, see
+    # base_filters_pass()'s own docstring): rsi14/close_20ago still feed freshness_score
+    # (used by the Fragility gate), RSI band/liquidity/ad_fraction are not checked
+    # directly. body_atr=0.5 verified to produce a non-"Precise" Fragility label.
+    base = dict(Close=110, ema34=100, ema8=105, rsi14=65, ema34_rising10=10,
+                close_20ago=100, body_atr=0.5)
     base.update(overrides)
     return _row(**base)
 
@@ -68,12 +73,10 @@ def test_base_filters_pass_true_on_a_clean_qualifying_row():
     assert base_filters_pass(_passing_base_row())
 
 
-def test_base_filters_pass_false_when_rsi_outside_band():
-    assert not (base_filters_pass(_passing_base_row(rsi14=RSI_MAX + 1)))
-
-
-def test_base_filters_pass_false_when_liquidity_floor_not_met():
-    assert not (base_filters_pass(_passing_base_row(traded_value_sma20=1)))
+def test_base_filters_pass_false_when_fragility_is_precise():
+    # A very small body relative to ATR pushes the Fragility estimate into "Precise" --
+    # see signals._fragility_risk's own docstring for the label meaning.
+    assert not (base_filters_pass(_passing_base_row(body_atr=0.05)))
 
 
 # --- breakout_continuation (z-score volume) ---

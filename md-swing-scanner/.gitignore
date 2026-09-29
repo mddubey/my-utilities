@@ -1,6 +1,7 @@
 data_cache/
 options_cache/
 intraday_cache/
+intraday_cache_1h/
 cash_bhav_cache/
 runs/
 .pytest_cache/
