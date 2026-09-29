@@ -1,519 +1,241 @@
 import csv
+import math
 import sys
 
-LOT_SIZE = 65  # constant lot size
-CSV_FILE = 'options.csv'  # always read this
+# ── Configurable constants ─────────────────────────────────────────────────────
+LOT_SIZE         = 65
+CSV_FILE         = 'options.csv'
+SPREAD_WIDTH     = 50      # fixed spread width in index points
+DELTA_MIN        = 0.22    # lower bound for short-strike |delta|
+DELTA_MAX        = 0.28    # upper bound for short-strike |delta|
+MIN_CREDIT_RATIO = 0.25    # credit must be ≥ 25% of spread width
+MAX_LOSS_RATIO   = 3.5     # max loss must be ≤ 3.5 × credit
+RISK_FREE_RATE   = 0.065   # annual risk-free rate (RBI repo ~6.5%)
 
-# Risk thresholds for payoff evaluation
-MAX_LOSS_LIMIT = 3500  # Max acceptable loss threshold
-MAX_LOSS_TO_PROFIT_RATIO = 3.5  # Max acceptable loss-to-profit ratio (e.g., 3.5:1 means max loss can be 3.5x max profit)
+# CSV column indices (0-based).
+# Default layout: NSE option chain CSV with one empty column before STRIKE.
+# Verify against your file's second header row if delta values look wrong.
+COL_STRIKE = 11
+COL_CE_LTP = 5
+COL_CE_IV  = 4
+COL_PE_LTP = 17
+COL_PE_IV  = 18
 
-# ANSI color codes for terminal output
-COLOR_RED = '\033[91m'
-COLOR_GREEN = '\033[92m'
-COLOR_AMBER = '\033[93m'
-COLOR_RESET = '\033[0m'
 
-def colorize_label(label):
-    """Add color to risk labels"""
-    if label == 'RED':
-        return f"{COLOR_RED}●{COLOR_RESET}"
-    elif label == 'GREEN':
-        return f"{COLOR_GREEN}●{COLOR_RESET}"
-    elif label == 'AMBER':
-        return f"{COLOR_AMBER}●{COLOR_RESET}"
-    return label
+# ── Black-Scholes helpers ──────────────────────────────────────────────────────
+def _ncdf(x):
+    """Cumulative standard normal distribution."""
+    return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
 
-def label_distance(distance, DTE):
-    if distance <= 50:
-        return 'RED'
-    elif distance <= 100:
-        return 'AMBER'
-    else:
-        return 'GREEN'
 
-def nearest_strike(spot, step=50):
-    return round(spot / step) * step
-
-def generate_candidate_table(spot, DTE, type_name, max_distance=300, step=50):
-    candidates = []
-    nearest = nearest_strike(spot, step)
-    seen_green = False  # Track if we've passed through GREEN zone
-
-    if type_name == 'CE':
-        current = nearest if nearest >= spot else nearest + step
-        while current <= spot + max_distance:
-            distance = current - spot
-            label = label_distance(distance, DTE)
-            candidates.append((current, label))
-
-            # Track if we've seen GREEN
-            if label == 'GREEN':
-                seen_green = True
-
-            # Only stop if we've passed GREEN zone and now encounter RED again
-            if label == 'RED' and seen_green:
-                break
-
-            current += step
-    else:  # PE
-        current = nearest if nearest <= spot else nearest - step
-        while current >= spot - max_distance:
-            distance = spot - current
-            label = label_distance(distance, DTE)
-            candidates.append((current, label))
-
-            # Track if we've seen GREEN
-            if label == 'GREEN':
-                seen_green = True
-
-            # Only stop if we've passed GREEN zone and now encounter RED again
-            if label == 'RED' and seen_green:
-                break
-
-            current -= step
-    return candidates
-
-def display_candidate_table(candidates, type_name, spot):
-    print(f"\n--- {type_name} Candidate Strikes ---")
-    print(f"No  Strike   Distance   Label")
-    for idx, (strike, label) in enumerate(candidates, 1):
-        distance = abs(strike - spot) if type_name == 'CE' else abs(spot - strike)
-        print(f"{idx:<3}{strike:<8}{distance:<10}{label:<6}")
-
-def select_strikes_by_index(candidates, indexes):
-    return [candidates[i-1][0] for i in indexes]
-
-def parse_index_input(input_str, num_candidates):
+def bs_delta(S, K, T, r, sigma, option_type):
     """
-    Parse index input supporting individual numbers, ranges, and 'end' keyword.
-
-    Examples:
-        "3,4,5" -> [3, 4, 5]
-        "3-5" -> [3, 4, 5]
-        "3-end" -> [3, 4, ..., num_candidates]
-        "1,3-5,7" -> [1, 3, 4, 5, 7]
-
-    Args:
-        input_str: User input string
-        num_candidates: Total number of candidates available
-
-    Returns:
-        List of indexes (capped at num_candidates)
+    Black-Scholes delta.
+    Returns None for degenerate inputs (expired, zero IV, etc.).
+    CE delta ∈ (0, 1); PE delta ∈ (-1, 0).
     """
-    indexes = []
-    parts = input_str.split(',')
+    if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
+        return None
+    d1 = (math.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * math.sqrt(T))
+    return _ncdf(d1) if option_type == 'CE' else _ncdf(d1) - 1.0
 
-    for part in parts:
-        part = part.strip()
-        if '-' in part:
-            # Handle range
-            start, end = part.split('-')
-            start = start.strip()
-            end = end.strip()
 
-            start_idx = int(start)
-            end_idx = num_candidates if end == 'end' else int(end)
+# ── CSV loader ─────────────────────────────────────────────────────────────────
+def _parse_float(s):
+    s = s.replace(',', '').strip()
+    return float(s) if s and s != '-' else 0.0
 
-            # Cap end_idx to available candidates
-            end_idx = min(end_idx, num_candidates)
 
-            indexes.extend(range(start_idx, end_idx + 1))
-        else:
-            # Single number
-            idx = int(part)
-            # Only add if within bounds
-            if idx <= num_candidates:
-                indexes.append(idx)
-
-    return indexes
-
-def generate_hedges(short_strike, type_name, spread_width):
+def load_option_chain(spot, T):
     """
-    Generate hedge strikes: one at spread_width and one at the next 50-point strike.
+    Read options.csv and return a list of dicts:
+      {strike, ce_ltp, pe_ltp, ce_delta, pe_delta}
+    Delta is computed from IV (percentage column) via Black-Scholes.
     """
-    if type_name == 'CE':
-        return [short_strike + spread_width, short_strike + 50]
-    else:  # PE
-        return [short_strike - spread_width, short_strike - 50]
-
-def risk_label(value, limit, higher_is_worse=True):
-    """
-    Assign risk label based on value and limit.
-
-    Args:
-        value: The value to evaluate
-        limit: The threshold limit
-        higher_is_worse: If True, higher values are worse (e.g., max loss)
-                        If False, lower values are worse (e.g., max profit)
-
-    Returns:
-        'GREEN', 'AMBER', or 'RED'
-    """
-    if higher_is_worse:
-        # For max loss: lower is better
-        if value <= limit * 0.7:  # Under 70% of limit
-            return 'GREEN'
-        elif value <= limit:  # 70-100% of limit
-            return 'AMBER'
-        else:  # Over limit
-            return 'RED'
-    else:
-        # For max profit: higher is better
-        if value >= limit * 1.5:  # Over 150% of minimum
-            return 'GREEN'
-        elif value >= limit:  # 100-150% of minimum
-            return 'AMBER'
-        else:  # Below minimum
-            return 'RED'
-
-def ratio_risk_label(max_loss, max_profit, max_ratio):
-    """
-    Assign risk label based on loss-to-profit ratio for credit spreads.
-
-    Args:
-        max_loss: Maximum loss amount
-        max_profit: Maximum profit amount
-        max_ratio: Maximum acceptable loss-to-profit ratio (e.g., 3.5 means loss can be 3.5x profit)
-
-    Returns:
-        'GREEN', 'AMBER', or 'RED'
-    """
-    if max_profit == 0:
-        return 'RED'  # Avoid division by zero
-
-    ratio = max_loss / max_profit
-
-    # GREEN: ratio is under 70% of max acceptable (e.g., under 2.45 for max_ratio=3.5)
-    # AMBER: ratio is 70-100% of max acceptable (e.g., 2.45-3.5 for max_ratio=3.5)
-    # RED: ratio exceeds max acceptable (e.g., over 3.5 for max_ratio=3.5)
-
-    if ratio <= max_ratio * 0.7:
-        return 'GREEN'
-    elif ratio <= max_ratio:
-        return 'AMBER'
-    else:
-        return 'RED'
-
-def overall_risk_label(loss_label, profit_label):
-    """
-    Compute overall trade risk by combining loss and profit labels.
-    If any is RED, overall is RED. If any is AMBER, overall is AMBER. Otherwise GREEN.
-
-    Args:
-        loss_label: Risk label for max loss
-        profit_label: Risk label for max profit
-
-    Returns:
-        'GREEN', 'AMBER', or 'RED'
-    """
-    if loss_label == 'RED' or profit_label == 'RED':
-        return 'RED'
-    elif loss_label == 'AMBER' or profit_label == 'AMBER':
-        return 'AMBER'
-    else:
-        return 'GREEN'
-
-def compute_payoff(short_price, hedge_price, spread_width):
-    credit = short_price - hedge_price
-    max_loss = spread_width - credit
-    max_profit = credit
-    return credit, max_loss, max_profit
-
-def calculate_target_exit_price(short_price, hedge_price, target_pct=70):
-    """
-    Calculate the spread price (buy-back price) to achieve target percentage of max profit.
-
-    For credit spreads:
-    - Entry: SELL spread at (short_price - hedge_price) = credit received
-    - Max profit: credit received (when spread goes to 0)
-    - Exit: BUY BACK spread at lower price to lock in profit
-
-    Logic:
-    - Initial credit = short_price - hedge_price
-    - Target profit = credit * (target_pct / 100)
-    - Remaining spread value = credit - target_profit
-    - Exit spread price = credit * (1 - target_pct / 100)
-
-    This means if you initially sold the spread for ₹21.35:
-    - For 50% profit: buy back when spread is worth ₹10.68 (50% decay)
-    - For 70% profit: buy back when spread is worth ₹6.41 (70% decay)
-
-    Args:
-        short_price: Premium received for short option
-        hedge_price: Premium paid for hedge option
-        target_pct: Target profit percentage (default 70%)
-
-    Returns:
-        Tuple of (target_spread_price, target_profit_amount)
-    """
-    # Calculate initial credit received (max profit potential)
-    credit = short_price - hedge_price
-
-    # Calculate target profit in rupees
-    target_profit = credit * (target_pct / 100)
-
-    # Calculate remaining spread value (what spread should be worth to exit)
-    # To capture X% profit, the spread must decay by X%
-    target_spread_price = credit * (1 - target_pct / 100)
-
-    return target_spread_price, target_profit
-
-def calculate_target_spot(short_strike, hedge_strike, option_type, short_price, hedge_price, target_pct=70):
-    """
-    Calculate spot price at which the spread achieves target percentage of max profit.
-
-    For vertical credit spreads:
-    - Max profit = credit received (when both options expire worthless)
-    - Target profit = credit * (target_pct / 100)
-    - Current spread value at target = credit - target_profit
-    - This means the spread must decay to: credit * (1 - target_pct/100)
-
-    For CE spreads:
-    - Both expire worthless when spot < short_strike
-    - When spot is between strikes, short is ITM, hedge is OTM
-    - Spread value = spot - short_strike (intrinsic only at expiry)
-    - Target: spot - short_strike = credit * (1 - target_pct/100)
-    - Spot = short_strike + credit * (1 - target_pct/100)
-
-    For PE spreads:
-    - Both expire worthless when spot > short_strike
-    - When spot is between strikes, short is ITM, hedge is OTM
-    - Spread value = short_strike - spot (intrinsic only at expiry)
-    - Target: short_strike - spot = credit * (1 - target_pct/100)
-    - Spot = short_strike - credit * (1 - target_pct/100)
-
-    Args:
-        short_strike: Strike price of the short option
-        hedge_strike: Strike price of the hedge (long) option
-        option_type: 'CE' for calls or 'PE' for puts
-        short_price: Premium received for short option
-        hedge_price: Premium paid for hedge option
-        target_pct: Target profit percentage (default 70%)
-
-    Returns:
-        Target spot price (float)
-    """
-    # Calculate credit received (max profit)
-    credit = short_price - hedge_price
-
-    # Calculate target remaining spread value
-    # If we want 70% profit, spread should be worth 30% of original credit
-    remaining_value = credit * (1 - target_pct / 100)
-
-    if option_type == 'CE':
-        # For CE: spot needs to be below short strike for max profit
-        # Target spot = short_strike + remaining_value
-        # (This is where intrinsic value of spread equals remaining_value)
-        target_spot = short_strike + remaining_value
-    else:  # PE
-        # For PE: spot needs to be above short strike for max profit
-        # Target spot = short_strike - remaining_value
-        # (This is where intrinsic value of spread equals remaining_value)
-        target_spot = short_strike - remaining_value
-
-    return target_spot
-
-def get_option_prices_from_csv(strikes):
-    """Returns dictionary: {strike: {'CE': price, 'PE': price}}"""
-    prices = {}
-    with open(CSV_FILE, 'r') as f:
+    min_cols = max(COL_STRIKE, COL_CE_LTP, COL_CE_IV, COL_PE_LTP, COL_PE_IV) + 1
+    rows = []
+    with open(CSV_FILE, newline='') as f:
         reader = csv.reader(f)
-        next(reader)  # Skip row 1: "CALLS,,PUTS" title row
-        headers = next(reader)  # Read row 2: actual column headers
-
-        for row in reader:
-            # Skip rows with insufficient columns (incomplete data)
-            if len(row) < 18:
+        next(reader)   # row 1: "CALLS,,PUTS" title
+        next(reader)   # row 2: column headers
+        for raw in reader:
+            if len(raw) < min_cols:
                 continue
-
             try:
-                # Column 11 (index 11) = STRIKE, remove commas and convert to int
-                strike = int(float(row[11].replace(',', '')))
+                strike  = int(_parse_float(raw[COL_STRIKE]))
+                ce_ltp  = _parse_float(raw[COL_CE_LTP])
+                pe_ltp  = _parse_float(raw[COL_PE_LTP])
+                ce_iv   = _parse_float(raw[COL_CE_IV])  / 100.0  # % → decimal
+                pe_iv   = _parse_float(raw[COL_PE_IV])  / 100.0
 
-                # Only process strikes we actually need
-                if strike in strikes:
-                    # Column 5 (index 5) = CE LTP (Call Option Last Traded Price)
-                    ce_ltp = float(row[5].replace(',', '')) if row[5] and row[5] != '-' else 0.0
-
-                    # Column 17 (index 17) = PE LTP (Put Option Last Traded Price)
-                    pe_ltp = float(row[17].replace(',', '')) if row[17] and row[17] != '-' else 0.0
-
-                    prices[strike] = {
-                        'CE': ce_ltp,
-                        'PE': pe_ltp
-                    }
+                rows.append(dict(
+                    strike   = strike,
+                    ce_ltp   = ce_ltp,
+                    pe_ltp   = pe_ltp,
+                    ce_delta = bs_delta(spot, strike, T, RISK_FREE_RATE, ce_iv, 'CE'),
+                    pe_delta = bs_delta(spot, strike, T, RISK_FREE_RATE, pe_iv, 'PE'),
+                ))
             except (ValueError, IndexError):
-                # Skip rows that can't be parsed (malformed data)
                 continue
+    return rows
 
-    return prices
 
+# ── Spread builder ─────────────────────────────────────────────────────────────
+def build_spread(side, short_k, hedge_k, short_ltp, hedge_ltp, delta):
+    """
+    Construct a 50-point vertical credit spread and apply risk filters.
+    Returns a dict on success, None if the spread fails any filter.
+    """
+    credit   = short_ltp - hedge_ltp
+    max_loss = SPREAD_WIDTH - credit
+
+    ok_credit = credit >= SPREAD_WIDTH * MIN_CREDIT_RATIO
+    ok_ratio  = credit > 0 and max_loss <= MAX_LOSS_RATIO * credit
+    passes    = ok_credit and ok_ratio
+
+    # Breakeven at expiry
+    breakeven = short_k + credit if side == 'CE' else short_k - credit
+
+    # Profit-target buyback prices:
+    #   50% target → buy back spread at 50% of credit received
+    #   70% target → buy back spread at 30% of credit received
+    tgt_50 = credit * 0.50
+    tgt_70 = credit * 0.30
+
+    return dict(
+        side         = side,
+        short_strike = short_k,
+        hedge_strike = hedge_k,
+        delta        = delta,
+        credit       = credit,
+        max_loss     = max_loss,
+        breakeven    = breakeven,
+        tgt_50       = tgt_50,
+        tgt_70       = tgt_70,
+        passes       = passes,
+    )
+
+
+# ── Output ─────────────────────────────────────────────────────────────────────
+RED   = '\033[91m'
+RESET = '\033[0m'
+
+def print_table(spreads):
+    COL = dict(side=5, short=7, hedge=7, delta=7,
+               credit=8, maxloss=8, beven=9,
+               t50=8, t70=8,
+               risk_lot=10, profit_lot=11, p50_lot=10, p70_lot=10,
+               flag=4)
+    hdr = (
+        f"{'Side':<{COL['side']}} "
+        f"{'Short':>{COL['short']}} "
+        f"{'Hedge':>{COL['hedge']}} "
+        f"{'Delta':>{COL['delta']}} "
+        f"{'Credit':>{COL['credit']}} "
+        f"{'MaxLoss':>{COL['maxloss']}} "
+        f"{'BEven':>{COL['beven']}} "
+        f"{'50%Tgt':>{COL['t50']}} "
+        f"{'70%Tgt':>{COL['t70']}} "
+        f"{'RiskPerLot':>{COL['risk_lot']}} "
+        f"{'ProfitPerLot':>{COL['profit_lot']}} "
+        f"{'Prof@50%':>{COL['p50_lot']}} "
+        f"{'Prof@70%':>{COL['p70_lot']}} "
+        f"{'':>{COL['flag']}}"
+    )
+    sep = "─" * len(hdr)
+    print(sep)
+    print(hdr)
+    print(sep)
+    for s in spreads:
+        risk_lot   = s['max_loss']        * LOT_SIZE
+        profit_lot = s['credit']           * LOT_SIZE
+        p50_lot    = s['credit'] * 0.50    * LOT_SIZE   # profit kept at 50% exit
+        p70_lot    = s['credit'] * 0.70    * LOT_SIZE   # profit kept at 70% exit
+        row = (
+            f"{s['side']:<{COL['side']}} "
+            f"{s['short_strike']:>{COL['short']}} "
+            f"{s['hedge_strike']:>{COL['hedge']}} "
+            f"{s['delta']:>{COL['delta']}.3f} "
+            f"{s['credit']:>{COL['credit']}.2f} "
+            f"{s['max_loss']:>{COL['maxloss']}.2f} "
+            f"{s['breakeven']:>{COL['beven']}.2f} "
+            f"{s['tgt_50']:>{COL['t50']}.2f} "
+            f"{s['tgt_70']:>{COL['t70']}.2f} "
+            f"₹{risk_lot:>{COL['risk_lot']-1},.0f} "
+            f"₹{profit_lot:>{COL['profit_lot']-1},.0f} "
+            f"₹{p50_lot:>{COL['p50_lot']-1},.0f} "
+            f"₹{p70_lot:>{COL['p70_lot']-1},.0f} "
+            f"{'':>{COL['flag']}}"
+        )
+        if s['passes']:
+            print(row)
+        else:
+            print(f"{RED}{row}  ●{RESET}")
+    print(sep)
+
+
+# ── Entry point ────────────────────────────────────────────────────────────────
 def main():
-    # Check if command-line arguments are provided
     if len(sys.argv) >= 3:
         spot = float(sys.argv[1])
-        DTE = int(sys.argv[2])
-        print(f"Using command-line args: spot={spot}, DTE={DTE}")
+        DTE  = int(sys.argv[2])
+        print(f"Spot={spot:.0f}  DTE={DTE}")
     else:
         spot = float(input("Enter current Nifty spot: "))
-        DTE = int(input("Enter days to expiry (1-5): "))
-    spread_width = {1:50, 2:100, 3:100, 4:150, 5:200}[DTE]
-    print(f"Suggested spread width based on DTE={DTE}: {spread_width}")
+        DTE  = int(input("Enter days to expiry (1-7): "))
 
-    CE_candidates = generate_candidate_table(spot, DTE, 'CE')
-    PE_candidates = generate_candidate_table(spot, DTE, 'PE')
+    T = DTE / 365.0
+    print(
+        f"Delta range : [{DELTA_MIN}, {DELTA_MAX}]\n"
+        f"Spread width: {SPREAD_WIDTH} pts\n"
+        f"Filters     : Credit ≥ {MIN_CREDIT_RATIO*100:.0f}% of width  |  "
+        f"Max Loss ≤ {MAX_LOSS_RATIO}× Credit\n"
+    )
 
-    display_candidate_table(CE_candidates, 'CE', spot)
-    display_candidate_table(PE_candidates, 'PE', spot)
+    chain  = load_option_chain(spot, T)
+    lookup = {r['strike']: r for r in chain}
 
-    ce_input = input("Select CE strikes to short [default: 3-6]: ").strip() or "3-6"
-    pe_input = input("Select PE strikes to short [default: 3-6]: ").strip() or "3-6"
+    spreads = []
 
-    short_CE_indexes = parse_index_input(ce_input, len(CE_candidates))
-    short_PE_indexes = parse_index_input(pe_input, len(PE_candidates))
+    for row in chain:
+        # ─ CE side: delta in [DELTA_MIN, DELTA_MAX] ─
+        d = row['ce_delta']
+        if d is not None and DELTA_MIN <= d <= DELTA_MAX:
+            hedge_k = row['strike'] + SPREAD_WIDTH
+            if hedge_k in lookup:
+                s = build_spread(
+                    'CE', row['strike'], hedge_k,
+                    row['ce_ltp'], lookup[hedge_k]['ce_ltp'], d,
+                )
+                if s:
+                    spreads.append(s)
 
-    short_CE_strikes = select_strikes_by_index(CE_candidates, short_CE_indexes)
-    short_PE_strikes = select_strikes_by_index(PE_candidates, short_PE_indexes)
+        # ─ PE side: |delta| in [DELTA_MIN, DELTA_MAX] ─
+        d = row['pe_delta']
+        if d is not None and DELTA_MIN <= abs(d) <= DELTA_MAX:
+            hedge_k = row['strike'] - SPREAD_WIDTH
+            if hedge_k in lookup:
+                s = build_spread(
+                    'PE', row['strike'], hedge_k,
+                    row['pe_ltp'], lookup[hedge_k]['pe_ltp'], d,
+                )
+                if s:
+                    spreads.append(s)
 
-    # --- Collect all strikes we need (shorts + hedges) ---
-    all_strikes = set(short_CE_strikes + short_PE_strikes)
+    if not spreads:
+        print("No qualifying delta strikes this week.")
+        return
 
-    # Add hedge strikes for CE shorts
-    for short_strike in short_CE_strikes:
-        hedges = generate_hedges(short_strike, 'CE', spread_width)
-        all_strikes.update(hedges)
+    # Sort: CE first, then PE; within each side by |delta| descending (closer to ATM first)
+    spreads.sort(key=lambda x: (x['side'], -abs(x['delta'])))
 
-    # Add hedge strikes for PE shorts
-    for short_strike in short_PE_strikes:
-        hedges = generate_hedges(short_strike, 'PE', spread_width)
-        all_strikes.update(hedges)
+    print_table(spreads)
+    passed = sum(1 for s in spreads if s['passes'])
+    print(f"\n{len(spreads)} spread(s) in delta range — {passed} pass risk filters, {len(spreads)-passed} flagged red.")
+    print("50%Tgt / 70%Tgt = buyback spread price to lock in 50% / 70% of credit.")
+    if len(spreads) - passed:
+        print(f"Red = Credit < {MIN_CREDIT_RATIO*100:.0f}% of {SPREAD_WIDTH}pts  OR  MaxLoss > {MAX_LOSS_RATIO}× Credit")
 
-    # --- Read prices from CSV ---
-    option_prices = get_option_prices_from_csv(all_strikes)
-
-    # --- Compute CE Payoffs ---
-    # Collect all CE spreads first for sorting
-    ce_spreads = []
-    for short_strike in short_CE_strikes:
-        hedges = generate_hedges(short_strike, 'CE', spread_width)
-        for hedge_strike in hedges:
-            short_price = option_prices[short_strike]['CE']
-            # Skip if hedge strike not available in CSV
-            if hedge_strike not in option_prices or option_prices[hedge_strike]['CE'] == 0.0:
-                continue
-            hedge_price = option_prices[hedge_strike]['CE']
-            credit, max_loss, max_profit = compute_payoff(short_price, hedge_price, spread_width)
-
-            # Calculate risk labels for scaled values (multiplied by lot size)
-            credit_scaled = credit * LOT_SIZE
-            max_loss_scaled = max_loss * LOT_SIZE
-            max_profit_scaled = max_profit * LOT_SIZE
-
-            loss_label = risk_label(max_loss_scaled, MAX_LOSS_LIMIT, higher_is_worse=True)
-            ratio_label = ratio_risk_label(max_loss_scaled, max_profit_scaled, MAX_LOSS_TO_PROFIT_RATIO)
-            overall_label = overall_risk_label(loss_label, ratio_label)
-
-            # Calculate target exit prices for profit milestones
-            exit_price_50, profit_50 = calculate_target_exit_price(short_price, hedge_price, 50)
-            exit_price_70, profit_70 = calculate_target_exit_price(short_price, hedge_price, 70)
-
-            ce_spreads.append({
-                'short_strike': short_strike,
-                'hedge_strike': hedge_strike,
-                'spread_name': f"{short_strike}/{hedge_strike}",
-                'short_price': short_price,
-                'hedge_price': hedge_price,
-                'credit_scaled': credit_scaled,
-                'max_loss_scaled': max_loss_scaled,
-                'max_profit_scaled': max_profit_scaled,
-                'overall_label': overall_label,
-                'exit_price_50': exit_price_50,
-                'profit_50': profit_50,
-                'exit_price_70': exit_price_70,
-                'profit_70': profit_70
-            })
-
-    # Sort: GREEN first, then AMBER, then RED; within each tier by max profit descending
-    risk_order = {'GREEN': 0, 'AMBER': 1, 'RED': 2}
-    ce_spreads.sort(key=lambda x: (risk_order[x['overall_label']], -x['max_profit_scaled']))
-
-    # Print sorted CE spreads
-    print("\n" + "="*160)
-    print("BEARISH/DOWNTREND SPREADS (Short Calls)")
-    print("="*160)
-    print(f"| {'Short':<18} | {'Hedge':<18} | {'Credit':>9} | {'Max Loss':>10} | {'Max Profit':>11} | {'Exit 50%':>10} | {'Profit@50%':>12} | {'Exit 70%':>10} | {'Profit@70%':>12} | {'Risk':^6} |")
-    print("|" + "-"*20 + "|" + "-"*20 + "|" + "-"*11 + "|" + "-"*12 + "|" + "-"*13 + "|" + "-"*12 + "|" + "-"*14 + "|" + "-"*12 + "|" + "-"*14 + "|" + "-"*8 + "|")
-
-    for spread in ce_spreads:
-        overall_color = colorize_label(spread['overall_label'])
-        short_label = f"{spread['short_strike']}CE @ ₹{spread['short_price']:.2f}"
-        hedge_label = f"{spread['hedge_strike']}CE @ ₹{spread['hedge_price']:.2f}"
-        print(f"| {short_label:<18} | {hedge_label:<18} | ₹{spread['credit_scaled']:>8.0f} | ₹{spread['max_loss_scaled']:>9.0f} | ₹{spread['max_profit_scaled']:>10.0f} | "
-              f"₹{spread['exit_price_50']:>9.2f} | ₹{spread['profit_50']*LOT_SIZE:>11.0f} | ₹{spread['exit_price_70']:>9.2f} | ₹{spread['profit_70']*LOT_SIZE:>11.0f} | {overall_color:^6} |")
-
-    print("="*160)
-
-    # --- Compute PE Payoffs ---
-    # Collect all PE spreads first for sorting
-    pe_spreads = []
-    for short_strike in short_PE_strikes:
-        hedges = generate_hedges(short_strike, 'PE', spread_width)
-        for hedge_strike in hedges:
-            short_price = option_prices[short_strike]['PE']
-            # Skip if hedge strike not available in CSV
-            if hedge_strike not in option_prices or option_prices[hedge_strike]['PE'] == 0.0:
-                continue
-            hedge_price = option_prices[hedge_strike]['PE']
-            credit, max_loss, max_profit = compute_payoff(short_price, hedge_price, spread_width)
-
-            # Calculate risk labels for scaled values (multiplied by lot size)
-            credit_scaled = credit * LOT_SIZE
-            max_loss_scaled = max_loss * LOT_SIZE
-            max_profit_scaled = max_profit * LOT_SIZE
-
-            loss_label = risk_label(max_loss_scaled, MAX_LOSS_LIMIT, higher_is_worse=True)
-            ratio_label = ratio_risk_label(max_loss_scaled, max_profit_scaled, MAX_LOSS_TO_PROFIT_RATIO)
-            overall_label = overall_risk_label(loss_label, ratio_label)
-
-            # Calculate target exit prices for profit milestones
-            exit_price_50, profit_50 = calculate_target_exit_price(short_price, hedge_price, 50)
-            exit_price_70, profit_70 = calculate_target_exit_price(short_price, hedge_price, 70)
-
-            pe_spreads.append({
-                'short_strike': short_strike,
-                'hedge_strike': hedge_strike,
-                'spread_name': f"{short_strike}/{hedge_strike}",
-                'short_price': short_price,
-                'hedge_price': hedge_price,
-                'credit_scaled': credit_scaled,
-                'max_loss_scaled': max_loss_scaled,
-                'max_profit_scaled': max_profit_scaled,
-                'overall_label': overall_label,
-                'exit_price_50': exit_price_50,
-                'profit_50': profit_50,
-                'exit_price_70': exit_price_70,
-                'profit_70': profit_70
-            })
-
-    # Sort: GREEN first, then AMBER, then RED; within each tier by max profit descending
-    pe_spreads.sort(key=lambda x: (risk_order[x['overall_label']], -x['max_profit_scaled']))
-
-    # Print sorted PE spreads
-    print("\n" + "="*160)
-    print("BULLISH/UPTREND SPREADS (Short Puts)")
-    print("="*160)
-    print(f"| {'Short':<18} | {'Hedge':<18} | {'Credit':>9} | {'Max Loss':>10} | {'Max Profit':>11} | {'Exit 50%':>10} | {'Profit@50%':>12} | {'Exit 70%':>10} | {'Profit@70%':>12} | {'Risk':^6} |")
-    print("|" + "-"*20 + "|" + "-"*20 + "|" + "-"*11 + "|" + "-"*12 + "|" + "-"*13 + "|" + "-"*12 + "|" + "-"*14 + "|" + "-"*12 + "|" + "-"*14 + "|" + "-"*8 + "|")
-
-    for spread in pe_spreads:
-        overall_color = colorize_label(spread['overall_label'])
-        short_label = f"{spread['short_strike']}PE @ ₹{spread['short_price']:.2f}"
-        hedge_label = f"{spread['hedge_strike']}PE @ ₹{spread['hedge_price']:.2f}"
-        print(f"| {short_label:<18} | {hedge_label:<18} | ₹{spread['credit_scaled']:>8.0f} | ₹{spread['max_loss_scaled']:>9.0f} | ₹{spread['max_profit_scaled']:>10.0f} | "
-              f"₹{spread['exit_price_50']:>9.2f} | ₹{spread['profit_50']*LOT_SIZE:>11.0f} | ₹{spread['exit_price_70']:>9.2f} | ₹{spread['profit_70']*LOT_SIZE:>11.0f} | {overall_color:^6} |")
-
-    print("="*160)
 
 if __name__ == '__main__':
     main()
