@@ -353,3 +353,38 @@ stop → performance test.
   proxy, base-duration sensitivity, breakout-day volume magnitude** — all
   CLOSED-negative (2026-09-21), not parked. Don't reopen without new
   evidence.
+
+## 10. fetch_prices.py — silent partial-batch failure, needs chunking + honest "current" bucket
+
+**What happened (2026-09-29)**: a full-universe refresh left 198 of ~700 tickers stuck
+2-13 days behind (last cached 09-16/09-17 while 501 others reached 09-28), discovered
+only because JUSTDIAL/GOCLCORP were being hand-checked for the swing_qs_bpc chart work
+and their dates didn't match the rest. `fetch_all()`'s own summary print gave no signal
+of this — the 198 were silently folded into the `current` bucket, indistinguishable
+from tickers that genuinely had no new trading day.
+
+**Root cause**: `fetch_all()` makes ONE `yf.download(..., threads=True)` call across the
+whole `existing_tickers` batch (up to ~700 names). When Yahoo throttles/drops a subset
+of tickers within that single batched, multi-threaded request, that sub-ticker's slice
+of the response comes back empty — `new_df.empty` is True — which the code currently
+treats as "nothing new since last fetch" (`result["current"]`), not as "the fetch for
+this ticker failed." There is no per-ticker success signal distinguishing a real
+no-new-trading-day case from a silently-dropped request. Confirmed the fix: re-running
+`fetch_all()` on just the 198 stragglers, in sequential chunks of 25 with a 2s pause
+between chunks, cleared 100% of them in one pass (0 empty, 0 still-current) — this is
+exactly the same class of failure this project already hit once before with
+`intraday_cache.py` (concurrent yfinance fetches rate-limited 224/500 tickers, fixed by
+running sequentially) — README already documents that incident but `fetch_prices.py`'s
+own main batch call was never hardened the same way.
+
+**Why parked**: user explicit, "we need to fix our refresh mechanism later" — fix now
+was the narrow unblock (retry the 198 stragglers), not the mechanism itself.
+
+**Next step**: harden `fetch_all()`'s existing-tickers branch to chunk instead of one
+big batched call (the 25-per-chunk/2s-pause shape that worked today is a reasonable
+starting point, not necessarily final), AND make `current` stop being a catch-all —
+distinguish "last_cached_date already == safe_today or one trading day prior" (genuinely
+current) from "still behind safe_today by more than a normal trading gap after a fetch
+attempt" (silently failed, should be retried automatically before the script exits, not
+just reported). Should reuse this same session's retry script as a starting point
+(ran directly against `fetch_all`, not a rewrite) rather than redesigning from scratch.
