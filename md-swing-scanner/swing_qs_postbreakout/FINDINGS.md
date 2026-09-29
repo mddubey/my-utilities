@@ -281,3 +281,59 @@ compute is spent chasing it.
 **Not yet done**: robustness sweep on the tercile boundaries/windows; a regime-excluded
 re-check; any performance/return numbers (still none anywhere in this whole line);
 any promotion of novel/flat/tight as a combined gate.
+
+## RQ-QS-05A robustness check on the Layer A0 triple-cut — FAILS, CLOSED (2026-09-29)
+
+Four variants pre-declared before running (`04_rq05a_robustness_check.py`): (A) same
+intersection using the already-computed 40d window instead of 90d, (B) a quartile
+split instead of terciles on both windows, (C) year-by-year breakdown (Rule #16),
+(D) the original 90d triple-cut with April-May 2022 excluded.
+
+**(A) Window robustness — fails.** 90d window: +7.4pp lift (n=123, 38.2% vs 30.8%
+baseline). 40d window, same tercile methodology: **-0.6pp** (n=126). The effect does
+not survive its own alternate pre-declared horizon.
+
+**(B) Quartile robustness — fails, more clearly.** 90d bottom-quartile: **+11.5pp**
+(n=78) — looks even stronger. 40d bottom-quartile: **-5.8pp** (n=80) — reversed. Same
+pattern as (A), confirmed under a second, independent cut methodology.
+
+**(C) Year-by-year (Rule #16) — the 90d lift is one year's artifact, not a stable
+effect**:
+
+| Year | n | hold-rate_40d |
+|---|---|---|
+| 2022 | 32 | 25.0% |
+| 2023 | 26 | **61.5%** |
+| 2024 | 24 | 33.3% |
+| 2025 | 16 | 37.5% |
+| 2026 | 25 | 36.0% |
+
+2023 alone accounts for most of the overall +7.4pp lift; 2022 sits BELOW the 30.8%
+baseline on its own. n per year (16-32) is thin, but the swing (25.0% to 61.5%) is far
+too large to read as a stable, year-independent effect.
+
+**(D) Regime exclusion — doesn't rescue it, and is moot given (A)/(B)**: ex-April/May-
+2022, lift rises to +10.9pp (n=103); the April-May-2022-only subset alone is -10.8pp
+(n=20) — confirms that specific correction dragged the number down, but doesn't
+address the more fundamental (A)/(B) window-instability failure.
+
+**Verdict: this is exactly the same failure shape as the earlier Sector Relative
+Strength candidate** (real-looking at one lookback, reversed at a nearby one — see
+`../FINDINGS.md`'s Sector-RS Independence Test) — **REJECTED per Rule #19, not
+promoted, and CLOSED per Rule #10 (a real-but-insufficient signal is a completed
+research outcome, not an open thread)**. The user's original instinct — "some of the
+bases we have not cleared" — was directionally worth checking and DID surface a real
+methodological gap (Layer A0 was missing entirely before this). But the specific
+"novel + flat + tight, by these two measures" operationalization does not survive its
+own pre-declared robustness check, and should not be re-litigated under a new name
+without genuinely new evidence.
+
+**Where this leaves the whole RQ-QS-05A line**: Layer A (novelty) is established and
+real. Layer B (decay characterization) shows a modest-but-real average decay tendency
+population-wide, with two hand-verified anchor examples (JUSTDIAL vs GOCLCORP)
+showing a clean, real contrast that does NOT generalize into a strong population-level
+effect on any cut tried so far (novel/re-accel, base-tightness, base-flatness, or
+their intersection). No gate, no filter, no promoted parameter exists anywhere in
+this line. Next step, if any, is the critic's call — this project's own convention is
+not to keep independently re-cutting a thin population in search of a surviving
+slice (that IS the threshold-hunting Rule #19 exists to prevent).

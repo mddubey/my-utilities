@@ -87,6 +87,15 @@ quotes and corrections already caught):
   until Layer A's novelty split is itself established as real/discriminating — no
   jumping ahead, per critic's explicit instruction.
 
+## Standing closed result — do not re-litigate without new evidence
+
+The "novel + flat + tight base" triple-cut (Layer A0) FAILED its own pre-declared
+robustness check 2026-09-29: real-looking at the 90d window (+7.4 to +11.5pp), gone or
+reversed at the 40d window (-0.6 to -5.8pp), and driven almost entirely by 2023 alone
+in the year-by-year breakdown (25.0% to 61.5% swing across 5 years, n=16-32/year). Same
+failure shape as this project's earlier Sector-RS candidate. CLOSED per Rule #10, not
+parked. Full detail: FINDINGS.md's robustness-check section.
+
 ## Open reconciliation item, not yet resolved (flag before trusting any external "verification" again)
 
 The critic's own independent JUSTDIAL numbers (July 14: high ~770, volume ~1.03 crore)
