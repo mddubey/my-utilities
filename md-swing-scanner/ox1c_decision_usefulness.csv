@@ -1,0 +1,10 @@
+ticker,rho,best_match,sign_agree,best_actual,best_recon
+ATHERENERG,0.6571428571428573,False,6,+5m,+120m
+BOSCHLTD,0.942857142857143,True,5,+15m,+15m
+DIVISLAB,0.942857142857143,True,5,+5m,+5m
+IDEA,1.0,True,6,+5m,+5m
+MAXHEALTH,1.0,True,6,+15m,+15m
+OIL,1.0,True,6,+5m,+5m
+PERSISTENT,0.7714285714285715,True,6,+5m,+5m
+SAIL,0.942857142857143,True,5,last-cont,last-cont
+SOLARINDS,0.6,False,6,last-cont,+60m

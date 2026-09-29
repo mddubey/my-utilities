@@ -4263,3 +4263,4453 @@ the original RQ-90/93 research did, not yet done. Given how cleanly the
 swing-side check passed, the options-side is expected to behave similarly, but
 that is an expectation, not a verified fact — flagged as the one remaining gap
 if this ever needs to be revisited with full rigor.
+
+## RQ-S1 (Supply Exhaustion Telemetry) — CLOSED, 2026-09-21
+
+Literature-audit follow-on after the Base Count closure: Minervini's VCP
+theory has two supply/demand phases — volume drying up inside the base
+(Phase 1, "supply exhaustion") and volume expanding through the pivot
+(Phase 2, "demand expansion" — already built as RVOL@Trigger). Tested
+whether Phase 1 adds anything RVOL@Trigger doesn't already capture. Full
+5-year canonical breach population (`rq128_breach_merged.csv`, n=6,201,
+2021-09-28 to 2026-09-16, 453 tickers) — run on the full history specifically
+because the live market has been choppy recently and a recency-biased sample
+wasn't trusted.
+
+**Test 1 (level)**: median volume of the final 5/10 days before breach vs.
+production's own 25-day normal-volume baseline (`_normal_day_volume_baseline`,
+unchanged). Flat — `corr(dryness_5d, pnl_pct)` = +0.029 full / −0.010
+tradable (fresh≤0.40), no monotonic quartile trend. **Closed as the wrong
+operationalization**, not just a negative result: the book's claim is a
+*declining trend* across successive contractions, not a *low absolute
+level* — low volume can also mean a holiday week, a finished index
+rebalance, or plain illiquidity, none of which are "supply exhausted."
+
+**Test 2 (trend + base-presence gate)**: rebuilt as the slope of normalized
+daily volume over the final 10 days, gated on a real-base-presence proxy
+reusing production's own `atr14 < 0.7*atr14_60ago` (from `reject_theta_trap`,
+no new threshold). Only 6.1% of breaches (355/5,863) satisfy this proxy.
+**Correction to how this was first framed**: this does not mean "94% of
+breaches have no real base" — `atr14` contraction is a high-precision,
+low-recall proxy (slow grinds, exhaustion trends, and sideways chop all
+shrink ATR too, not just genuine bases), so the honest claim is "only 6%
+satisfy this specific heuristic," not "only 6% have a base." Within that 6%
+subset the slope's sign matched the book (corr(slope,pnl)=−0.106) but was
+underpowered (n=355, SE≈0.053 — at the noise floor).
+
+**Test 3 (joint interaction, loosened base gate)**: loosened the gate to a
+self-referential "tight last 10 days vs. this stock's own trailing 60-day
+norm" (ratio<0.7, 24.6% of population, 4x Test 2's n) and tested the actual
+sequential hypothesis jointly — pre-breach volume trend (Declining/Flat/
+Rising) x breach-day RVOL (`vol_zscore_breach`, terciles). **Result reverses
+the theory's predicted order**: within the High-RVOL tier, median pnl is
+Rising (2.97%) > Flat (2.59%) > Declining (2.44%) — the "dried up, then
+expanded" cell's apparent edge over the rest of the population is fully
+explained by RVOL@Trigger's already-known main effect, with zero
+incremental lift from prior dry-up. Same ordering holds on full, tradable,
+tight-base, and tight-base+tradable cuts.
+
+**Test 4 (conditional independence, critic-proposed)**: does dryness explain
+any variance in outcome *after* conditioning on what's already known to
+matter (RVOL@Trigger, Close-vs-Trigger)? Partial correlation (OLS and
+rank-based, both agree, robust to `vol_zscore_breach`'s extreme outliers):
+`partial_corr(slope, close_vs_trigger | RVOL)` ≈ +0.05 to +0.08 (small,
+real, but **wrong-signed** — rising volume mildly associated with a
+*better* breach, not declining); `partial_corr(slope, pnl | RVOL,
+close_vs_trigger)` ≈ 0.00 to −0.02 (n=5,863/4,064) — indistinguishable from
+noise. Dryness carries no independent information about final outcome once
+breach quality and demand expansion are already known.
+
+**Interpretation (adopted, critic-proposed framing)**: this does NOT
+falsify Minervini's supply-exhaustion concept — it indicates that within
+this project's Breakout Continuation universe specifically, pre-breakout
+volume dry-up isn't an independently useful production signal once
+breakout demand is observed. Most plausible mechanism: Breakout Continuation
+(`Close > high10_prior + vol_zscore≥1.5`) trades at least two distinct
+archetypes — quiet-base/VCP-style breakouts (where dry-up theory applies)
+and momentum-continuation breakouts with already-rising participation before
+the trigger (where it doesn't) — and the entry signal doesn't distinguish
+between them. The literature population (hand-selected VCP candidates with
+proper constructive bases) and this project's population (every BC fire
+across NIFTY 500, most without a textbook base) are different populations
+answering different questions — a null result here isn't a refutation of the
+book, just evidence the mechanism doesn't transfer to this broader universe.
+
+**Decision: CLOSED.** Four independent angles (level, base-gated trend,
+joint interaction, conditional independence), full multi-regime history,
+both full and tradable cuts, all converge. Not reopening without a
+different reason to expect a different outcome, not just a fourth
+operationalization. Base Count and historical stage-counting remain
+separately closed (2026-09-21, prior section) for a different reason
+(no objective/reproducible definition, not an outcome null) — RQ-LIT's
+remaining scope narrows to auditing the VCP implementation's structural
+fidelity to the book and post-breakout behavior (20-day MA rule, failed
+pivots), not supply-exhaustion telemetry or base counting.
+
+## RQ-LIT-02 (20-day MA post-breakout check) — SPLIT VERDICT, 2026-09-21
+## (corrected same day — see "Correction" below; original single-CLOSE verdict was wrong)
+
+The strongest literature-audit candidate found this weekend, because it's the
+one passage with an explicit "my studies have shown" validated claim (unlike
+the volume-extrapolation and supply-exhaustion passages, both already closed
+above): closing below the 20-day MA shortly after a proper VCP breakout "cuts
+the probability of success... in about half." Genuinely untested in this
+project's history — the existing SMA21 trail only arms after +3% gain; this
+checks from day 1 with no arming gate. Same full 5-year canonical population
+as RQ-S1 (`rq128_breach_merged.csv`, n=6,201), full vs. tradable (fresh≤0.40)
+reporting.
+
+**Step 1 (raw correlation)**: fresh 20-day SMA (not the production `sma21`
+column, which serves a different, already-armed purpose). Trades that ever
+close below SMA20 within N days of entry vs. those that never do:
+
+| Window | Below-SMA20 win rate | Never-below win rate | Ratio |
+|---|---|---|---|
+| 3d | 18.3% | 58.6% | 0.31 |
+| 5d | 20.3% | 62.5% | 0.32 |
+| 10d | 22.7% | 78.0% | 0.29 |
+
+Even stronger than the book's own claim (~0.50) — closer to a 3x reduction.
+Identical shape on tradable-only. **Actionability check** (does the breach
+precede the trade's actual exit, or just restate a loss already underway):
+96.4% of the time the first breach happens strictly before the actual exit,
+median 8 days early against the 15-day max-hold cap — real lead time, not
+circular with the existing stop/target/max-hold logic.
+
+**Step 2 (real bake-off — the raw correlation does NOT survive being turned
+into an action)**: spliced a counterfactual "exit on first close below
+SMA20" into the same 6,201 trades (post-hoc, using the real recorded
+entry/exit prices — `check_primed_exit()`'s own priority order untouched).
+Result: **worse on every metric** — win 55.1%→44.0%, median pnl
++0.98%→−1.38%, median return/day +0.067%→−0.123%/day. Fires on 54% of all
+trades (far too promiscuous). Of the 25.5% of fired trades that were
+originally winners, **85.8% get turned into an actual loss** by exiting
+early (median giveback +5.89pp).
+
+**Step 3 (confirmation + window sweep, not guessed — swept, matching this
+project's own convention)**: required K∈{2,3} consecutive confirmed closes
+below SMA20 (not `ACCEPTANCE_STREAK_THRESHOLD=3` — that's a 3-bar
+5-MINUTE intraday streak from `live_checkpoint.py`, a different timeframe,
+reusing its numeral here would be an unjustified cross-timeframe transplant)
+within W∈{5,7,10,full-hold} days of entry. **All 8 combinations tested
+remain worse than doing nothing** — even the tightest (K=3, W=5d, fires on
+only 4.0% of trades): win 54.6% (vs 55.1%), median pnl +0.91% (vs +0.98%),
+ret/day +0.062%/day (vs +0.067%/day). Every configuration's winners-cut
+group turns into a loss ≥90% of the time, most at exactly 100%. Identical
+shape on tradable-only.
+
+**Mechanism (why the real correlation doesn't convert into an edge)**: the
+SMA20 breach is a *symptom* of a trade already going bad for reasons the
+existing stop/max-hold-cap logic will independently catch — not an
+independent early-warning event. A genuinely healthy trade also dips below
+its own 20-day average routinely as ordinary noise on the way to a good
+outcome; the rule has no way to distinguish "temporary wobble in a winner"
+from "real breakdown," so every time it fires on what would have been a
+winner, it costs close to the full gain. Confirmation and window
+restriction only reduce how often that mistake happens — they never flip
+the net effect positive, across an exhaustive sweep.
+
+**Correction (critic-caught, same day)**: the original write-up here
+concluded a flat "CLOSED" for the whole RQ. That conflated two different
+causal questions — "does this symptom correlate with bad outcomes"
+(Step 1, an observational finding) and "does intervening on the symptom
+improve outcomes" (Steps 2-3, a policy intervention) — exactly the same
+distinction this project already draws for Weak Breach (Weak Breach
+predicts disasters; that never meant exiting every Weak Breach immediately
+would help, since it would destroy real winners too). The exit-rule
+rejection (Steps 2-3) is correct and stands. The blanket "no production
+value" framing was not established and is retracted.
+
+**Step 4 (exit-reason attribution audit, RQ-LIT-02B, critic-specified —
+answers "is this generic trend noise or does it track which trades are
+actually failing")**: cross-tabulated breach rate by (original exit_reason,
+win/loss), using the already-built Step-2 data. No new threshold, no
+percentage-below-SMA20 variant — exactly the one test the critic asked for
+and nothing else.
+
+| Exit reason | Outcome | n | Fire rate | Median lead days |
+|---|---|---|---|---|
+| stop | Loss | 681 | **82%** | 4 |
+| stop | Win (rare) | 390 | 3% | 8 |
+| max_hold_cap | Loss | 2,080 | **92%** | 7 |
+| max_hold_cap | Win | 2,923 | 28% | 6 |
+| target | Win | 55 | 13% | 4 |
+| climax | Win | 28 | 4% | 8 |
+
+Decisive on the first pass. Within the SAME exit mechanism, breach rate is
+82-92% for trades that end up losing vs. 3-28% for trades that end up
+winning — a 64-point gap inside `max_hold_cap` alone, the one bucket that
+contains both outcomes. This isn't just relabeling "which exit fired" —
+it separates eventual winners from eventual losers even before either one
+resolves. Same shape on tradable-only.
+
+**Decision, corrected: SPLIT.**
+
+- **Finding A — Telemetry: PROMOTE (observation-only).** Early SMA20 breach
+  is a strong, non-circular, exit-reason-independent deterioration marker —
+  one of the largest descriptive effects found in this project's history
+  (win-rate ratio ~0.29-0.32, stronger than the book's own ~0.50 claim),
+  confirmed to concentrate specifically in eventually-failing trades rather
+  than firing uniformly across an exit bucket. **Labeled Type-B, not
+  Type-A, on re-check against this project's own definition (2026-09-20
+  reframe, line ~3522): Type A is a fake breakout where momentum
+  disappears almost immediately; Type B is a momentum stall over the full
+  hold, explicitly noted as having "no detector at all" (the origin of
+  RQ-77).** This signal's median 4-8 day lead time and its sharpest
+  contrast (92% fire rate on losers vs. 28% on winners, inside
+  `max_hold_cap` specifically — Type B's own signature bucket, not an
+  immediate/overnight failure) matches Type B's profile, not Type A's.
+  A candidate first answer to RQ-77's standing gap, not a generic
+  explanatory signal — worth surfacing as a mid-trade deterioration flag
+  for review or a future classifier input, not as a standalone gate.
+- **Finding B — Exit rule: CLOSED.** Immediate and all 8 confirmed/windowed
+  variants reduce expectancy (Steps 2-3, unchanged from the original
+  write-up) — a real symptom does not make "exit on the symptom" a good
+  policy, the same lesson already learned from Weak Breach in this project.
+  Not reopening this half without a different reason to expect a different
+  outcome, not just another threshold (explicitly ruled out by the critic:
+  no percentage-below-SMA20 variant, no ATR-distance variant — that is the
+  threshold-hunting rabbit hole this project's discipline already bans).
+
+RQ-LIT's remaining scope: VCP structural-fidelity audit and failed-pivot
+behavior.
+
+**RQ-77 diagnostic, run same day**: per the standing mandate (line ~3524,
+"no new rule ... strictly diagnostic," same 4 questions required of every
+prior Type-B candidate), ran the SMA20 breach detector against
+`max_hold_cap` trades only (n=5,003 full / n=3,365 tradable):
+
+| | Losers (n=2,080) | Winners (n=2,923) |
+|---|---|---|
+| Detector fires | 92.2% | 28.2% |
+| Q1: median lead time | 7d (of 15) | 6d |
+| Q2: damage avoided (pnl at breach vs. final day-15 pnl) | +0.41pp median | — |
+| Q3: false-exit risk (day-15 outcome beats exiting at breach) | 44.2% of the time, median +1.93pp better | — |
+| Q4: opportunity cost if acted on | — | +5.89pp median giveback, 85.9% turn into a booked loss |
+
+**Fails the diagnostic.** By the time it fires on an eventual loser,
+median pnl (−4.21%) is already nearly at its final day-15 value
+(−4.32%) — most of the damage already happened, little left to avoid.
+Worse, 44.2% of the time price partially recovers between the breach and
+day 15 even though the trade still ends net-negative — acting on the
+signal would lock in a worse loss than waiting almost half the time. Cost
+side is large: fires on 28.2% of eventual winners, median giveback +5.89pp,
+85.9% conversion to a booked loss. Same shape on tradable-only. Per the
+standing mandate, this does not advance to a portfolio/capacity-constrained
+simulation. RQ-77 (Type-B, momentum stall) remains open with no working
+detector — the SMA20 signal stays logged as observation-only telemetry
+(Finding A above), not as an RQ-77 candidate.
+
+## RQ-66 extension: Type-A literature reconnaissance mapped against existing research, one new feature tested (2026-09-21)
+
+User's explicit ask, given the SMA20/RQ-77 thread closed on Type-B: don't
+push further on Type-B, but check whether external breakout-failure
+literature has anything genuinely new for Type-A (fake breakout, momentum
+disappears almost immediately — the options-relevant failure mode) *before*
+opening new research, "so it doesn't become shooting in the dark."
+
+**Critic's RQ-TypeA-LIT proposal (post-breach immediate-failure mechanisms)
+mapped against this project's own history — nearly all already tested and
+closed**, under different names, in the RQ-53/RQ-66/RQ-67 arc
+(2026-09-18 to 20):
+
+| Proposed concept | Already tested as | Verdict |
+|---|---|---|
+| Price progress before rejection (MFE-before-rejection) | MAE-anytime confirmation | Rejected — cuts 43% of eventual winners |
+| Immediate rejection / return through pivot | `breakout_failure_confirmation_cost.py` | Rejected — do-nothing beats every variant; options side 0.0% win rate on immediate-exit |
+| Effort vs. result (volume without price progress) | `breakout_failure_volume_displacement.py` | Rejected — wrong-signed, not just weak |
+| Retest/hold of pivot | 2026-09-19/20 accepted/rejected/pullback decomposition | Rejected — retest-after-acceptance is a mild weakness tell, not a usable rule |
+| A1/A2/A3 staged failure | RQ-66's exact Immediate Fade target + 6 daily-bar + 3 intraday features | Exhausted, no classifier found |
+
+**RQ-TypeA-Pre's one genuinely novel angle — "repeated failed tests of the
+same resistance level" — is not already tested. Built and tested fresh**:
+`prior_touches` = count of days in the trailing 60 sessions where High
+approached (within 2%) the current `high10_prior` level without closing
+above it. Tested against RQ-66's own exact target (**Immediate Fade** =
+`close_d1<0 AND close_d2<close_d1 AND close_d3<close_d2`, Close-anchored —
+not trigger-anchored, per RQ-66's own established rule against a known
+fake-signal artifact), full canonical population (n=5,979 matched),
+full vs. tradable (fresh≤0.40):
+
+| | Fade rate by touch-count quartile | corr(touches, Close-anchored d3 ret) | corr(touches, Immediate Fade) |
+|---|---|---|---|
+| Full | flat 11.9-12.8% | +0.007 | +0.004 |
+| Tradable | flat 10.9-12.9% | +0.009 | +0.012 |
+
+**Clean null.** Also directly demonstrates why RQ-66's Close-anchoring rule
+matters: the naive trigger-referenced version (`close_vs_trigger_pct`)
+shows a small, tempting positive correlation (+0.08 to +0.09) and a higher
+win rate in the most-touches quartile — vanishes to ~0 once properly
+Close-anchored, the same artifact pattern that already fooled three other
+RQ-66 features (`vol_zscore`, `body_atr_daily`, `dist_to_trigger_pct`)
+three weeks ago.
+
+**Decision: this round of Type-A literature reconnaissance adds nothing
+new.** Confirms, rather than reopens, RQ-66's original conclusion
+("no remaining untested classifier family for the Early/Unique split with
+currently available data ... a future data source such as IV history could
+reopen it"). Not treating this as a new standalone RQ number — it's an
+extension/re-confirmation of RQ-66, logged here rather than under a new
+name. The only genuinely open door for Type-A remains acquiring new data
+(intraday options IV/greeks), not a new feature computed from what's
+already cached.
+
+## Research Integrity Rule #9 adopted (2026-09-21, critic-proposed) — Entry/Exit Architecture Confound
+
+**Never compare entry architectures under different exit architectures
+unless the research question is explicitly "complete strategy
+comparison."** Expectancy and win rate are downstream of exits as well as
+entries — a raw performance comparison between two entry types that run on
+two different exit mechanisms answers "how do these two complete systems
+behave today," not "which entry is better." Allowed: comparing two entry
+variants on the same exit engine, or two exit engines on identical entries.
+Not allowed: comparing entry-A-with-exit-mechanism-1 against
+entry-B-with-exit-mechanism-2 and attributing the performance gap to the
+entries. Same philosophy as freezing the baseline before varying one
+dimension, applied at the system-architecture level. (Numbered #9 — Rule
+#8, adopted earlier today, is Structural Independence, a different bug
+family: observational independence in bootstrap/significance testing, not
+architecture confounding.)
+
+Surfaced by, and immediately applied to, the VCP/BC comparison directly
+below — the raw 65.3%/62.7% win-rate table there is retroactively labeled
+descriptive-only per this rule, not an entry-quality comparison.
+
+## Known Architectural Gaps
+
+New section, distinct from Closed Research — documented technical debt
+that should shape how future findings are interpreted, not an open
+hypothesis awaiting a test.
+
+| Gap | Status | Notes |
+|---|---|---|
+| VCP exit architecture | **VALIDATE** (project integrity issue, not a research finding) | Entry system (Trend Template + multi-contraction base detector) has not been evaluated under the audited v31 exit framework (ATR0 stop, ZigZag+R_FLOOR target, K=2 swing-low trail, RQ-68/69-audited). VCP still runs entirely on the legacy engine (`resistance_target()` pivot target, SMA21 trail) that predates this weekend's whole exit-research arc. Comparisons with BC's performance are descriptive only until this is resolved. |
+
+### VCP exit architecture gap — 2026-09-21, frozen checkpoint for next-weekend resumption
+
+**The core sentence, kept verbatim**: *"VCP entry logic and VCP exit logic
+have never been evaluated as one coherent trading system."* Also, the
+user's own framing, kept verbatim: *"We have built entry/exit rules of a
+different system and are trying to trade it as a different system."*
+
+**What was checked before this was identified** (all real, all run — this
+wasn't guessed at):
+1. RQ-S1 (supply exhaustion) re-run on the REAL VCP/coiled_spring
+   population (n=496, built via the actual production `vcp_breakout()`/
+   `stage2_trend_template()` detector, not a proxy) — same null as on BC,
+   same mild reversal. **Global conclusion, not BC-specific**: supply
+   exhaustion doesn't hold on this system's data, on either population.
+2. RQ-LIT-02's raw SMA20 correlation re-run on the same real VCP
+   population — reproduces cleanly, slightly stronger than on BC
+   (win-rate ratio 0.26-0.36 vs. BC's 0.29-0.32). **Real telemetry,
+   confirmed population-independent.**
+3. Raw, same-engine (legacy `backtest.py`, both patterns run identically,
+   `require_regime=True`) comparison: `breakout_cont` n=1,200, 65.3% win /
+   +1.741% expectancy / 30.3% concentration; `coiled_spring` n=496, 62.7%
+   win / +1.873% expectancy / 25.7% concentration. Win-rate gap ~1 SE for
+   these sample sizes — not clearly distinguishable from noise either way.
+   **Per Rule #9, this is a complete-system comparison (VCP entry + legacy
+   exit vs. BC entry + legacy exit — note even this same-engine run
+   doesn't reach the newer Primed Gate mechanism BC now uses in
+   production), not an entry-quality comparison.**
+
+**Frozen checkpoint — exactly what's settled and what isn't**:
+- Entry detector is trusted (Trend Template + VCP multi-contraction base
+  detector) — not in question.
+- Two literature-derived telemetry findings (RQ-S1's null, RQ-LIT-02's
+  SMA20 correlation) are now confirmed population-independent, not
+  BC-specific artifacts — real, global conclusions.
+- VCP is confirmed still running on the legacy exit engine, never migrated
+  to or audited against the Primed Gate framework BC uses.
+- Decided NOT to interpret the BC-vs-VCP performance numbers as an entry
+  comparison (Rule #9).
+
+**Implications while parked — to prevent future misuse of today's
+numbers**:
+- Do not compare BC and VCP expectancy/win-rate to rank entry quality.
+- Do not use VCP's raw performance numbers as evidence for or against
+  Minervini-style entries generally.
+- VCP research MAY still use entry-side telemetry (RVOL@Trigger,
+  Close-vs-Trigger, Freshness, etc.) since those are independent of exit
+  mechanism — only cross-pattern *performance* comparisons are affected.
+
+**Status: "Weekend Parking," not "PARK"** — a distinction worth keeping
+precise going forward. `PARK` (RQ status) = lower-priority or inconclusive
+research thread, no specific reason to return to it. `Weekend Parking` =
+valid, real thread, intentionally paused because it wasn't the highest-value
+use of a specific limited window (here: one hour to market open, live BC/
+options work took priority) — resume later exactly where it stopped, not
+re-derive from scratch.
+
+**Cost/value note, revised**: before this gap was identified, VCP work was
+priced as a niche-strategy question (only ~496 trades/5yr). After it,
+VCP-exit-audit work is a project-integrity question with a reusable
+framework already built (RQ-68/69's own audit machinery) — a materially
+different, higher expected-value calculation than another literature
+rabbit hole, though still not higher priority than the live options/Type-A
+work this week.
+
+**Next weekend starts with exactly one question, nothing else bundled in**:
+audit VCP's exits under the same RQ-68 (exit-efficiency)/RQ-69
+(stop-geometry) framework already built for BC, no production changes, no
+migration decision yet. Recommended sequencing when picked up: **Phase 0
+(diagnostic only)** — run VCP entries through the existing audit framework,
+no changes; **Phase 1 (controlled replay)** — identical VCP entries under
+both the legacy and Primed Gate exit mechanisms, to isolate how much of
+VCP's performance is entry vs. exit, before touching production; **Phase 2
+(migration decision)** — only after Phase 0/1 give a real answer, migration
+becomes an engineering decision, not a guess. Explicitly not in scope for
+next weekend unless Phase 0 demands it: base-count work, further SMA20/
+Type-B variants, or any VCP detector redesign — one question at a time.
+
+## O'Neil fidelity audit — how close is our system to the actual primary source? (2026-09-21)
+
+Prompted by a direct question: BC (the dominant pattern, ~92%+ of real
+trades) was already established as structurally closer to O'Neil's plain
+Stage-2/pivot-breakout concept than to Minervini's VCP. Sourced and
+verified O'Neil's own book directly (`How to Make Money in Stocks`, 2nd
+ed. 1995 — `~/Documents/pet-pooja/How To Make Money In Stocks(pdf)
+forex.pdf`, 142pp, OCR text clean), same direct-quote discipline already
+used for both Minervini books.
+
+**Structural fidelity mapping, `entry_signal()`/`breakout_continuation()` vs. verified quotes:**
+
+| O'Neil's rule (direct quote) | Our production code | Verdict |
+|---|---|---|
+| Base runs 7-8 weeks to 15 months (flat base ≥6-7 weeks) before a valid pivot | `high10_prior` = 10-trading-day (~2wk) rolling high, no minimum duration | **Gap** — our pivot window is far shorter than any base length O'Neil describes |
+| "If you buy more than 5% to 10% past the [buy] point, you are late" | No ceiling anywhere in `breakout_continuation()`/`entry_signal()` | **Real, concrete gap** |
+| Volume "should increase at least 50% above normal" at the pivot | `vol_zscore >= VOL_ZSCORE_MIN(1.5)` | **Conceptual match**, different statistic |
+| Prior uptrend of "a minimum of a 30% increase in price" before the base even begins | `MOMENTUM_20D_MIN=1.05` (5% over 20 days) | **Gap** — far weaker |
+| M = Market Direction (avoid a weak market) | Nifty regime gate (ADX/SMA200/SMA50) | **Conceptual match**, different mechanics |
+| C/A/I (earnings growth, institutional sponsorship — half of CANSLIM) | None — BC is pure price/volume | **Entirely absent** |
+| Stop: flat "7% or 8% below your purchase price... THE ABSOLUTE LIMIT" | ATR0 structural stop (Primed Gate) / 1.0x-ATR-buffer structural stop (legacy) | **Different mechanism entirely** — not a flat %, no equivalent |
+| Stop-raise: ONE-TIME step, "once you get to +15%+, move the defensive sell line to <5% below the pivot" — explicitly NOT continuous ("I do not think you should continue to follow a stock up by raising stop-loss orders") | Continuous SMA21/K=2-swing-low trail, arming at `TRAIL_ENGAGE_PCT=1.08` (+8%) then tightening every day | **Direct philosophical contradiction** — O'Neil explicitly argues against exactly this mechanism |
+
+**Extension-cap test on OUR OWN tuned BC population (rebuilt via
+`primed_engine.run_primed()`, n=6,216, full 5-yr, since the original cached
+file expired): naive trigger-anchored test looked dramatic (+0.28 corr,
+extension "helps") — caught in time as the exact RQ-66 artifact
+(pnl_pct and extension_pct both anchored to trigger/entry_price, so a big
+already-realized gap mechanically inflates the outcome measure). Re-tested
+Close-anchored (return from the breach day's own Close, not entry) per
+RQ-66's own established rule: **corr collapses to +0.001, essentially
+nothing**, with a thin (n=90), suggestive-not-decisive hint that >10%
+extension is worse (33.3% win, -3.36% median) — consistent with, not
+contradicting, O'Neil's caution, but too thin to trust alone. Only 1.4% of
+real BC breaches are even >10% extended by construction (10-day pivot
+leaves little room to be wildly extended).**
+
+**Second, cleaner extension test — RQ-ONeil-Naive: a faithful replica of
+O'Neil's OWN described entry+exit, none of our tuned machinery.** Entry:
+Close > 40-trading-day (~8wk, book's shortest named base) prior high, Close
+> SMA200, volume ≥1.5x the trailing-25-day normal-volume baseline (same
+production formula as everywhere else, `_normal_day_volume_baseline`, no
+new threshold invented). Exit: flat 7.5% stop (splits the book's explicit
+7-8% range), one-time raise to entry-5% once Close reaches 1.15x entry
+(matching the book's explicit rejection of continuous trailing), else held
+open (no crisp profit-target exists in the book — climax-top/market-
+weakness/earnings-deceleration are qualitative, not quantified, and not
+implemented here). Full NIFTY 500, full 5-yr, no RSI/EMA34/momentum/
+Freshness/regime-gate at all. n=2,423 trades, 484 tickers, 2022-06-20 to
+2026-09-17.
+
+**Real, trustworthy result — win rate declines monotonically with entry
+extension, exactly as O'Neil claims:**
+
+| Extension at entry | n | Win rate | Median days held |
+|---|---|---|---|
+| 0-5% ("on-time") | 2,157 | 33.5% | 61 |
+| 5-10% ("getting late") | 212 | 26.4% | 42 |
+| >10% ("too late") | 54 | **20.4%** | 12.5 |
+
+This is a clean, monotonic, directionally-consistent result on the one
+metric (win rate) that isn't contaminated by the backtest's own
+engineering limitation (see below) — real support for O'Neil's specific
+claim, on a population built with none of our own tuning.
+
+**Real limitation, flagged honestly rather than glossed over — the
+expectancy/mean number from this same population is NOT trustworthy.**
+Concentration = 53.5% (well above this project's own ~25-30% honest
+baseline). Every one of the top-15 winners (300-615% gains) exits via
+`cap_or_data_end` at exactly the 252-trading-day backtest-closure boundary
+— an [ENGINEERING] artifact, not a real O'Neil exit rule (his actual
+profit-taking is qualitative: climax-top pattern, general-market weakness,
+earnings deceleration — none implemented here, and none would be testable
+without either fabricating an unquantified threshold or acquiring
+fundamentals data this project doesn't have). Stop-side numbers ARE
+trustworthy (1,587 real stop-outs, mean -8.66%/median -8.17%, tightly
+clustered around the real 7.5%+raise mechanism, no cap artifact). Headline
+"win 32.6% / mean +16.12%" should NOT be read as this system's true
+expectancy — it's an artifact of an undefined exit boundary, not a
+measurement.
+
+**Where this leaves the O'Neil-fidelity thread**: two real, load-bearing
+architectural differences confirmed (no extension cap anywhere in our
+entry gate; a continuous trail that O'Neil explicitly argues against as a
+philosophy, not just a different number) — both queued as candidate
+observation-only telemetry, not adopted, matching this project's standing
+discipline. Extending this further (a genuine climax-top profit-exit) would
+require inventing a threshold the book doesn't quantify — explicitly NOT
+done here, flagged as a deferred, not-yet-well-scoped item rather than
+guessed at.
+
+## O'Neil fidelity audit — continued reading, remaining chapters (2026-09-21)
+
+Critic's "independent verification" of the parity table cited secondary
+web sources (studylib.net, preview-snippet sites) and introduced two
+claims not supported by direct re-check of the actual primary text: (1)
+"40-50% above normal" breakout volume — the real text says "**at least
+50%** above normal" (verified twice, a floor not a range; the 40%/50%
+figures elsewhere in the book are about earnings growth and bull-market
+decline sizes, unrelated); (2) a "10-week moving average / distribution
+days / eight-week rule / 20-25% sell rule" trailing mechanism — zero
+matches anywhere in the extracted text. These may be real O'Neil/IBD
+concepts from a later edition or broader teaching material, but are not in
+this 2nd-edition (1995) primary source. The CLOSE decision on the
+continuous-trail thread still stands, but for the originally-verified
+reason (explicit rejection of continuous stop-raising + intentional,
+already-validated strategy divergence), not the disputed softening.
+
+**Continued reading, Market Direction chapter (M) in full — one major new
+mechanism found: the Follow-Through Day.** Market-bottom confirmation is a
+discrete, event-based signal, not a continuous trend filter like our
+regime gate: after a decline, the first strong up-day is only the *first*
+sign; the real buy signal is a *later* day (typically day 4-7 of the
+attempted rally, day 3 only if the first days were unusually powerful;
+"follow-throughs after the tenth day indicate weakness") where the index
+closes up >=1% on volume higher than the prior day. Directly comparable to
+our ADX/SMA200/SMA50 regime gate — genuinely different mechanism
+(event-confirmation vs. continuous trend state), not yet compared or
+tested. Market-top detection is real but qualitative in this edition
+("heavy volume without further price progress," weak/incomplete
+rally-failure signs on day 3-5) — confirms the underlying "distribution"
+*concept* exists in the book, but there is no quantified "N distribution
+days in M sessions" counting rule here, consistent with the correction
+above, not a reversal of it.
+
+**Options chapter (Ch. 12) — real, options-specific numbers, distinct from
+the stock-side rules, directly relevant to the project's actual options
+pain point**: stop-loss "more than 8%... perhaps 20% or 25% might be a
+possible absolute limit" for options (vs. 7-8% for the stock, since
+options move ~3x faster); profit-take "take many of your gains when they
+hit 50% to 75%." Most notably: his answer to short-dated options getting
+hurt by ordinary stock corrections is structural, not a smarter exit rule —
+*"you are better off buying longer time period options — six months, or
+so"* rather than the 30-90 day options most investors default to,
+specifically because a normal correction can wipe out a short-dated
+position on time alone. A genuinely different angle on the Type-A/overnight
+pain problem than anything tested in this project (which has always used
+current-month/ATM+ITM) — not tested, flagged as a candidate idea only.
+
+**Industry Groups chapter (Ch. 18)**: quantifies "37% of a stock's price
+movement is due to subgroup influence and 12% to major group influence"
+and that the top 50-100 of 200 tracked groups meaningfully outperform the
+bottom 100 — reinforces, doesn't add to, this project's already-adopted
+sector RS finding (2026-09-01, top-quartile RS sector wins 68.1% vs.
+55-61% bottom three).
+
+**18 Common Mistakes chapter (Ch. 20)**: mostly behavioral/psychological,
+not mechanically testable. One options-relevant note: warns against
+over-concentrating in cheap, short-dated options and against
+writing/naked options as unsound practice — consistent with the Ch. 12
+finding above.
+
+**C/A/L/I chapters checked directly, per explicit request to verify rather
+than assume.**
+
+- **C (Current Quarterly Earnings) and A (Annual Earnings)**: pure
+  fundamentals — minimum 25-30% quarterly/annual EPS growth, with explicit
+  cautions about not being misled by comparisons against a near-zero
+  prior-year base. **Explicit OUT OF SCOPE — this project has no earnings
+  data source, not a missed or overlooked item.**
+- **I (Institutional Sponsorship)**: requires quarterly fund-holdings
+  disclosure data (available ~6 weeks after quarter-end per the book
+  itself) — mutual funds, pension funds, insurance companies, etc.
+  **Explicit OUT OF SCOPE — this project has no ownership/holdings data
+  source, not a missed or overlooked item.**
+- **L (Leader or Laggard) — the one chapter with real, technical,
+  data-available content.** O'Neil's own stated rule: *"restrict your buys
+  to companies showing a relative strength rank of 80 or higher"*
+  (1-99 percentile vs. the general market, 6-12 month lookback); best
+  performers historically averaged RS **87** just before their major move,
+  RS **90+** specifically at the best VCP-style breakouts. **Checked
+  directly against our own `relative_strength.py`**: `RS_LOOKBACK=126`
+  (~6 months, matches the book's window), but `RS_RATING_MIN=70` — code
+  comment attributes this to "Minervini's published minimum bar." O'Neil's
+  own primary text says 80, not 70 — a real, documented divergence between
+  the two authors' stated thresholds, not a bug. This constant is wired
+  live only into `vcp.py`'s Stage-2 Trend Template (`vcp.py:33`,
+  `strong_rs = rs >= RS_RATING_MIN`) — **VCP-only, so per the standing
+  instruction ("VCP we don't touch unless asked for") this is logged for
+  the record only, not proposed as a change.** L also independently
+  restates the extension-cap rule a third time ("ensure the stock is not
+  extended more than 5% or 10% above [the] base") — now confirmed in three
+  separate chapters (3, 5, 15), strengthening confidence this is a
+  central, repeated principle rather than an isolated aside. L's RS-decline
+  warning ("sinking for 7+ months, or an abnormally sharp decline for 4+
+  months" = questionable) is a real, quantified deterioration signal on a
+  much longer timeframe than the SMA20/RQ-77 Type-B work — noted, not
+  tested.
+
+Remaining unread: Ch. 14 (historical winner models, 1953-1993), Ch. 17
+(tape reading). Reading continues through the week per the agreed cadence
+(learn now, benchmark build deferred to next weekend); nothing here
+implemented or tested against production.
+
+## O'Neil fidelity audit — final chapters, reading pass substantially complete (2026-09-21)
+
+**Ch. 14 (Models of the Greatest Stock Market Winners, 1953-1993)**: a
+real historical win/loss shape data point from O'Neil's own small tracked
+account — "about 20 successful transactions... also 20 losing
+transactions. The average profit was around 20% and the average loss,
+about 7%." Roughly 50% win rate, ~2.9:1 average-win/average-loss ratio —
+directly comparable in shape to this project's own Fixed-R exit-ratio
+finding (rejected as a system-level candidate 2026-09-20 on capacity
+grounds, not because the per-trade shape wasn't real). David Ryan's
+(1985-87 US Investing Championship winner) tracked winning-stock
+characteristics: Average RS 85, RS line up ~6.5 months, median industry
+strength top 30% — a third independent data point (after the L chapter's
+"87 average"/"90+ at best breakouts") triangulating the RS~85-90 range as
+where the best O'Neil-style setups cluster.
+
+**Ch. 17 (Tape Reading) — extension cap confirmed a FOURTH time**, now
+across chapters 3, 5, 15, and 17: *"Is the Stock in a Base or Is It
+Extended? ... If it is extended in price, leave it alone; it's too late."*
+This is clearly a central, load-bearing, repeated principle throughout the
+whole book, not an isolated aside — further strengthens RQ-ON-01's
+priority.
+
+**Correction/nuance to the earlier RS_RATING_MIN=70-vs-80 note**: Ch. 17's
+own market-health checklist uses a DIFFERENT RS threshold in a different
+context — *"Check price tables for companies with relative strength
+breaking below 70"* as a weakness/laggard warning sign, distinct from the
+L chapter's stricter "restrict NEW buys to RS>=80" selection bar. So the
+book itself uses both numbers, for different purposes: 70 as a rough
+laggard/weakness boundary, 80 as the stricter new-buy quality floor. Our
+production `RS_RATING_MIN=70` (VCP-only, `vcp.py:33`) is plausibly closer
+to the "avoid laggards" framing than a direct mismatch with "80" — softens,
+without fully resolving, the earlier-flagged discrepancy. Still VCP-only,
+still not touched, per the standing hold.
+
+**Reading pass substantially complete.** Covered in direct-quote detail:
+Ch. 1-7 (full CANSLIM), 9-10 (sell rules), 12 (options), 14 (historical
+models), 15 (chart reading/base patterns), 17 (tape reading), 18 (industry
+groups), 20 (common mistakes). Not read: Ch. 8 (broker/account logistics),
+11 (diversification/margin/short-selling generalities), 13 (mutual funds),
+16 (reading financial news pages), 19 (pension/institutional portfolio
+management) — judged low-value for this project's purposes (retail swing
+system, no fundamentals data, no institutional-portfolio-scale concerns);
+not pursued further unless something specific surfaces later. Full parity
+table, all four extension-cap confirmations, the Follow-Through Day
+mechanism, and the options-specific stop/profit numbers are all logged
+above, ready as direct inputs for the O'Neil Benchmark v1.0 build next
+weekend.
+
+**Verification correction, critic-agreed**: an earlier secondary-source
+"independent verification" introduced later/broader O'Neil-or-IBD concepts
+(a 10-week MA trail, distribution days, an eight-week rule, a 20-25% sell
+rule, a "40-50%" volume range) that are not present in the 1995 primary
+text this project actually has. The primary-source recheck supersedes that
+interpretation — the original "direct philosophical contradiction"
+characterization of the continuous-trailing gap is the defensible one for
+this specific edition, and the CLOSE decision on that thread does not
+depend on the erroneous material either way. **Standing rule for the
+Benchmark v1.0 build**: ground every O'Neil fidelity claim in the actual
+1995 text (or a verified page/quote from it), not a secondary source —
+future claims drawing on later O'Neil/IBD material must be explicitly
+labeled as such, not presented as this edition's content.
+
+## RQ-ON-FTD (Follow-Through Day telemetry) — TELEMETRY, two separate observations, thread stopped (2026-09-21)
+
+Bounded after-hours check per critic's exact spec: 25 FTD events found
+(simple 10-day-low trough as day 0, first day-3-10 with Close up >=1% on
+rising volume vs. prior day — not a full O'Neil market-bottom
+reconstruction). Joined against the BC canonical population (n=6,216) and
+the existing regime gate (`market_trending(require_above_sma200=True)`).
+Pre-registered robustness check run once (10d/20d/30d recency windows),
+then stopped per explicit instruction not to keep sweeping:
+
+| Window | Regime | n | Win% | Median Pnl |
+|---|---|---|---|---|
+| 10d | OK (live) | 273 | 50.9% | +0.14% |
+| 20d | OK (live) | 427 | 46.1% | -0.68% |
+| 30d | OK (live) | 477 | 46.5% | -0.41% |
+| 10d | Blocked | 715 | 56.8% | +1.60% |
+| 20d | Blocked | 1,148 | 56.0% | +1.33% |
+| 30d | Blocked | 1,740 | 54.8% | +0.95% |
+
+**Decision: TELEMETRY, two separate observations, thread stopped —**
+
+- **A (regime-off/blocked population)**: recent FTD consistently
+  associates with better BC outcomes across all three windows (54.8-56.8%
+  win, +0.95% to +1.60% median) — a real, robust, same-sign-at-all-three
+  effect. But it occurs entirely outside the population the production
+  system currently enters (regime already blocks these) — does not justify
+  changing the regime gate on its own; preserved as market-transition
+  telemetry only.
+- **B (regime-on/live population)**: near-neutral at 10d (+0.14%, n=273),
+  negative at 20-30d (-0.68%/-0.41%, n=427/477). Not sufficient to
+  establish causality or a production rule, but consistent with a genuine
+  mechanism: FTD may expose *where the market is in its recovery cycle*
+  (freshly-recovered-from-correction vs. an established uptrend) —
+  information the continuous SMA200/SMA50/ADX regime gate doesn't capture,
+  since both phases can satisfy "above SMA200."
+
+Explicitly not doing a further window sweep (10/20/30 already answered
+the robustness question; more windows would just search for a preferred
+cutoff). No gate, no threshold, no production change. Question for the
+weekend Benchmark v1.0: does an independently-reconstructed O'Neil
+market-direction system (event-based FTD, not continuous trend state)
+outperform the current regime mechanism when the whole O'Neil organism
+operates together — not answerable by grafting FTD onto v31 piecemeal.
+
+## RQ-ON-01 (Extension Frontier), properly re-run — real, multi-dimensional, decisive (2026-09-21)
+
+Critic's exact next task: re-analyze extension on the faithful O'Neil
+replica population (n=2,423 — see RQ-ONeil-Naive above), with extension
+measured as entry_price vs. pivot40 (both known before any outcome, no
+shared denominator with pnl_pct — confirmed not trigger-anchored, same
+non-artifact structure as before), original unmodified O'Neil bands, no
+threshold optimization, no v31 comparison.
+
+| Bucket | n | Win% | Median Pnl | Median Days Held | Stop-out Rate | Top-5 of +Pnl | Top-10 of +Pnl |
+|---|---|---|---|---|---|---|---|
+| 0-5% (on-time) | 2,157 | 33.5% | -7.62% | 61 | 64.4% | 5.4% | 9.8% |
+| 5-10% (late) | 212 | 26.4% | -7.67% | 42 | 73.1% | 25.0% | 45.7% |
+| >10% (too late) | 54 | 20.4% | -8.02% | 12.5 | 79.6% | **85.8%** | **98.9%** |
+
+**Every metric moves monotonically in the same direction** — win rate
+falls, stop-out rate rises, holding period shrinks (less room before the
+fixed 7.5% stop the more extended the entry). **The concentration numbers
+are the most decisive new evidence**: in the >10% bucket, the top 10 of 54
+trades account for 98.9% of ALL positive P&L (top 5 alone: 85.8%) — a
+"typical" trade in that bucket essentially either stops out or is one of a
+tiny handful of extreme outliers; there is almost no broad-based, repeatable
+edge once those outliers are excluded.
+
+**Decision: real, robust, multi-dimensional support for O'Neil's extension
+warning**, independent of the RQ-66-style denominator artifact already
+ruled out, on the book's own unmodified bands. Not a causal claim, not a
+threshold recommendation, not yet compared to v31 — this is the strongest
+single candidate feature for the weekend Benchmark v1.0 build.
+
+## O'Neil research queue (ON-01 through ON-18) adopted, week-ahead research mode confirmed (2026-09-21)
+
+Critic proposed and the queue was adopted: Tier 1 (ON-01 Extension,
+ON-02 Prior Advance, ON-03 FTD, ON-04 Market Direction organism, ON-05
+Breakout Volume, ON-06 Base Duration, ON-07 Buy-point quality), Tier 2
+(ON-08 through ON-14, watch for VCP overlap/rabbit holes), Tier 3
+(ON-15 through ON-18, options duration/stop/profit-taking — explicitly
+weekend-scale). Explicit non-research list: continuous trailing (closed),
+C/A/I (out of scope), historical base counter (killed, same reason as
+Minervini's), further FTD windows (done, stopped at 10/20/30), further
+extension thresholds (done, O'Neil's own bands are final). Research
+posture confirmed: this week = research only, zero production
+consequences, "follow the evidence, don't follow the implementation";
+next weekend = build O'Neil Benchmark v1.0 from scratch, then compare
+organisms; only after that ask what v31 should steal, if anything. **User
+standing instruction, adopted**: don't send every individual RQ result to
+critic one-by-one — batch and consolidate, loop critic in only when there's
+a genuine decision point.
+
+## ON-02 (252-day prior-advance proxy) — no differentiation found (2026-09-21)
+
+Critic-approved operational definition (explicitly named a "proxy," not a
+claim to reconstruct O'Neil's real prior-advance concept, to avoid the
+base-counter trap): `pivot_idx - 40` = base start (same window already
+driving entry); advance start = lowest Close in the trailing 252 trading
+days strictly before base start (excludes base start itself); 
+`prior_advance_pct = base_start_close/advance_start_close - 1`. Same
+faithful O'Neil replica population (397/2,423 trades dropped for
+insufficient 252-day lookback history).
+
+| Bucket | n | Win% | Median Pnl | Stop-out% | Median Hold |
+|---|---|---|---|---|---|
+| <30% | 1,158 | 31.9% | -7.64% | 65.2% | 58 |
+| 30-50% | 355 | 35.8% | -7.57% | 62.0% | 61 |
+| 50-100% | 307 | 26.4% | -7.75% | 73.0% | 41 |
+| >100% | 206 | 30.1% | -7.75% | 69.4% | 44 |
+
+**No monotonic trend on any of the five metrics** — 30-50% shows the best
+win rate, not either extreme; median pnl essentially flat across all four
+buckets (0.18pp spread). Two of four buckets sit below the project's own
+500-trade minimum. Two honest candidate explanations, not distinguished by
+this test: the fixed-window-minimum proxy doesn't capture what O'Neil
+means, or the underlying concept itself doesn't differentiate outcomes
+here. Not pursuing a different operationalization to distinguish these —
+per the standing rule against definition-hunting. **Disposition: no signal
+found with this proxy, not pursued further.**
+
+## ON-05 (Breakout Volume magnitude) — flat to mildly negative, reconfirms an already-established finding (2026-09-21)
+
+The naive O'Neil replica already gates entry at vol_ratio≥1.5x normal
+(O'Neil's "≥50% above normal" rule), so every trade clears that floor by
+construction — tested whether the MAGNITUDE above the floor (continuous,
+not the binary gate) carries information. `vol_ratio` = Volume at entry ÷
+`_normal_day_volume_baseline` (same production formula reused throughout,
+no new baseline invented).
+
+| Vol ratio | n | Win% | Median Pnl | Stop-out% | Median Hold |
+|---|---|---|---|---|---|
+| 1.5-2x | 421 | 34.2% | -7.52% | 60.6% | 78 |
+| 2-3x | 548 | 36.1% | -7.57% | 62.8% | 68.5 |
+| 3-5x | 514 | 34.1% | -7.65% | 64.6% | 59 |
+| >5x | 940 | 29.0% | -7.71% | 69.8% | 42 |
+
+Overall corr(vol_ratio, pnl_pct) = -0.027, essentially zero. Win rate flat
+through 1.5-5x, drops at the extreme (>5x); stop-out rate rises and
+holding period shrinks monotonically with volume (same shape as ON-01's
+stop-out pattern, much weaker magnitude). **Reconfirms, on a completely
+different population/mechanism, an already-established project finding**
+(the earlier same-day intraday-confirmation research: "volume magnitude
+beyond the existing gate showed no further discrimination, 95-96% hold
+rate flat across 1.5-8+ z-score buckets"). The >5x weakness is also
+consistent with O'Neil's own "climax volume" caution (exhaustion, not
+healthy accumulation) — a plausible, untested mechanism. **Disposition:
+no incremental signal beyond the existing floor gate, consistent with
+prior RVOL research.**
+
+## ON-06 (Base Duration sensitivity) — modest exclusion, no quality change (2026-09-21)
+
+Rebuilt the naive O'Neil replica with `PIVOT_WINDOW=60` (12 weeks) instead
+of the current 40 (8 weeks, the book's shortest named duration), otherwise
+identical.
+
+| | 8-week base | 12-week base |
+|---|---|---|
+| n | 2,423 | 2,227 |
+| Win rate | 32.6% | 33.1% |
+| Median pnl | -7.64% | -7.59% |
+| Median days held | 58 | 62 |
+| Raised-stop rate (+15%) | 44.0% | 45.3% |
+
+Lengthening the required base only excludes ~8% of the population and
+leaves win rate/median pnl essentially unchanged — base duration, within
+this reasonable range, isn't a differentiating factor even inside a
+faithful O'Neil-style system (a cleaner result than the earlier
+population-mismatch closure on testing this against BC directly).
+**Disposition: no material effect found.**
+
+## ON-14 (Base Tightness) — real, multi-dimensional signal, echoes VCP intuition inside a pure O'Neil system (2026-09-21)
+
+Does not touch `vcp.py` or the `coiled_spring` pattern — tested entirely
+on the naive O'Neil replica's own fixed 40-day base window.
+`base_tightness_pct` = (High.max()-Low.min()) over the base window
+(strictly the base, excluding the breakout day itself) ÷ the window's own
+median Close. No swing/extrema detection.
+
+| Tightness | n | Win% | Median Pnl | Stop-out% |
+|---|---|---|---|---|
+| Q1 (tightest) | 606 | 37.8% | -7.56% | 59.4% |
+| Q2 | 606 | 33.2% | -7.65% | 63.9% |
+| Q3 | 605 | 32.2% | -7.61% | 66.4% |
+| Q4 (loosest) | 606 | 27.2% | -7.76% | 72.3% |
+
+Real ~10.6pp win-rate gap between tightest and loosest quartiles, stop-out
+rate rises consistently with looseness. Linear correlation is near-zero
+(+0.011) despite this — the relationship isn't smoothly linear, most
+separation is between the middle group and the loosest quartile; flagged
+explicitly so the flat correlation isn't misread as "no effect."
+**Disposition: real signal, candidate for the weekend Benchmark v1.0 —
+not promoted, not compared to v31 yet.**
+
+## Tier 2 items ON-08/09/10/11/12/13 — largely already answered by prior work, not re-tested (2026-09-21)
+
+ON-08 (prior failed attempts/resistance touches) — same question as
+today's earlier `prior_touches` Type-A reconnaissance test (Close-anchored
+vs. Immediate Fade): clean null (corr +0.004 to +0.012). ON-09 (breakout
+candle quality) and ON-10 (price/volume agreement) — map onto
+`body_atr_daily` (void) and `breakout_failure_volume_displacement.py`
+("effort vs result", wrong-signed) from the RQ-53/66 arc, already mapped
+in today's Type-A reconnaissance section. ON-11 (distribution) and ON-12
+(RS≥80) and ON-13 (industry leadership) — already logged in the O'Neil
+reading-pass sections above (qualitative-only distribution concept;
+RS record-only/VCP-untouched; industry leadership reinforces existing
+sector RS). None re-run — flagged as overlapping rather than duplicated.
+
+## Extension check on OUR OWN production BC population — a real methodology catch, plus a real, money-quantified, soft preference (2026-09-21)
+
+Direct follow-up to ON-01: does extension-at-breach add anything beyond
+Freshness on the real BC population (n=6,216, rebuilt fresh)? Checked with
+`_freshness_score()` computed on the prior day's row (Rule #2 convention)
+and `extension_pct = breach_close/entry_price - 1` (entry_price = real
+trigger).
+
+**Raw vs. partial correlation (controlling for Freshness) — essentially
+identical**, both populations: full +0.0022 raw / +0.0068 partial;
+tradable (fresh≤0.40) +0.0156 raw / +0.0204 partial. If Freshness already
+captured extension's information, the partial correlation would shrink
+toward zero relative to raw — it doesn't. **Extension and Freshness are
+independent axes here, not redundant** — but both are weak on this
+production population (contrast with ON-01's much cleaner effect on the
+naive O'Neil replica).
+
+**A real methodology catch made and corrected in the same session**: a
+first pass reported the >10% extension bucket as dramatically *positive*
+(86.7% win, +9.08% median) — this used trigger-anchored pnl, which shares
+its denominator with `extension_pct`'s own definition (both are
+`X/entry_price - 1`), reproducing the exact RQ-66 artifact already banned
+in this project. Re-anchored to the breach day's own Close (the correct
+convention for feature-predicts-outcome tests): the >10% bucket reverses
+to genuinely worse (33.3% win, -3.36% median). **This also raises an open
+question about an earlier, already-adopted project finding**: `extension_pct`
+as defined here is essentially the same construct as the established
+`close_vs_trigger_pct` feature, and the earlier "close-vs-trigger distance
+correlation 0.28" result (Tier 1 breach-behavior work, described as one of
+the strongest signals found) has not been confirmed to be Close-anchored —
+flagged for future verification before continuing to treat that number as
+solid, not yet checked.
+
+**Money-quantified breakdown (Close-anchored, correct convention), full
+population** — the clearest way to see the real economics, not just win
+rate:
+
+| Group | n | Win% | Avg Win | Avg Loss | Net (money made − lost) | Made per ₹1 lost |
+|---|---|---|---|---|---|---|
+| ≤0% (Weak Breach) | 2,532 | 49.1% | +7.54% | -6.17% | +1,426.6 | ₹1.18 |
+| 0-10% | 3,575 | 51.6% | +7.27% | -6.19% | +2,731.1 | ₹1.26 |
+| >10% | 90 | 33.3% | +11.98% | -7.99% | **-120.1** | **₹0.75** |
+
+Same shape on tradable (fresh≤0.40): Weak Breach +414.4/₹1.08, 0-10%
++1,500.4/₹1.19, >10% **-69.4/₹0.67**. **>10% is the only group that's a
+genuine net money-loser in aggregate**, not just a lower-win-rate group —
+real, if small-sample (n=90/47). Weak Breach (≤0%) remains net profitable
+overall, just the weakest of the three — consistent with this project's
+own established RQ-90→95 conclusion not to treat Weak Breach as a hard
+exclusion gate.
+
+**Practical disposition, user-confirmed**: not a hard filter either
+direction (>10% is too rare/small-sample to gate on; ≤0% is too large a
+slice with too mild an effect to exclude, and duplicates the
+already-considered-and-rejected Weak Breach gate). **Adopted as a soft
+live-candidate preference**: when choosing between multiple live
+candidates, prefer one with 0-10% extension at breach over either ≤0% or
+>10%, since 0-10% is both the largest and the best-performing group by net
+money and by made/lost ratio on this production population. Not wired
+into any code — a human-judgment tiebreaker, not an automated gate.
+**Correction to wording, critic-suggested**: "soft ranking preference," not
+"live-candidate preference" — a review signal surfaced to the human when
+candidates are otherwise comparable, never a scoring feature, filter, or
+rank weight.
+
+## Research Integrity Rule #10 formally numbered (not new — the existing Measurement Anchor Rule from RQ-66, 2026-09-19) — and a P0 audit that overturns part of a flagship finding (2026-09-21)
+
+Critic proposed a new "Rule #10: Outcome Anchor Independence" after today's
+extension-denominator catch. **Checked first: this already exists.** Line
+~2793 (2026-09-19, "sibling to Rule #6," never formally numbered): *"any
+test of 'does a breach-time feature predict future price action' must
+measure the outcome from a reference point that has no definitional or
+correlational overlap with the feature itself — concretely, anchor forward
+returns to the breach day's own Close, not trigger."* Word-for-word the
+same content as the proposed Rule #10. **Not creating a duplicate — formally
+numbering the existing rule as Rule #10 instead.** Today's extension catch
+is the SECOND real-world violation of this rule caught in time (first:
+RQ-66's `dist_to_trigger_pct`), which is real, valuable reinforcement that
+the rule is necessary and correctly specified — not evidence a new rule
+was needed.
+
+**Rule #10, final wording (critic's generic formula merged in, a cleaner
+statement than either of the two prior wordings)**: *"Shared Anchor
+Leakage — a feature and an outcome that share the same reference point
+will appear predictive purely by construction, even if the feature tells
+you nothing about what happens after that reference point. Formally: if
+Feature = (A−B)/B and Outcome = (C−B)/B, both anchored to the same B,
+correlation is inflated regardless of whether A actually predicts C
+beyond the shared starting point. Fix: outcome evaluation must begin from
+the decision point (the feature's own measurement moment — e.g. the
+breach day's Close), never from the feature's own reference price (e.g.
+trigger/entry/pivot)."* Known vulnerable features in this project:
+`close_vs_trigger_pct`, `extension_pct`, any gap-vs-trigger measure, any
+"distance from entry" feature. Known SAFE features (no trigger/entry
+term in their own formula, e.g. pure intraday-range ratios like
+`close_pos_in_range`, `upper_wick_pct_of_range`, `body_pct_of_range`) —
+these can be tested against trigger-anchored pnl without this specific
+artifact risk, per the rule's own stated exception for outcome reporting
+on an already-decided population.
+
+**P0 audit, run immediately per critic's exact three-question spec**, on
+the same real BC population (n=6,197): was the original "close-vs-trigger
+distance correlation 0.28" (Tier 1 breach-behavior work, on record as one
+of the strongest signals this project has found) trigger-anchored?
+
+| | Trigger-anchored | Close-anchored (correct) |
+|---|---|---|
+| corr(close_vs_trigger_pct, outcome) | **+0.2809** (reproduces "~0.28" exactly) | **+0.0014** |
+
+| Quartile | Trigger-anch. Win% | Trigger-anch. Median | Close-anch. Win% | Close-anch. Median |
+|---|---|---|---|---|
+| Q1 (weakest) | 41.2% | -2.10% | 48.0% | -0.28% |
+| Q2 | 50.8% | +0.13% | 51.4% | +0.23% |
+| Q3 | 57.4% | +1.34% | 52.3% | +0.36% |
+| Q4 (strongest) | **71.0%** | **+4.01%** | 49.8% | -0.03% |
+
+**Answer: yes, it was trigger-anchored, and yes, it collapses.** The clean
+monotonic Q1→Q4 staircase (41%→71% win) does NOT survive Close-anchoring —
+under the correct anchor it's flat and non-monotonic (48%→51%→52%→50%),
+Q4 isn't even the best quartile. **Only Q1 (weakest breach) shows a real,
+if now much smaller, effect; Q2-Q4 are statistically indistinguishable
+from each other.**
+
+**Important reconciling context — this is not a fresh catastrophe out of
+nowhere**: the 2026-09-20 record already self-corrected the original
+"skip anything below trigger" framing once, to "the true losers signal is
+in the tail specifically... the worst-ranked 10%... widening the cut
+toward 20-25% dilutes this back toward flat." Today's Close-anchored
+result is *consistent* with that earlier correction — it gives the actual
+mechanism (denominator leakage inflating the broad quartile gradient) that
+the earlier work had already partially caught by feel (a real, narrow
+tail effect) without diagnosing why the broader "0.28 correlation, clean
+quartiles" framing was overstated.
+
+**Correction to the canonical record**: "Close-vs-Trigger, correlation
+0.28, one of the strongest signals found" should be understood as
+superseded — the real, surviving finding is narrower: a real but modest
+weak-breach-tail effect (Q1 specifically), not a broad, strong, monotonic
+gradient across the whole close-vs-trigger range. Does not invalidate the
+RQ-90→95 options-side work broadly (gap-attribution, independence
+checks, and the eventual RQ-95 EOD-carry threshold were cross-validated
+multiple ways, not solely via this correlation) — but the specific "0.28"
+figure and the "strongest signal found" characterization should not be
+cited as-is going forward.
+
+## Type-A after-hours backlog (RQ-A1/A2/A3/A4) — everything collapses, and Rule #10's scope broadens (2026-09-21)
+
+Real BC production population (n=6,211), four candidate pre-entry/breach-
+day features tested.
+
+| RQ | Feature | Trigger-anchored | Close-anchored (correct) |
+|---|---|---|---|
+| A1 | Candle position (Close-Low)/(High-Low) | Clean staircase: 43.8%→64.1% win, corr +0.138 | **Flat: 48.4%/51.8%/49.4%/51.8% win, corr -0.012** |
+| A3 | Upper wick (High-Close)/(High-Low) | Exact mirror of A1 (mathematically the same info, inverted) | Same collapse |
+| A2 | Close vs pivot location (Close-Pivot)/(High-Pivot) | — (references trigger by construction, tested Close-anchored only) | Flat: 48.4%/50.9%/51.7%/50.5% win, corr -0.025 |
+| A4 | Weak Breach × candle quality interaction | — | Weak-breach axis still shows its known modest effect (established above); candle quality adds nothing within either group |
+
+**Rule #10's scope broadened by a real finding, not just theory**: A1's
+own formula contains no trigger/entry term, yet its clean trigger-anchored
+result (corr +0.138) collapses to near-zero (corr -0.012) under the
+correct Close-anchor. Mechanism: a stock closing near its day's high is
+strongly correlated with also closing well above the trigger — so testing
+*any* feature correlated with breach strength against trigger-anchored pnl
+inherits the same artifact indirectly, even without the feature's own
+formula literally containing "trigger." **Rule #10 update**: the danger
+zone isn't just features whose formula shares the trigger/entry term with
+the outcome — it's any feature correlated with breach strength /
+close-vs-trigger, which in this system is apparently most breach-day
+candle-shape features. Default to Close-anchored outcomes for any new
+breach-day feature test unless there's a specific, checked reason the
+feature is genuinely uncorrelated with breach strength.
+
+**Decision: CLOSED, all four.** No real signal in candle quality, upper
+wick, or pivot-relative close location once correctly measured —
+reinforces, not opens, the already-established RQ-53/66 conclusion that
+this class of breach-quality signal doesn't hold up in this system.
+
+## Type-A Tier A redirect (TA-01/02/03) — pre-breakout structure, all null on the real production population (2026-09-21)
+
+Critic's redirect after the candle-shape family closed: test pre-breakout
+STRUCTURE (base behavior), not breakout-day candle geometry. TA-02
+explicitly touches the standing "do not revisit acceptance in any form"
+prohibition — flagged to the user before running; user said run it
+(different time-slice: pre-breakout historical behavior at the level, not
+post-breach confirmation-as-entry-gate). Real BC production population
+(n=6,122), all outcomes Close-anchored by default (per the just-learned
+broadened Rule #10 lesson — not assuming any of these are safe just
+because their formula lacks a literal "trigger" term).
+
+| RQ | Feature | corr | Coverage | Notes |
+|---|---|---|---|---|
+| TA-01 | Pressure (closes within 1% below trigger, trailing 20d) | -0.009 | 100%, but sparse (median=0) | Flat win rate 50.5%/50.5%/50.7%/49.8% |
+| TA-02 | Acceptance ratio (of prior touches, trailing 20d) | -0.018 | Only 22.3% (most breakouts have no prior touch in 20d) | Weak hint Q1 (fully rejected) is worst (-0.73% median), not monotonic beyond that |
+| TA-03 | Compression (10d range % of median close) | +0.019 | 100% | Same direction as ON-14 (tighter=better) but far weaker — short window, different population |
+
+**Decision: all three CLOSED, no signal strong enough to trust.**
+
+## ON-14 x ON-01 interaction — real, but additive, not multiplicative (2026-09-21)
+
+Does extension only matter when the base is loose? 2x3 table (tight/loose
+split at the median tightness, x 0-5%/5-10%/>10% extension), same naive
+O'Neil replica population used for both original tests, no new feature.
+
+| Base | Extension | n | Win% | Median Pnl |
+|---|---|---|---|---|
+| Loose | 0-5% | 1,035 | 30.8% | -7.64% |
+| Loose | 5-10% | 132 | 24.2% | -7.79% |
+| Loose | >10% | 44 | 20.5% | -8.23% |
+| Tight | 0-5% | 1,122 | **36.0%** | -7.60% |
+| Tight | 5-10% | 80 | 30.0% | -7.55% |
+| Tight | >10% | 10 | 20.0% | -7.87% |
+
+**Decision: real, but the two effects are additive/independent, not
+strongly interacting.** Extension degrades win rate at BOTH tightness
+levels, roughly in parallel — tight base gives a consistent ~5-6pp
+win-rate boost regardless of extension level, it doesn't only "kick in"
+when the base is loose. Best reliable cell: Tight+0-5% (36.0%). Worst
+reliable cell: Loose+>10% (20.5%, n=44). Tight+>10% (20.0%) has only n=10
+— too small to trust despite looking similar to Loose+>10%. Both ON-01
+and ON-14 remain independently real candidates for the weekend benchmark;
+this doesn't establish they compound multiplicatively, just that both
+hold simultaneously.
+
+## Research Integrity Rule #11 adopted — Provenance Requirement (2026-09-21)
+
+Critic-proposed after two failed reproduction attempts (below). *"A
+quantitative finding may be cited as Validated only if its computation is
+reproducible from committed code or a preserved research artifact. If the
+original script or methodology cannot be reconstructed with confidence:
+downgrade to Unverified Historical Finding, do not build new research on
+top of it, do not spend unlimited time reconstructing it."* Distinct from
+Rule #10 (Shared Anchor Leakage — a statistical bug family) — Rule #11 is
+about what to do when a historical claim's exact computation can no longer
+be checked at all, contaminated or not.
+
+**Targeted Rule #10 audit, scoped down from a full sweep per critic's
+explicit recommendation** ("integrity audit, not archaeology" — only audit
+findings that are both highly influential and plausibly susceptible;
+Freshness's 0.696 correlation explicitly NOT audited, since its formula
+contains no trigger/entry/breakout-close term at all — a different family,
+not Rule #10's concern):
+
+- **`close_vs_trigger_pct` correlation 0.28 — CONFIRMED contaminated**
+  (reproduced exactly, +0.2809; collapses to +0.0014 Close-anchored; see
+  above). Corrected record stands.
+- **"Day+1 adverse movement" correlation 0.3417 — could NOT be reproduced**
+  (my reconstruction gives +0.7758 trigger-anchored, not 0.3417). Per Rule
+  #11: **downgraded to Unverified Historical Finding.** Not built upon, not
+  declared wrong, not further reconstructed.
+- **"Close-vs-trigger → real option day+1-open pnl" correlation 0.137 —
+  could NOT be reproduced** on a bounded 592-trade sample (ATM, current
+  expiry): got -0.0696, opposite sign and much smaller magnitude. Per Rule
+  #11: **downgraded to Unverified Historical Finding.** Not a full-population
+  exhaustive check (592/4,524 F&O-eligible trades, one moneyness/expiry
+  combination) — genuinely unverified, not confirmed wrong either.
+
+## O'Neil Benchmark Research — Week 1 formally closed (2026-09-21)
+
+**User's own framing, adopted**: close this chapter unless something
+interesting/impactful remains; nothing does. Full day's work, start to
+finish: primary-source reading (all mechanically-relevant chapters, C/A/I
+explicitly out-of-scope not missed), parity audit (with a citation
+correction to the critic's own secondary-source claims), individual
+feature validation (14 major items tested), a targeted Rule #10/#11
+integrity audit. **Zero production changes made or proposed all day** —
+this changed understanding of BC, not v31 itself.
+
+**Carrying forward into the weekend Benchmark v1.0, exactly three items,
+nothing else**:
+1. **ON-01 (Extension)** — strongest validated finding, confirmed four
+   separate times in O'Neil's own text, monotonic across win rate/
+   stop-out rate/holding period/concentration in a faithful replica.
+2. **ON-14 (Base Tightness)** — real, independent signal, additive (not
+   multiplicative) with Extension.
+3. **O'Neil Benchmark v1.0 build itself** — faithful entry/exit
+   reconstruction, compared organism-vs-organism against BC/Primed Gate,
+   specification written before any experiment (prevents accidental
+   tuning toward a predetermined answer).
+
+**Archived, not to be reopened without new evidence**: supply exhaustion,
+the entire breakout-candle-geometry family (candle position, upper wick,
+pivot-relative close, pressure, acceptance ratio, short-window
+compression), breakout-day volume magnitude beyond the existing floor,
+the 252-day prior-advance proxy, 8-week-vs-12-week base duration, SMA20 as
+an exit rule (telemetry status stands separately), continuous-vs-one-time
+trailing (closed as intentional strategy divergence, not a gap).
+
+**Telemetry only, not gates, carried as context not action items**: SMA20
+deterioration marker (Type-B), Follow-Through Day (regime-dependent,
+real only in market states the current gate already excludes).
+
+**Overall fidelity assessment (critic's framing, adopted as the closing
+characterization)**: Breakout Continuation is philosophically closer to
+O'Neil's plain Stage-2/pivot-breakout system than to Minervini's VCP —
+roughly 75-80% conceptual overlap (pivot breakout, volume confirmation,
+market trend filter, Stage-2 continuation philosophy all high-parity;
+extension discipline and base-tightness are the two areas O'Neil does
+that BC currently doesn't; exit philosophy and CANSLIM fundamentals are
+where this project deliberately diverged). This is a qualitative
+characterization, not a computed metric — treat the "75-80%"/"76/100"
+framing as directional, not a precise score.
+
+## RQ-A5 — Breakout Dominance Loss / Breakout Retest Failure Signature — CLOSED, core hypothesis rejected, real opposite-direction finding instead (2026-09-22)
+
+**Origin**: real, live, n=1 observation (2026-09-21/22) — GRANULES cleared a real prior
+resistance high on massive volume (7.85M), then 4 trading days later printed a
+marginal fresh high on 73% less volume, closed weak, and gave back the entire
+breakout gain. AEGISLOG was live-testing an analogous level, which prompted the
+question. Approved as a Tier A Candidate, P1, bounded 5-step telemetry-only plan
+(no thresholds, no gate, no production wiring, no parameter sweep). GRANULES's own
+real 2026-09-21/22 event is too recent for the current `data_cache` snapshot and
+could not be located directly in the built table (latest cached GRANULES row: 2026-07-13).
+
+**Population**: real production breakout entries, both patterns — `breakout_cont` via
+the canonical Primed Gate trigger-touch (`primed_engine.detect_primed_entry`, trigger =
+high10_prior×1.005, real entry price), `coiled_spring` via the legacy Entry Gate
+(`backtest.detect_entry` + `vcp.vcp_breakout` for the real base pivot) — per the
+2026-09-20 governance split (Primed Gate is BC-only, VCP untouched). `require_regime=
+False` (big-population convention). 22,224 real breakouts scanned; **75.5% (16,783)
+make a fresh high above their own breakout High within Day+1–Day+5** (NO_RETEST rate
+only 24.5%) — a retest is the norm, not the exception, for this population.
+
+**Two ingredients tested separately, then interacted, all in quartiles (no threshold-
+hunting) — plus a `close_vs_breakout_close` cut (literal "closes below breakout-day
+close") added after the main run, and the proposed Gain Retention feature**:
+
+| Cut | fake_rate (ret_d1<0) range across quartiles | d1 exp range | Monotonic? |
+|---|---|---|---|
+| close_position_pct (retest day's own range) | 48.9%→51.6% | +0.080%→+0.177% (non-monotonic) | No |
+| high_extension_pct (descriptive buckets) | 49.4%→51.6%→51.6% | +0.069%→+0.072%→+0.137% | Flat/no |
+| gain_retention (new feature) | 51.2%→49.9% | +0.103%→+0.091% | No |
+| volume_ratio_breakout (Ingredient B) | 50.8%→50.4% | +0.091%→+0.113% | No, flat |
+| close_vs_breakout_close | 49.4%→51.4% | +0.066%→+0.180% | No |
+| weak-close × low-volume interaction | 49.4%–51.7% across all 4 cells | — | No distinct interaction |
+
+**Core hypothesis REJECTED on the immediate (Day+1/Day+2) window**: fake_rate sits in
+a flat 49–52% band with no monotonic staircase on ANY of the 5 cuts, and stock-level
+d1/d2 expectancy differences are noise-level (<0.2pp) everywhere. Same result on the
+Freshness≤0.40 subset (n=7,435, 44.3% of the table). `close_position_pct` reproduces
+the already-known RQ-A1 candle-position null almost exactly (cross-validation, not a
+new finding).
+
+**Real, replicated finding instead — opposite direction from the hypothesis**: retest
+STRENGTH (not weakness) predicts a meaningfully better next-day OPTIONS outcome,
+confirmed independently across three different features, all monotonic in the same
+direction:
+
+| Feature, top vs bottom cut | opt(d+1-open) win | exp |
+|---|---|---|
+| high_extension: 0-1% → >3% | 61.1% → **70.9%** | +0.158% → **+0.609%** |
+| volume_ratio_breakout: Q1 → Q4 | 62.1% → 67.4% | +0.218% → +0.385% |
+| close_vs_breakout_close: Q1 → Q4 | 60.3% → **71.2%** | +0.136% → **+0.538%** |
+
+Concentration checked before trusting this (per standing rule): ~39% across every
+cut, including the "weak" comparison buckets (38.8-39.8%) — not disproportionately
+carried by the strong-cut's own outliers, a shared population-level baseline, not an
+artifact of this specific cut. Bootstrapped the strongest cell (high_extension>3%,
+n=1,915): win 70.9%, 90% CI [69.2%, 72.6%] — tight, real.
+
+**Theoretical read (why the hypothesis's logic doesn't hold here, not just "data says
+no")**: a retest that makes a fresh high within 5 days is, by construction, already
+evidence the stock is still in an intact uptrend — the weak/strong variation on that
+retest day is a second-order quality signal on an already-confirmed-bullish event, not
+a reversal signature. An institutional-dominance-loss mechanism may be real over a
+longer horizon (this matches the project's own still-open RQ-77/momentum-stall
+question), but doesn't resolve inside a 1-2 day window — same shape as RQ-53/RQ-66's
+prior finding that tight immediate-reaction windows are noisy even where a real
+longer-horizon effect might exist. What the data actually supports is closer to a
+CONFIRMATION/quality filter (strong volume + real extension + a close that holds
+above the original breakout close = a genuinely better options entry) than a
+failure-avoidance signal — and it points the opposite way from "detect and avoid
+weak retests."
+
+**Decision**: CLOSED. All 5 steps of the bounded plan run to completion. Core
+hypothesis (Ingredients A+B as a near-term failure predictor) rejected — no monotonic
+fake-rate staircase on any tested cut. Not promoted to any gate/rule (matches the
+plan's own explicit telemetry-only scope). The real finding (retest strength as an
+options-entry quality signal) is logged as a candidate observation, same status as
+other confirmation-style telemetry in this project (e.g. `acceptance_state`) — not
+wired into anything, would need its own dedicated validation pass (survival/
+concentration/out-of-time split) before being treated as more than directional.
+Script: `rq_a5_retest_dominance.py`, raw event table `rq_a5_retest_dominance.csv`
+(n=16,783, both patterns, 5-year universe).
+
+## RQ-A5 — critic sign-off, structural retest-rate telemetry, Rule #10 extended, Type-A search space update (2026-09-22)
+
+**Critic's formal verdict on the RQ-A5 closure above**: CLOSED, Closed Negative
+disposition (hypothesis rejected), with one unexpected positive observation parked
+separately — not reopened for a different volume ratio, day window, or weak-close
+threshold; reopen only if a genuinely different hypothesis is proposed (e.g.
+longer-horizon momentum deterioration, options-specific gamma behavior). Praised as
+one of the cleanest closures in the project: live observation → falsifiable
+hypothesis → large-population test → hypothesis false → stop (not another variant).
+Explicitly separated the (rejected) hypothesis from the (real) discovery — did not let
+the unexpected finding retroactively validate the original claim.
+
+**Two clean entries, per critic's exact requested format**:
+
+**Closed Negative — RQ-A5 (Breakout Dominance Loss / Breakout Retest Failure
+Signature)**. Reason: large-population event study (16,783 real retests, BC+VCP,
+full 5-year universe) rejected the core hypothesis — no monotonic fake-breakout-rate
+relationship on any of 5 tested cuts, immediate Day+1/Day+2 window. Status: **do not
+reopen** for a different volume ratio, day window, or weak-close threshold.
+
+**Observation (separate note) — Retest Strength Telemetry**. Strong retests (higher
+extension, stronger close relative to the breakout day, stronger relative volume)
+showed better immediate options outcomes, consistent across 3 independent features.
+Status: observation only — not validated, not actionable. Has NOT passed
+out-of-time validation, a concentration audit beyond the single spot-check already
+done, a capacity audit, or any live-usefulness check. Treat exactly like early SMA20
+telemetry before its own promotion pass — do not build on this without running it
+through the same validation gauntlet first.
+
+**New structural telemetry, promoted independently of the RQ-A5 hypothesis itself**:
+**75.5% of all real breakouts (both patterns) make a fresh high within Day+1-5**
+(NO_RETEST rate only 24.5%, n=22,224 breakouts). Three implications, per critic,
+worth carrying forward as a mental model correction for Breakout Continuation:
+1. Retesting is normal, not exceptional, for this population.
+2. A fresh high after breakout is NOT evidence of continuation by itself (it's what
+   ~3 in 4 breakouts do regardless of eventual quality).
+3. Any future Type-A detector should not fire merely because price revisits highs —
+   that's the base rate, not a signal.
+
+**Rule #10 extended** (one additional sentence, critic-proposed, keeps the rule from
+being read as a blanket "just Close-anchor everything"): *"When studying
+post-breakout behavior, anchor the outcome from the event being studied (e.g. the
+retest close), not from the original breakout or entry."* Makes explicit that there
+are multiple valid anchor classes depending on what's being studied, not one universal
+anchor:
+
+| Event being studied | Outcome anchor |
+|---|---|
+| Breakout-day feature | Breakout day's own Close, forward |
+| Retest-day feature | Retest day's own Close, forward |
+| Entry feature | Entry price, forward |
+
+**Type-A search space, updated map (critic's framing)** — the single-bar/candle-shape
+detector family is now essentially exhausted: candle position (closed), upper wick
+(closed), close-vs-trigger distance (artifact, corrected), pressure/acceptance
+(closed), 10-day compression (closed), weak retest/RQ-A5 (closed). **Remaining Type-A
+frontier, all structural rather than candle-shape**: base quality (not yet tested on
+BC), prior trend maturity (O'Neil/Stage-2 fidelity — ties to the parked O'Neil
+Benchmark v1.0), market context (Follow-Through Day/regime interaction — currently
+telemetry-only), relative strength/leadership (price structure, not candle shape),
+and breakout extension (ON-01, already the strongest surviving candidate from the
+O'Neil week). This narrows the live search space considerably — no more single-bar
+quality ideas queued.
+
+**Production impact: none.** No gate, no feature, no scoring change, no telemetry
+promotion beyond the two notes above.
+
+## RQ-A5-O1 — intraday dominance-loss event study, options branch — weak/marginal result, no faster-detection case found (2026-09-22)
+
+**Scope**: the single approved next action for the RQ-A5-O (A5-Options) branch, per
+the 2026-09-22 handoff. Reuses A5-Stock's exact breakout/retest event construction and
+Rule #10-compliant outcomes (`ret_d1` stock close-to-close, `opt_d1_open` the
+project's standard stock-based day+1-open proxy for an option's PnL — not a real
+option price, matches the established convention used throughout, e.g.
+`breakout_failure_confirmation_cost.simulate_day1()`). Restricted to F&O-eligible
+tickers with BOTH the breakout day and the retest day inside `intraday_cache`'s real
+5-min-bar coverage (2026-06-10..2026-09-19) — **n=656 retest events, 149 unique
+tickers, 637 breakout_cont + 19 coiled_spring**. Small-sample, single-~3.5-month-
+regime caveat applies throughout (same caveat this project always attaches to
+intraday-only work, matches RQ-66B's n=303 precedent) — no out-of-time split possible
+on this window.
+
+**Method**: for each retest event, walked the retest day's real 5-min bars and
+computed, at 10/25/50/75/100% of the trading day elapsed, three RUNNING (as-of-that-
+bar) versions of A5-Stock's own dominance-loss ingredients — volume ratio vs the
+SAME bar-index on the original breakout day, price position within the day's own
+running range, and how far price has faded off the day's own running high.
+Correlated each against both outcomes at each checkpoint to build an information-
+arrival curve (Q-A), checked halfway-point quartile outcomes for false-exit risk
+(Q-B), and compared the stock-outcome curve against the options-outcome curve (Q-C).
+
+**Internal consistency check, passed**: the 100%-of-day (full EOD) checkpoint,
+recomputed independently from raw 5-min bars on this much smaller F&O+intraday-window
+population, reproduces the SAME direction as A5-Stock's daily-bar finding on the full
+5-year population — `vol_ratio` top-vs-bottom-quartile options expectancy +0.056%→
++0.199% here vs +0.218%→+0.385% on the full population. Same sign, similar shape, a
+different n and a completely different computation path (summed 5-min bars vs the
+daily Volume column) — real corroboration, not a coincidence of one script's bug.
+
+**Q-A (does deterioration show up earlier intraday than the daily EOD picture)**:
+weak evidence either way. The `vol_ratio`/options correlation is small throughout the
+whole day (0.05–0.09) and roughly FLAT, not a curve that builds toward the close —
+it's about as present at 25-50% of the day as it is at 100%. Significance check
+(n=656, approx SE=0.039): only the 25% (z=2.05) and 50% (z=2.31) checkpoints cross the
+conventional z>1.96 threshold; 10%, 75%, and 100% do not (z=1.72/1.54/1.36). This is a
+marginal signal at best, not a clean result. `off_high` and `price_pos` are messier —
+non-monotonic across checkpoints, likely confounded with the day's own volatility/
+range scale rather than a clean dominance-loss signal; not trusted without more work.
+Halfway-point quartile table (vol_ratio, options outcome) is nearly IDENTICAL in
+magnitude to the full-day quartile table (bottom/top: +0.045%/+0.169% @50% vs
++0.056%/+0.199% @100%) — whatever weak signal exists doesn't meaningfully sharpen
+between midday and close.
+
+**Q-B (is earlier detection useful — false-exit risk)**: the "weak" bottom quartile
+at the halfway point is NOT a disaster bucket — it's modestly positive (opt exp
++0.045%, win 50.6%), not a catastrophic tail that would justify an urgent early cut.
+No case found here for an aggressive early-exit rule even in principle — there's no
+large avoidable loss sitting in the weak quartile to avoid.
+
+**Q-C (is the options tolerance genuinely different from the stock tolerance, or does
+theta not buy anything real)**: the stock (`ret_d1`) correlations are all
+non-significant (z<1 at every checkpoint, one even trends slightly negative across
+the day) while the options (`opt_d1_open`) correlations stay modestly positive
+throughout — this divergence reproduces A5-Stock's core finding (retest strength
+predicts the OPTIONS outcome better than it predicts the stock's own return) on an
+independent, smaller, intraday-resolution population. Real corroboration that
+whatever this effect is, it's genuinely options-specific, not just noise in the stock
+number. But because the signal doesn't concentrate or sharpen late in the day, there's
+no evidence that FASTER intraday detection would unlock meaningfully better decisions
+than the existing daily-EOD picture already gives — undermining, not supporting, the
+theta-driven "options need stricter/faster deterioration detection" premise from the
+original branch motivation. Not a definitive rejection (modest power, single regime,
+no out-of-time check) — a null-leaning result, not a strong negative.
+
+**Data-quality checks before trusting any of this**: bucket composition spread across
+85-100 unique tickers per quartile (no single name dominating — top ticker is
+SONACOMS at 15/656 = 2.3%), concentration ~30-38% across cuts (matches, doesn't
+exceed, A5-Stock's own ~39% baseline).
+
+**Decision**: NOT closed, NOT promoted. Per the handoff's explicit scope, this was
+purely a measurement pass — no exit rule, no theta-derived threshold, no EMA8
+promotion, no option-price estimator, no production changes were built or proposed.
+Honest summary for handoff back: the intraday resolution doesn't obviously find
+something the daily framework misses on this population — the same modest, options-
+specific dominance-strength signal A5-Stock already found is visible here too, but
+it's flat across the day rather than building, and the weak-signal bucket isn't a
+danger zone worth racing to detect faster. Whether this is enough to retire the A5-O
+branch, or whether a larger/out-of-time population would sharpen the marginal 25-50%
+checkpoint result, is a call for the next review pass, not decided here.
+Script: `rq_a5o1_intraday_dominance.py`, raw checkpoint table
+`rq_a5o1_intraday_dominance.csv` (n=3,280 checkpoint-rows, 656 events × 5 checkpoints
+each).
+
+## RQ-A5-O1 — critic review: CLOSED, theta-driven-faster-detection hypothesis rejected, wording correction on "options-specific" (2026-09-22)
+
+**Critic's verdict**: VALIDATE complete — the research question itself ("does earlier
+intraday deterioration buy materially better options decisions because of theta?")
+did not receive supporting evidence on the tested population. Scope discipline
+confirmed clean: same A5 event construction, same Rule #10-compliant outcomes, no new
+indicator invented, no EMA8 promotion, no theta threshold, no production logic — a
+pure measurement pass, "exactly how this project should evolve."
+
+**Population audit**: n=656/149 tickers judged acceptable for exploratory telemetry,
+not promotion; the ~3.5-month window is the single biggest limitation, explicitly
+flagged as correctly NOT presented as canonical.
+
+**Internal consistency audit elevated to a methodological success in its own right**:
+independently reconstructing the EOD measurement from summed 5-min bars and
+recovering the same qualitative relationship A5-Stock found (different computation
+path, same direction) reduces the probability the original daily-volume finding is a
+script bug, a daily-bar artifact, or an implementation mistake — "the sort of audit I
+want to see after Update 93." **Proven**: A5's volume-strength measurement survives
+independent recomputation.
+
+**Q-A ("mostly no")**: signal exists, arrives early, does NOT strengthen meaningfully
+through the session — the flat curve directly undermines the motivating "wait until
+late afternoon for options-specific deterioration" hypothesis. Multiple-testing
+caution agreed with: 5 checkpoints tested, 2 marginal z≈2 results is not compelling
+evidence of a genuine "25-50% sweet spot" — good restraint not promoting that as a
+finding. **Proven**: no clear information-accumulation curve through the day. **Not
+proven**: that 25-50% is genuinely optimal.
+
+**Q-B, judged STRONGER than originally written**: this is real negative evidence
+against aggressive intraday exits, not just a mild non-finding. The weak midday
+bucket still shows positive expectancy, coin-flip win rate, no catastrophic tail —
+"many apparently dull breakouts continue to behave acceptably by the project's own
+options proxy," which is exactly the false-positive cost this branch worried about.
+**Production insight, critic's framing**: an options-specific faster detector has to
+beat a surprisingly difficult baseline — if the weak bucket still earns money,
+exiting it aggressively is expensive. **Proven**: midday weakness is not a disaster
+bucket.
+
+**Q-C — wording correction, important**: critic agrees the divergence (options proxy
+reacts, stock outcome barely reacts) reproduces A5-Stock's story and is real
+corroboration, not proof — but pushed back on "genuinely options-specific" as
+overstating the evidence, since `opt_d1_open` is still a stock-derived proxy, not an
+observed option premium. **Corrected framing, adopted**: *"The relationship
+preferentially predicts the project's options objective over the stock objective"* —
+not "the effect is inherently options-specific." This wording should be used going
+forward for this finding and any similar one built on the same proxy.
+
+**Theta hypothesis audit — the actual point of this RQ**: original hypothesis
+("theta means options require materially faster deterioration detection") status:
+**Not supported** — stronger than "null-leaning," per critic's explicit correction to
+the original write-up's softer framing. Important distinction preserved: this rejects
+the specific MECHANISM tested ("faster intraday versions of A5 measurements produce
+materially better options timing"), not the broader idea that intraday research could
+ever be useful here.
+
+**MAXHEALTH audit**: the branch began because the live MAXHEALTH 1H-EMA8 observation
+felt convincing; this RQ prevented that anecdote from becoming architecture — EMA8
+remains anecdotal, was correctly never promoted, "exactly how this project is
+supposed to behave" post-integrity-work. Counted as a process success, not a failure
+to find something.
+
+**Explicitly closed rabbit holes, critic's own list — do not do these next**: don't
+tune EMA length (EMA5/10/13), don't change the checkpoint percentages, don't sweep
+15m/30m/45m/90m bar sizes, don't introduce VWAP/RSI/MACD "because it's intraday" — the
+mechanism failed before indicator choice became relevant, so none of these would
+address the actual finding.
+
+**Disposition table**:
+
+| Component | Decision |
+|---|---|
+| Intraday dominance-loss measurement | VALIDATED as telemetry |
+| Intraday-stronger-than-daily hypothesis | NOT SUPPORTED |
+| Theta-based stricter-tolerance premise | NOT VALIDATED |
+| EMA8 live intuition | Remains anecdotal |
+| Production exit variant | DO NOT PROMOTE |
+
+**Final decision**: **RQ-A5-O1 CLOSED** (the specific hypothesis tested, not the
+entire A5-O branch — critic explicitly declined to park the whole branch). Treated as
+an instance of the project's "preserve losing research" principle: document the null
+result, reference it in future discussions, don't reopen without genuinely new
+evidence or a fundamentally different mechanism. **Next bounded action, per critic**:
+not another intraday operationalization — return to the PARENT RQ-A5 and continue
+investigating breakout dominance loss on the canonical population, without assuming
+options require a faster intraday variant.
+
+## RQ-OX1-A — Empirical Stock→Option Observability Feasibility Study — strong result, real evidence supporting OX1-B (2026-09-22)
+
+**Scope**: the single approved next action for the revived RQ-OX1 branch, per the
+2026-09-22 critic sign-off. Revised objective (critic's exact wording): *"Can
+underlying movement explain enough of option movement to provide useful state
+observability in the absence of option quotes?"* — evaluating observability, not
+pricing accuracy. Guardrails respected: no IV, no Greeks, no Black-Scholes, no beta
+optimization, no curve fitting, no ML, no production wiring — a measurement pass only.
+
+**Population**: real production breach events (both patterns, reusing
+`rq_a5_retest_dominance._detect_breakout`), F&O-eligible, full 5-year universe,
+tested across all 4 standing moneyness×expiry combos (ATM/ITM × current/next). Real
+contract selection and pricing reused directly from `option_backtest.py`'s own
+production functions (`pick_contract`/`option_row`/`_real_spot`/`liquid`) — not
+reimplemented. **n=38,242 usable rows, 11,599 unique breach events, 208 tickers**
+(16,142 breach events × 4 combos = 64,568 attempts; 21,383 no valid contract, 4,943
+day+1-illiquid — a strict window, not walked forward to the next liquid day). **Known
+limitation, not worked around**: 100% calls (CE) — this project has no PE/bearish
+population, so call/put stratification (which the critic asked for) is genuinely not
+testable.
+
+**Layer 1 — Sensitivity**: raw stats were badly distorted by a known artifact —
+12.2% of rows have |ΔStock| < ₹1 (near-zero denominator), which mechanically blows up
+β=ΔOption/ΔStock toward extreme values (top outliers reach β≈-524,288 on a ₹0.000002
+stock move — mechanically meaningless, not a real signal). **Excluding |ΔS|<₹2
+(79.0% of data retained)**: median β=0.565, mean=0.579 (now close to median — sane),
+std=1.257 (not thousands). Raw linear correlation is weak-modest either way:
+corr(ΔS,ΔO)=0.171, corr(R_S%,R_O%)=0.070 — this alone would NOT support the
+hypothesis, and is flagged as a real caveat below.
+
+**Layer 2 — Stability**: median β stays in a genuinely narrow, stable band across
+EVERY tested stratum — 0.49–0.75 across moneyness×expiry combos, 0.52–0.64 across DTE
+buckets, 0.568–0.574 across overnight-gap-size terciles. No stratum shows the kind of
+swing the critic flagged as disqualifying ("a beta of 2.1 useless if it ranges 0.8 to
+5.7") — this is real, positive evidence for stability. **Moneyness-drift audit**
+(critic-added): trades that TRANSITIONED moneyness bucket (e.g. ATM entry → ITM by
+day+1) actually show a TIGHTER, cleaner β (median 0.504, IQR [0.375,0.613], std=0.363)
+than trades that stayed in the same bucket (median 0.606, IQR [0.316,0.893],
+std=5246 — the near-zero-denominator outliers concentrate here, not in the
+transition group, since a transition requires a meaningfully large stock move by
+construction).
+
+**Layer 3 — Decision observability (the strongest result)**: does the stock's own
+move-tercile predict the option's move-tercile? **79.3% exact tercile agreement**
+(down/flat/up × down/flat/up, vs. a 33.3% random baseline); **83.5% directional
+agreement** restricted to non-flat stock terciles. This is the metric closest to the
+project's actual decision use-case (is the position getting better or worse), and it
+is far stronger than the raw correlation numbers suggest — magnitude is noisy
+(leverage/theta/IV effects), but DIRECTION is highly informative. **Important honest
+caveat, not to be overclaimed**: some of this is mechanically expected for calls
+(positive delta means a call should almost always move with the underlying in
+direction) — the number is real and useful, but not as surprising as it might look in
+isolation; it answers "does direction track" more than "is there hidden information
+here," which is exactly what Layer 3 was designed to test.
+
+**Deliverable — absolute option-price error from a simple, non-optimized beta proxy**
+(no fitting, reuses already-computed group medians only, per the critic's explicit
+"beta is necessary but not sufficient" ask): reconstructing day+1 option price as
+`O0 + median_beta × ΔS` gives **median absolute error 5.2%** (global beta) or **4.6%**
+(strata-conditional beta) of the option's actual day+1 price; 90th percentile
+18.1%/16.8%; 95th percentile 29.3%/26.3%. A meaningfully strong result for a
+zero-parameter, no-IV, no-Greeks proxy.
+
+**Failure cases — identifiable, not random** (per the critic's success criterion):
+combined failure rate (no contract + day+1-illiquid, out of 16,142 attempts each)
+is clearly stratified by liquidity: **ATM+current 29.1%** (best) → **ITM+current
+36.0%** → **ATM+next 40.9%** → **ITM+next 57.0%** (worst) — matches this project's
+own long-standing finding that ITM+next-month suffers the thinnest real liquidity.
+Not random noise; a real, explainable, structural pattern.
+
+**Honest summary against the critic's precommitted criteria**: median β is
+stable across every tested stratum (real evidence for "reasonably stable within
+product strata"); failures are systematic and explainable (real evidence for
+"failures identifiable rather than random"); the decision-level (tercile) evidence
+that option movement is substantially explained by stock movement is strong (79-83%
+vs 33.3% baseline), though this is partially tempered by weak raw linear correlation
+and the acknowledged mechanical component of call-option directional co-movement.
+On balance, this looks like real, positive evidence for OX1-A's SUCCESS criteria —
+handed to the critic for the actual VALIDATE/CLOSE disposition call, not decided here.
+
+Script: `rq_ox1a_observability.py`, raw dataset `rq_ox1a_observability.csv`
+(n=38,242 breach×combo rows, 11,599 breach events, 208 tickers).
+
+## RQ-OX1-B pilot — critic review: methodology VALIDATE, model NOT validated, new permanent rules adopted (2026-09-22)
+
+**Verdict**: VALIDATE the pilot *methodology*, explicitly NOT the reconstruction model
+itself. n=3 answered the question the critic was worried about (does OX1-A's EOD
+relationship collapse immediately intraday? — apparently not) but is three
+deliberately-diverse stress cases (small reversal, strong favorable gap,
+spike-and-fade), not a representative sample — "clears the bar for a systematic
+study, not for any performance claim."
+
+**Biggest finding of the session, per critic**: not the prediction errors — the CAS
+methodological correction. *"Testing a continuous-trading model against an
+auction-determined price is a category error."* Adopted as a new **permanent
+protocol rule, "OX1 Continuous Trading Rule"**: *"Evaluation horizon ends at the last
+continuous-trading timestamp before the closing auction begins. Everything after that
+is reference-only."* Explicitly given the same standing as Rule #10 (anchor
+leakage) — future RQs must not "discover" a late-day error that's actually auction
+pricing.
+
+**Late-day degradation — real, cause NOT isolated**: critic pushed back on citing
+"theta/IV bleed" as the explanation — four competing candidates exist (theta
+accumulation, IV normalization, gamma/nonlinear delta, microstructure/spread/
+liquidity), none separated by this pilot. **Standing instruction: don't encode "theta
+window" into OX1-B; encode confidence decay instead** — a cleaner abstraction that
+doesn't require knowing the cause.
+
+**OX1-B architecture revised**: from "estimate option price at timestamps" to
+"estimate option STATE and PREDICTION UNCERTAINTY at timestamps." Output fields:
+estimated option value (primary reconstruction), confidence (morning vs afternoon
+reliability), known structural regime (ATM/current vs ITM/next etc.), evaluation
+timestamp (continuous trading only).
+
+**New requirement before automation — three baselines, not one**: the existing pilot
+only beat "naive, option unchanged" — critic explicit pushback: *"beating a weak
+baseline is necessary, not impressive."* OX1-B must compare against three baselines:
+(1) naive/unchanged, (2) opening premium carried forward, (3) a stock-percentage
+proxy ("option moves same % as stock"). Real success criterion, per critic: *"does
+reconstruction error remain economically acceptable during the decision windows you
+actually care about (5-60 minutes after open)"* — a materially higher bar than
+merely beating naive.
+
+**Per-trade reads, critic's own**: MAXHEALTH — morning excellent, late-day drift is
+"evidence of time-dependent error, nothing more." OIL — real, useful finding:
+*"linear beta is conservative during strong continuation days"* (proven); gamma as
+the CAUSE is explicitly flagged not proven. DIVISLAB — the most informative case:
+*"the stock returned toward entry, the option did not follow a linear path... path
+dependence matters"* — a stronger, more precise statement than "theta."
+
+**Proven / Not proven, critic's own list**:
+- Proven: continuous-trading evaluation protocol is correct; intraday reconstruction
+  is plausible enough to automate; morning prediction errors are encouraging across
+  three diverse cases; late-day error is a repeatable phenomenon deserving
+  measurement.
+- Not proven: that late-day error is theta specifically; that gamma explains OIL
+  specifically; that reconstruction is accurate across the population; that
+  reconstruction is accurate enough for backtesting exits.
+
+**Honest limitations, critic's own list**: n=3; stress cases not a representative
+sample; real Dhan option data only available for manually collected trades (no
+automated source); no uncertainty curve yet; no comparison against the two
+additional trivial baselines yet.
+
+**Disposition**: VALIDATE (pilot methodology only). **Exactly one next action, per
+critic**: RQ-OX1-B — Population-Scale Intraday Reconstruction Validation. Run the
+reconstruction across a LARGE sample of real trades with intraday stock paths, fixed
+continuous-trading checkpoints (5m/15m/30m/60m/120m/15:10), reporting median/90th/
+95th percentile error, directional agreement, confidence by contract strata, and
+error growth over the day. Protocol rule (now permanent): evaluation window ends at
+15:10-15:15, CAS prices never scored.
+
+**Known practical gap, flagged for the user, not yet resolved**: the critic's
+"population-scale" ask requires real intraday option ground truth at MANY trades,
+which currently only exists via manual Dhan exports (3 collected so far:
+MAXHEALTH/OIL/DIVISLAB) — there is no automated, at-scale source of real historical
+intraday option data in this project (the underlying constraint RQ-96 was originally
+parked for). Whether/how to scale data collection to make RQ-OX1-B's exact ask
+buildable is an open question, not yet decided.
+
+## RQ-OX1-B — critic decision: bounded n≈10-15 feasibility pilot, pre-registration required, Dhan automation deferred (2026-09-22)
+
+**Decision on the data-constraint question**: Path 3 chosen — expand the real-data
+pilot from n=3 to a modest, deliberately-selected n≈10-15 using manually exported
+option data (same method as MAXHEALTH/OIL/DIVISLAB), NOT "population-scale
+validation." Path 2 (automate `ticks.dhan.co`) explicitly rejected for now — *"we
+have not yet earned the right to build the data pipeline"*; would turn a research
+question into a data-access/infrastructure project with real ToS/auth/rate-limit/
+account-risk considerations before the underlying reconstruction question has been
+tested at even a modest scale. Path 1 (manual, unbounded) also rejected in favor of
+the specific n≈10-15 bound.
+
+**Real scope narrowed, usefully**: OX1-B does NOT need to prove reconstruction works
+"across the entire NIFTY 500." The actual practical question: *"Is stock-path-based
+reconstruction sufficiently credible to make historical comparisons between
+realistic intraday exit timings (+5/+15/+30/+60/+120 min)?"* — narrower, and
+answerable at small n.
+
+**Sampling requirement — deliberate coverage, not convenience, and NOT
+results-informed**: the next n≈10-15 trades must be selected to cover, without
+needing to balance perfectly: stock move direction (favorable/flat/adverse),
+intraday path shape (monotonic/spike-reversal/gap-continuation), contract type
+(ATM/current, ITM/current where available), premium level (low/higher), DTE (more
+than one bucket), day type (strong continuation/weak follow-through), and
+time-of-day behavior (early-stable vs late-divergent). Must NOT cherry-pick based on
+how well the proxy already works. **Real journal trades only** (not arbitrary
+historical candidates) — preserves connection to actual strategy entry conditions.
+
+**Pre-registration required, explicit audit-trail rule**: the selection rule must be
+recorded BEFORE seeing reconstruction results. Critic's suggested wording: *"Take
+the next eligible journal trades for which manual Dhan intraday option export is
+available, while ensuring the accumulated sample has basic coverage of move/path/
+contract conditions."*
+
+**Guardrails for this pilot, explicit — do NOT do any of these yet**: no
+Black-Scholes, no fitting a better beta (test whether the existing OX1-A ATM/current
+β=0.492 survives contact with more real data, don't re-derive it), no theta/IV
+corrections (mechanism still unverified), no new cutoff beyond the already-adopted
+15:10 Continuous Trading Rule boundary, no automating the Dhan endpoint.
+
+**Success criteria for THIS pilot — explicitly NOT a MAE threshold** (critic:
+"that would immediately turn this into threshold hunting"). Three qualitative
+questions instead: (1) does the beta-based relationship survive at early/mid
+checkpoints across the bigger sample; (2) are the failure modes understandable
+(nonlinear response on large moves, late-session divergence, path-dependence) or do
+genuinely chaotic errors appear; (3) **the most important one** — is the
+reconstruction error small relative to the actual research decision's own effect
+size (e.g. if comparing a 5-min vs 30-min exit and the strategies differ by ₹8-10,
+a typical ₹1 reconstruction error is fine; if the strategies differ by ₹2 and the
+error is ₹5, it isn't) — no absolute "acceptable error" number set in advance.
+
+**RQ dispositions, critic's own, now official**:
+- OX1-A: VALIDATE (unchanged).
+- OX1-B pilot (n=3): VALIDATE/CONTINUE — demonstrated the methodology works, exposed
+  real, understandable error modes.
+- Next: bounded feasibility pilot, n≈10-15 — explicitly NOT called "population
+  validation."
+
+**Three possible outcomes after the n≈10-15 pilot, pre-specified**: (A) reconstruction
+looks fundamentally viable → consider whether acquiring larger ground truth (i.e. the
+Dhan automation question) is worth it; (B) reconstruction is too unstable → close/
+park OX1 without ever touching Dhan infrastructure; (C) reconstruction works only for
+a clearly defined subset → investigate whether that subset maps to the actual
+options product this project trades (ATM+current-month, fast/day+1 recipe).
+
+**Exactly one next action**: run the pre-registered manual pilot on ~10-15
+additional real journal trades, same checkpoints (5/15/30/60/120 min + 15:10
+continuous-trading boundary), same frozen OX1-A ATM/current β=0.492, no fitting/
+correcting/optimizing anything. Decision on automating `ticks.dhan.co` explicitly
+deferred until this pilot completes.
+
+## RQ-OX1-B — Pilot scaled to n=9 (real journal trades + real production-detected candidates)
+
+**Population**: 9 real intraday option paths, manually exported from Dhan's internal
+charting endpoint (`ticks.dhan.co/getData`), 5-min bars. 3 from actual journal trades
+(MAXHEALTH, OIL, DIVISLAB), 6 from real production-detected breakouts not necessarily
+personally traded (PERSISTENT, ATHERENERG, BOSCHLTD, SAIL, IDEA, SOLARINDS) — user
+explicitly relaxed the "journal-only" constraint mid-pilot to reach adequate n within
+the ~30-day Dhan data-availability window (DIXON/COFORGE at 34 days old were dropped
+as too old; NAUKRI/original BOSCHLTD dates swapped when their pick_contract()-resolved
+August expiry had already lapsed).
+
+**Result**: frozen OX1-A β=0.492 (ATM/current-month) beats both naive (option
+unchanged) and stock-percentage-proxy baselines by ~3x at every checkpoint
+(5/15/30/60/120min + 15:10 continuous-trading boundary). Overall directional
+(sign) agreement 94.4% (51/54 checkpoint-decisions). Two confirmed, understandable
+error families: undershoot on large favorable moves (convexity/gamma-related), and
+overshoot when the stock fades/reverts (theta/IV/path-dependence-related) — no
+chaotic/unexplainable errors found.
+
+**BOSCHLTD false-alarm, corrected in-session**: sparse 5-checkpoint view looked like
+a data/contract bug (option barely moving despite a real stock decline). User
+provided a screenshot confirming the correct contract ("BOSCHLTD 29 SEP 50000 CALL")
+and re-exported. Full intraday path showed a genuine, continuous, monotonic decline
+— real data, not a bug. Retracted the flag. Real finding instead: β=0.492 badly
+over-predicted the DECLINE MAGNITUDE (predicted ~70-80% crash, actual ~25-30%), the
+largest magnitude-miss in the sample, a valid illustration of the model's known
+convexity limitation. **New research-process lesson, logged**: never classify an
+apparent option-data anomaly from sparse checkpoints when the full intraday series
+is available — check the full path first.
+
+**CAS/EOD methodology correction (user-caught)**: initially mixed the last
+continuous-trading stock checkpoint (15:10) with the option's true CAS-auction close
+(15:30/15:35) under one "EOD" label for MAXHEALTH. Separated permanently: 15:10
+continuous-trading checkpoint = scored; 15:30/15:35 CAS close = reference-only,
+never scored against the model. Formalized as the **"OX1 Continuous Trading Rule"**
+— same standing as Research Integrity Rule #10.
+
+**Critic disposition ("D")**: declined to force A/B/C from the original pre-spec.
+VALIDATE — OX1 reconstruction feasibility. Introduced three-way viability split:
+Reconstruction viability (can we produce a better-than-trivial estimate — yes),
+Backtest viability (can we use it to compare exit policies — the open question),
+Execution viability (can we actually get filled at it — explicitly out of scope,
+never claimed). Flagged the one unanswered question: is reconstruction error small
+relative to the actual decision's own effect size — not answerable from OX1-B alone.
+
+**Exactly one next action, critic's own**: RQ-OX1-C — Decision-Usefulness Pilot,
+using the EXISTING n=9 data (no new collection), testing whether reconstruction
+preserves the RELATIVE RANKING of hypothetical +5/+15/+30/+60/+120-min exits, not
+absolute price accuracy. Guardrails: no new beta, no theta correction, no IV model,
+no threshold optimization, no Dhan automation, no additional data collection unless
+n=9 proves insufficient.
+
+## RQ-OX1-C — Decision-Usefulness Pilot — CLOSED, PROMOTE
+
+**Method**: for each of the 9 tickers, at each of 6 checkpoints (5/15/30/60/120min,
+last-continuous), computed actual_pnl_pct and recon_pnl_pct vs entry (O0). Per
+ticker: Spearman rank correlation between the two 6-point P&L series, whether
+argmax(actual) == argmax(recon) ("best-exit match"), sign agreement per checkpoint.
+Reused `ox1b_pilot_n9_pooled.csv` as-is — no new data collection.
+
+**Result**: mean Spearman ρ=0.873 (median 0.943) across 9 tickers. Best-exit match
+7/9 (77.8%). Sign agreement 51/54 (94.4%, matches OX1-B). Per-ticker: IDEA/
+MAXHEALTH/OIL ρ=1.000 (perfect); BOSCHLTD/DIVISLAB/SAIL ρ=0.943; PERSISTENT ρ=0.771;
+ATHERENERG ρ=0.657, SOLARINDS ρ=0.600 (the 2 best-exit mismatches).
+
+**Mismatch diagnosis (checked magnitude before reporting, not just direction)**: both
+mismatches are the already-known Family-1 undershoot error, not a new failure mode,
+and neither flips sign or produces a loss — both just leave money on the table vs.
+the true optimal exit:
+- ATHERENERG: actual best = +5m (+48.4%), recon's pick = +120m (actual value there
+  = +37.8%) → ~10.7pp opportunity cost. Recon undershot the +5m spike (predicted
+  +35.5% vs actual +48.4%) but still correctly called +120m a strong, profitable
+  exit.
+- SOLARINDS: actual best = last-continuous (+37.6%), recon's pick = +60m (actual
+  value there = +32.7%) → ~4.9pp opportunity cost.
+
+**Critic verdict, full**: "This clears the decision-usefulness bar." The failure
+mode in both mismatches is "the reconstruction recognized the profitable region
+correctly but failed to identify the exact peak" — a peak-timing error, not a
+direction/state error (contrasted explicitly against the much worse failure mode of
+"exit here, you're profitable" vs. reality "no, this was a loss," which did NOT
+occur). Sign agreement (94.4%) explicitly given LESS weight going forward — rank
+preservation is "the genuinely decision-relevant result," already established by
+OX1-B's directional-agreement number. Correct scope boundary, critic's own wording:
+"OX1 is sufficiently validated to support historical research comparing materially
+different intraday exit timings, subject to reconstruction uncertainty" — explicitly
+narrower than "OX1 is accurate enough for all exit strategies" (not tested: rules
+depending on tiny 2-3% differences between closely-spaced exits).
+
+**Retired without further data collection**: the "need more ground truth" question.
+Critic explicit: would NOT automate `ticks.dhan.co` now just to raise n, would NOT
+require dozens more manually-collected trades as a prerequisite to using OX1 —
+"more data can improve confidence later, but it is no longer a prerequisite for the
+next research decision." Architectural feasibility question is answered; remaining
+uncertainty is precision/edge-case robustness, not whether the premise works.
+
+**Frozen design constraint, critic's own, now official — three distinct claims**:
+1. State reconstruction — supported (useful approximation of historical option
+   state from underlying movement).
+2. Backtest reconstruction — supported with caveats (preserves broad relative
+   outcome of fixed intraday exit timings).
+3. Execution reconstruction — NOT supported, and never claimed. Cannot know
+   bid/ask spread, available quantity, fill latency, slippage, order-book behavior,
+   or whether a price was actually executable. This boundary must be explicit in
+   any future architecture — **a reconstructed option value must never be labeled
+   "exit price"; it must be labeled reconstructed option state/value, distinct from
+   executable exit price.**
+
+**CAS rule reaffirmed, refined**: keep 15:10 continuous-trading boundary as the
+scored evaluation window; CAS remains reference-only. Do NOT additionally exclude
+120min/late-day checkpoints — late-day reconstruction is less reliable (documented
+overshoot family) but not useless. Don't manufacture a cutoff the evidence hasn't
+established; future OX1 outputs should carry their timestamp naturally with the
+known fact that tail error widens later in the session.
+
+**Theta/IV/gamma corrections: still explicitly rejected.** Critic: OX1-C's result is
+what SAVES the project from unnecessary modelling — two systematic, understood
+failure families (large-move undershoot, fading-move overshoot) are enough to use
+the reconstruction for its validated purpose; adding IV/theta/gamma/DTE curves would
+turn a simple empirical reconstruction layer into a pricing model, not justified yet.
+
+**Disposition: PROMOTE — OX1 to Research Infrastructure / Validated Reconstruction
+Layer.** Not production. Not an execution simulator. Not a new trading signal. The
+architectural feasibility hypothesis is closed; OX1 is no longer an open research
+question.
+
+**Not proven (explicit, critic's own list)**: a stable population-level mismatch
+rate (n=9, 2 mismatches, can characterize the mechanism not the rate); accuracy
+across every option regime; that reconstruction can safely choose between very
+closely-spaced exit outcomes; actual historical execution prices.
+
+**Original MAXHEALTH motivation, resolved scope**: OX1 can now help answer "what
+would the option's reconstructed state have been if I'd exited 5 minutes after
+open" — it cannot and will never answer "what exact price would I have gotten."
+Future backtest output must distinguish these two as separate fields, not conflate
+them under one "exit price" label.
+
+**Exactly one next action, critic's own**: **RQ-OX1-D — Define the production-safe
+research interface for reconstructed option exits.** Before implementing anything
+broadly: specify exactly what OX1 exposes to the options backtest (reconstructed
+option value, timestamp, contract metadata, and an explicit reconstruction-
+confidence/uncertainty field), and define how the backtest reports reconstructed
+outcomes without presenting them as executable fills. Guardrails: no new model, no
+more beta fitting, no additional data hunt, no trading-rule changes. This is the
+architectural handoff from "research hypothesis" to "validated research
+infrastructure" — a spec/interface-design task, not a data or modelling task.
+
+## RQ-OX1-D — Production-Safe Research Interface — APPROVED with revisions, IMPLEMENTED
+
+**Critic verdict on the draft spec**: APPROVE with two required changes, both about
+preventing future misuse rather than changing the model.
+
+**Required Change #1 (adopted)**: added immutable provenance field
+`reconstruction_method = "OX1_beta_v1_ATM_current_0.492"` on every reconstruction --
+so a future OX1 beta v2 or nonlinear proxy never gets silently conflated with this
+result.
+
+**Required Change #2 (adopted)**: split the singular `reconstruction_confidence`
+into two concepts -- `reconstruction_flags[]` (factual, multi-valued conditions:
+LARGE_MOVE, LATE_SESSION, MONEYNESS_TRANSITION, PATH_DEPENDENCE) and a derived
+categorical `reconstruction_confidence` (BASELINE = no flags, CAUTION = one flag,
+LOW_CONFIDENCE = multiple flags, or any UNVALIDATED_STRATUM). A single checkpoint
+can legitimately carry multiple conditions; the original singular field couldn't
+express that.
+
+**FADING_REVERSAL renamed PATH_DEPENDENCE** (critic: the original wording described
+an implementation -- direction sign-flip -- not the actual mechanism, which is
+broader path-dependent deterioration/fade from an intraday excursion; a stock can
+retrace most of its move without a literal direction reversal).
+
+**execution_status field added** alongside `executable_price=None` -- critic:
+"prevents people from treating NA as missing data instead of intentionally
+unavailable data." Always `"NOT_MODELED"`.
+
+**Canonical OX1 Principle, critic's own wording, now elevated to project-level
+status**: "OX1 is validated for comparative research across candidate exit
+timings, not for asserting executable historical option prices."
+
+**New guardrail, critic's own (Non-Goals)**: OX1 outputs must never be used as an
+optimization target -- don't optimize a stop, hold duration, or threshold against a
+reconstructed premium. That's exactly how reconstruction uncertainty becomes fake
+precision in an optimization objective.
+
+**New guardrail on cross-comparisons**: actual-option <-> reconstructed-option
+(allowed), reconstructed-ranking <-> actual-ranking (allowed, this is OX1-C's
+validated use), fill <-> quoted-option (allowed, execution analysis). Fill <->
+reconstructed (FORBIDDEN) -- reconstruction is not execution, computing a
+"slippage" number against a reconstructed value would misrepresent both.
+
+**New artifact type, critic's own, added to the project's disposition taxonomy**:
+**Research Infrastructure** -- a shared utility that enables future RQs but does
+not constitute a trading rule. Distinct from PROMOTE (trading feature), TELEMETRY
+(live observation), VALIDATE (finding), PARK/CLOSE. OX1 is the first thing in this
+project classified this way.
+
+**Architectural boundary, critic's own, now enforced**: `option_backtest.py`
+remains the production/reference engine; `ox1_reconstruction.py` is the research
+infrastructure provider, consumed by research RQ-*.py scripts only -- never
+imported into `option_backtest.py`, `daily_scan.py`, or any live/production path.
+Keeps "production code stays boring / research code stays isolated."
+
+**Implementation (`ox1_reconstruction.py`, standalone module, new file)**: exposes
+`reconstruct_option_value(...)` returning a `Reconstruction` dataclass with all of
+the above fields. Verified against the n=9 pooled data before use: reimplemented
+formula (`O_pred = O0 + beta * delta_S`, beta=0.492) reproduces all 54 stored
+`O_pred` values from `ox1b_pilot_n9_pooled.csv` exactly (0 mismatches) -- confirms
+the module didn't silently drift from the already-validated formula. Spot-checked
+flag/confidence behavior across all 9 tickers at the last-continuous checkpoint:
+confirmed NOT artificially correlated with known reconstruction quality (e.g. IDEA
+has perfect rho=1.000 but still gets LOW_CONFIDENCE from a LARGE_MOVE flag; SOLARINDS
+has the worst rho=0.600 in the sample but only CAUTION) -- consistent with, not
+contradicting, the critic's own explicit caveat that the flags describe known
+degradation conditions, not estimated reconstruction error, and are not proven to
+independently explain error magnitude.
+
+**Heuristic thresholds, explicit, NOT tuned to the 2 known OX1-C mismatches**:
+LARGE_MOVE >= 3.0% stock move since entry, LATE_SESSION >= +120min elapsed,
+PATH_DEPENDENCE = retraced >=50% of its own largest intraday excursion,
+MONEYNESS_TRANSITION = bucket changed vs entry (+-2% ATM band, matching RQ-OX1-A).
+Round, pre-registered-style numbers chosen from the pilot's general character, not
+fit to maximize agreement with the known mismatches -- doing that would be the
+exact threshold-hunting Research Integrity Rule #6 forbids.
+
+**Disposition: Research Infrastructure, promoted and implemented.** OX1 arc
+(A/B/C/D) is now closed end-to-end: hypothesis -> validated -> interface-specified
+-> implemented as an isolated module, ready for future research RQs to consume.
+No production/live-trading code touched at any point in the arc.
+
+## RQ-OX1-E — Day+1 Intraday Exit-Checkpoint Study — VALIDATE (descriptive), REJECT (policy)
+
+**Method**: n=367 real breakout events (freshness<=0.40, F&O, day+1 inside intraday
+coverage window). Entry anchor (O0, S0) real EOD option-chain data at breakout-day
+close; day+1 checkpoints (09:15/09:30/10:00/11:30/15:25) reconstructed via
+`ox1_reconstruction.py`. Direct motivation: the fast/day+1 play's planned exit at
+day+1 09:15 open is unfillable in practice.
+
+**Pooled result (initial, before the tension surfaced)**: looked like a general fade
+-- 09:15 best (median +4.338%), degrading through 10:00/11:30 (median +3.118% at
+11:30), ~2pp median cost for waiting past 09:30.
+
+**Tension #1, surfaced by direct user question ("is it always by 10 we have options
+fading or are you only checking within gap-ups?")**: split by day+1 gap direction
+(vs breakout-day close) and the "fade" completely dissolved as a general effect --
+it was a population-composition artifact. Gap-up (139/367): expectancy IMPROVES
+through 11:30 (+22.9%->+25.1%), breakout momentum continuing into day+1. Gap-down
+(60/367): worsens through 11:30 (-20.0%->-22.5%) then partially recovers by EOD.
+Flat-open (168/367, the plurality): decays 09:15->10:00 (+1.1%->-0.1%) -- this
+bucket alone was dragging the pooled aggregate down. The original pooled framing
+("waiting costs ~2pp generally") was misleading.
+
+**Tension #2, surfaced by a second direct user question ("but generally a flat
+should cause a theta decay?")**: checked whether the flat bucket's own wobble is
+real theta decay or a model artifact. `ox1_reconstruction.py` has ZERO theta term
+by construction (`O_pred = O0 + beta*delta_S` only) -- a disclosed guardrail since
+OX1-A, not an oversight. Verified against REAL n=9 pilot data: IDEA's actual +5-min
+checkpoint has stock move = exactly 0.000% and the real option price genuinely
+unchanged (Rs0.48->Rs0.48) -- confirms no visible theta bleed at 5-min granularity,
+as expected. Conclusion: the flat bucket's wobble is residual stock noise through
+beta, not theta. Genuine, disclosed open question: over the longer day+1 horizon
+(overnight + up to 2h15m), real theta could be non-negligible and is unverified
+either way from available data.
+
+**Critic verdict, in full**:
+- VALIDATE the descriptive stratification finding: population composition
+  materially changes pooled interpretation; gap direction is a meaningful
+  explanatory split; OX1 remains useful/valid across all three gap groups; theta
+  correctly left unproven (not attributed to residual error).
+- REJECT (do not promote) the conditional exit policy ("gap-up names can tolerate
+  waiting toward 11:30; flat/gap-down names should be exited fast"). This is a NEW
+  intervention/trading rule that OX1-E did not validate -- OX1-C validated
+  COMPARISON across fixed checkpoints, not CONDITIONAL checkpoint SELECTION based
+  on gap regime. Different claim, different validation requirement.
+- **Critic's correction on my theta wording**: I wrote "the true flat/gap-down
+  picture is probably worse than shown" -- critic: soften "probably" to "if theta
+  contributes meaningfully over the overnight+intraday horizon, the reconstruction
+  would not capture it" -- an identified blind spot, not a directional claim we can
+  yet make.
+- **Family-2 overshoot connection**: keep as a plausible, unconfirmed contributor
+  only -- "Family-2 overshoot observed -> late-day/path-dependent degradation
+  observed -> theta is one plausible contributor," explicitly stop there, don't
+  elevate.
+- **New dimension flagged, not previously noted**: gap direction is observable at
+  09:15 (known before the exit decision, so no lookahead violation) but this
+  introduces a "selection timing" distinction future RQs must make explicit:
+  pre-open decision vs. post-open decision.
+- **Danger flagged on the gap-up bucket specifically**: most attractive numbers,
+  easiest to overfit into a rule ("hold gap-ups until 11:30") without having
+  checked reversal frequency after early strength, variance, downside tail, or
+  robustness across regimes -- OX1-E only reports average behavior, a policy needs
+  distributional behavior.
+
+**OX1's validated-capability boundary, now formalized (critic's own)**:
+1. Reconstruct option path from stock path -- VALIDATED.
+2. Compare fixed candidate exit checkpoints -- VALIDATED (this is OX1-C's scope).
+3. Choose checkpoint conditionally on market state (e.g. gap direction) -- NOT
+   VALIDATED. This is exactly where OX1-E stops, per critic: "This is actually a
+   new RQ, not an extension of OX1-E ... the reconstruction layer is no longer the
+   question." A gap-conditioned exit policy is a distinct exit-strategy hypothesis,
+   different disposition, different validation path from OX1 itself.
+
+**New standing methodology rule adopted -- numbered Rule #12** (NOTE: critic
+proposed calling this "Rule #11," but Rule #11 is already taken -- Provenance
+Requirement, adopted 2026-09-21 during the O'Neil Benchmark week. Caught and
+corrected before logging; using #12 instead):
+
+**Research Integrity Rule #12 (Population Composition Audit)**: before reporting
+any pooled performance result, audit whether a cheap, obvious partition of the
+population reverses or materially changes the interpretation (examples: gap
+direction, market regime, DTE bucket, pattern family, liquidity bucket, moneyness
+bucket). Not permission to slice endlessly -- specifically the most structurally
+obvious, cheap, pre-entry, economically meaningful composition variables. Distinct
+from Rule #10 (Shared Anchor Leakage, a feature/outcome correlation-construction
+problem) and Rule #11 (Provenance Requirement, a reproducibility problem) -- Rule
+#12 protects against aggregation/composition artifacts specifically.
+
+**How this surfaced, explicit, logged per Rule #12's own spirit**: both tensions
+were caught by the user's direct questions, not by a pre-report check on my part --
+the pooled result was drafted and nearly reported as a general finding before
+either challenge. This is exactly the gap Rule #12 is meant to close going forward.
+
+**Disposition: VALIDATE — exploratory stratification finding. Do NOT promote the
+conditional exit policy.** The descriptive finding (population composition changes
+interpretation; gap direction is meaningful; OX1 works across all 3 gap groups) is
+real and stands. The intervention (gap-conditioned exit timing) remains an
+unvalidated hypothesis.
+
+**Exactly one next action, critic's own**: **RQ-OX2 — Opening Gap as an
+Exit-Modifier** (new RQ identity, NOT an OX1 extension -- this is an exit-strategy
+question, not a reconstruction question). Bounded question: "does opening gap
+direction robustly modify the relative ranking of fixed exit checkpoints across
+out-of-time samples?" Requirements: pre-register gap buckets BEFORE analysis;
+report checkpoint ranking within each bucket, variance/tail behavior, and
+robustness across an out-of-time split (not just the same in-sample population).
+No theta model, no reconstruction changes, no production rule until complete.
+
+## RQ-OX2 — Opening Gap as an Exit-Modifier, run with an explicit unmet requirement (2026-09-24)
+
+**Feasibility check done first, real data constraint surfaced and discussed directly with the user before proceeding**: intraday_cache is hard-capped at Yahoo's rolling 60-day 5-min-bar retention window (confirmed 2026-09-01, server-side, not paginable — a request for any date older than 60 days from NOW is rejected outright, permanently, regardless of how the request is split). The cache's actual ~3.3-month depth (2026-06-10 to ~09-23) reflects real elapsed calendar time accumulating via repeated `refresh()` snapshots since that date, not a single deep fetch — meaning the ONLY way to get a longer window is to let more real time pass. Within that window, RQ-OX1-E's population is only n=367 real breakout events (gap-up=139, gap-down=60, flat=168) — splitting further for a genuine out-of-time check would leave gap-down at ~30 per half, too thin to trust. **User's explicit instruction: proceed anyway with whatever data exists, flag the gap honestly rather than skip or fake it.**
+
+**Reused existing per-trade OX1 reconstruction data** (`rq_ox1e_exit_checkpoints.csv`, 1,835 rows = 367 trades x 5 checkpoints, already built and validated in the prior RQ-OX1-E session) rather than re-running the full pipeline. Gap bucket re-derived and confirmed to exactly reproduce the documented split at the ±0.5% threshold on the 09:15 checkpoint's stock move (139/60/168 — exact match), confirming this was the original methodology, not a newly-mined threshold.
+
+**Checkpoint ranking + variance/tail behavior, all 3 gap buckets, 09:15/09:30/10:00/11:30/15:25 (plus a new 09:20 checkpoint, added per direct user request — see below)**:
+
+| Bucket | 09:15 median (std, p10, min) | 11:30 median (std, p10, min) | 15:25 median (std, p10, min) |
+|---|---|---|---|
+| Gap-Up (n=139) | +16.81% (19.14, +8.64%, +6.41%) | +20.40% (30.86, -3.85%, -16.65%) | +14.87% (33.24, -12.26%, **-43.93%**) |
+| Flat (n=168) | +1.46% (5.38, -6.19%, -12.94%) | -0.74% (22.15, -23.47%, -50.03%) | +0.17% (28.53, -24.69%, **-105.25%**) |
+| Gap-Down (n=60) | -17.50% (12.38, -30.31%, -76.82%) | -18.01% (24.46, -45.91%, -128.54%) | -11.27% (28.38, -49.18%, -112.87%) |
+
+**Real finding, addresses the critic's own flagged concern directly**: median/mean stay roughly stable or even improve through 11:30 in every bucket, but **variance and downside tail risk grow substantially at every later checkpoint in all three buckets** — Gap-Up's worst-decile flips from "always profitable" (p10=+8.64% at 09:15) to "a real loss" (p10=-3.85% at 11:30) despite its median IMPROVING; by 15:25 a genuine large-loss tail appears (-43.93% min) that simply didn't exist at the open. This directly answers what OX1-E flagged as unchecked before ("reversal frequency, variance, downside tail on the attractive gap-up bucket") — now checked, in-sample, and the answer is real risk exists that the averages alone hid.
+
+**New 09:20 checkpoint, added per direct user request ("09:15 we cannot really exit... check at 9:20 and 9:30")**: reused the existing entry anchors (O0/S0, identical across all checkpoints per trade) and the frozen OX1 beta (0.492), computing only the new stock-path point — no re-run of the full option-chain pipeline needed. **Result: the tail widens almost immediately, not gradually** — comparing 09:15 to just 5 minutes later (09:20), means/medians barely move in any bucket, but Gap-Up's min flips from +6.41% (always profitable) to -0.49% (first loss appears); Flat's min roughly doubles (-12.94%->-25.83%); Gap-Down's max flips from -5.43% (always a loss) to +5.83% (first recovery appears). A meaningful share of the session's eventual dispersion is already present within the first 5 minutes after open — sharpens rather than changes the main finding.
+
+**Explicit scorecard against the critic's 4 requirements**:
+1. Pre-register gap buckets before analysis — satisfied with a caveat: reused the already-established ±0.5% threshold from an earlier session (confirmed reproduces the documented split) rather than a freshly-invented number, close to but not identical to blind pre-registration.
+2. Checkpoint ranking per bucket — done.
+3. Variance/tail behavior — done, this is what surfaced the real finding.
+4. **Robustness across an out-of-time split — NOT MET.** Explicitly flagged, not silently skipped: the population is too thin (gap-down n=60) to support a trustworthy split given the hard 60-day intraday data ceiling. Ran anyway on user's explicit instruction, with this gap stated up front.
+
+**Disposition (pending critic)**: descriptive/exploratory finding only, same as the original OX1-E disposition — VALIDATE the tail-risk observation as real and useful context, do NOT treat as validating any conditional exit policy (gap-conditioned timing rule), since requirement #4 is unmet. This is now the SECOND time this exact tail-widening-with-no-out-of-time-validation pattern has appeared — worth naming to the critic as a standing data ceiling on ALL future intraday-option-timing research until real calendar time passes, not specific to this one RQ.
+
+**Critic disposition: VALIDATE the observation, do NOT promote any exit policy.** Real read: "opening gap changes the risk distribution of exits much faster than it changes the median return — the tails are the story, not the medians." Confirmed real: gap-up median improves into 11:30 AND gap-up downside tail becomes much worse into 11:30 (both true simultaneously — not a contradiction, a genuine risk/reward decoupling); flat bucket deteriorates quickly post-open; gap-down shows occasional recoveries after 09:20. "Wait until 11:30 on gap-ups" explicitly NOT supported.
+
+**The 09:20 result judged the more important finding, not just a footnote**: "You showed that within five minutes, medians barely move but dispersion expands dramatically — that suggests the opening auction vs continuous trading transition is doing a lot of the work." New framing adopted: **"09:15-09:20 is a regime transition, not just five more minutes of the same market"** — a real research insight independent of any exit policy question.
+
+**Three reasons given for staying descriptive, not promoting a policy**: (1) no out-of-time validation (already disclosed); (2) gap-down's small sample (n=60) makes any conditional policy fragile; (3) OX1 is reconstruction-based, and late-session tails are already the least trustworthy part of the model — compounding uncertainty on top of thin data.
+
+**New Research Integrity Rule #15 adopted (Tail-Aware Intraday Reporting)**: any intraday exit-timing study must report BOTH median/mean outcome AND downside-tail metrics (p10, min, std) together — median-only reporting would have produced the wrong conclusion in this exact case (gap-up looked strictly better through 11:30 on medians alone, while its downside tail was simultaneously getting worse). Same family as Rule #13 (proxy vs real exit) — a methodology gap that silently changes the right answer if skipped.
+
+**Final status, Priority B ledger**: OX1 reconstruction infrastructure — Promoted (earlier). Day+1 gap descriptive study (RQ-OX2) — Validated observation (not a candidate, not closed-negative). Gap-conditioned exit policy — **Parked pending longer intraday history** (not rejected, not promoted — genuinely waiting on the cache to deepen naturally over real calendar time). Gap bucket telemetry and the 09:20 checkpoint both kept as supported, reusable analysis tools going forward.
+
+## IOC Execution Behavior (Priority B item #3) — CLOSED, not a tractable research question
+
+**Attempted first, then retracted after a decisive user correction**: built a 5-min-bar-based "same-bar slippage" proxy (breach bar's Close vs the assumed zero-slippage entry price, `primed_engine.py`'s `SLIPPAGE_PCT=0.5%` currently only applies to stop exits, never entries) on the runaway/pullback population (n=3,896). Real numbers: mean +0.133%/median +0.028% adverse drift, p90=+0.787% in the worst decile — but immediately flagged as a weak proxy even before the user's correction, since 5-minute bars are too coarse to isolate genuine execution friction from ordinary continued price movement, and can't distinguish "filled near trigger then price reversed" from "touch was too brief, order never filled" (a real, unmodeled missed-entry risk).
+
+**Decisive correction, changes the whole premise, not just the data quantity**: real execution is NOT a single, fixed mechanism — the user sometimes places a genuine IOC order at the trigger touch, and sometimes manually runs the dashboard and places a discretionary limit order instead, choosing case by case. This means there is no single underlying execution process to characterize statistically at all — unlike the RQ-OX2 intraday-window constraint (a genuine "not enough data yet, will improve with real calendar time" gap), this is a **structural non-tractability**: even with far more real trade history, "IOC execution slippage" wouldn't resolve into a clean distribution, because a meaningful share of real trades were never IOC executions in the first place, and the two mechanisms have fundamentally different fill profiles (algorithmic near-instant fill-or-nothing vs human-timed discretionary limit order).
+
+**Disposition: CLOSED, not parked.** This is a different closure reason from every other item today — not "null result," not "insufficient data," but "the research question itself doesn't map onto a discoverable phenomenon given how execution actually happens in practice." The backtest's zero-slippage assumption remains a known idealization for both real execution paths, but resolving it isn't a data-collection problem to revisit later — don't reopen this exact framing without a fundamentally different premise (e.g., if execution ever becomes fully mechanized/consistent, or if the question is reframed around something else entirely, like comparing OUTCOMES of the two chosen methods rather than characterizing "IOC slippage" as if it were one thing).
+
+**Priority B fully resolved**: OX1 infra (promoted), RQ-OX2 (validated observation, gap-conditioned policy parked), IOC execution behavior (closed, non-tractable). All three named Priority B areas now have a final disposition.
+
+## Same-Day Pullback Entry vs Original Breach Entry — real, verified finding (2026-09-24)
+
+**Motivation, direct from user's own real workflow**: sometimes a candidate is too far from trigger (>1%) to justify an IOC on one dashboard refresh, then on a LATER refresh (same day) it's found having breached and pulled back to somewhere between the raw pivot and the band. Question: is entering at that later, pulled-back price genuinely better than the original breach-moment price would have been?
+
+**First attempt was wrong-scoped twice, corrected before trusting anything**: (1) initially tested a MULTI-DAY retrace (wrong — this is a same-day behavioral question, not a multi-day one); (2) then tested the wrong SAME-DAY zone (price still above trigger, "off the peak but not back down" — user's own pivot=100/band=103-105 example clarified the real definition is Close coming back down to AT OR BELOW the trigger itself, matching `live_checkpoint.py`'s real `PULLED_BACK_TOLERANCE_PCT=0.5%` measured from the raw pivot — which happens to numerically equal this project's own `TRIGGER_CLEARANCE=1.005`, so "Close<=trig" is the exact correct same-day analogue).
+
+**Coverage and depth** (n=3,896 total breach population, `pulled_back=True` subset n=3,484, 89.4%):
+- 83.0% of the TOTAL breach population offers a genuine same-day pullback-to-trigger entry (92.8% of pullback-type candidates) — median 5 minutes after the breach bar.
+- Depth: median discount below trigger 0.222%, mean 0.388% (p90=0.908%, real tail). Only 24.7% settle at/below the raw pivot itself — most pullbacks are shallow, closer to the trigger side of the band, not a deep round-trip to the pivot.
+- On the REAL production-gated population (`base_filters_pass()`, n=1,359): essentially identical mechanics — 79.5% coverage, 0.210% median discount, 23.6% settling at/below pivot. **The gates change entry quality, not pullback geometry.**
+
+**Real outcome comparison, n=3,233 (genuine same-day pullback cases), paired trade-by-trade**:
+
+| Metric | Entry at breach | Entry at pullback |
+|---|---|---|
+| Win% | 54.5% | 56.4% |
+| Median pnl_pct | +0.921% | +1.237% |
+| Mean R | -0.0249 | +0.0020 |
+| Cumulative R @5 / @10 | -1.37 / -1.46 | -0.003 / +0.175 |
+| Max DD @5 / @10 | -7.01 / -9.13 | -6.42 / -9.64 (slightly worse at 10) |
+| Worst streak @5 / @10 | -4.83 / -3.91 | -2.62 / -3.02 |
+
+Paired sign-flip randomization test: **100.0th percentile** (essentially p<1/5000), **99.3% of individual trades** show the pullback entry beating the original breach entry.
+
+**Bias/sanity checks run, all clean, before trusting this** (per direct user request — "make sure we have not messed up anything"): outlier concentration (top-1 trade only 1.26% of total gain, top-10 only 6.87% — not outlier-driven, and the significance test used the median anyway); ticker concentration (495 unique tickers, top-5 only 2.6% of trades); risk_pct sanity (no negative/zero values, sensible distribution). **One important caveat flagged, not hidden**: the parallel options (`day1_open_ret`) comparison shows 100.0% of trades outperforming — but this is PURELY MECHANICAL (same fixed next-day-open numerator, only entry_price differs, so a cheaper entry algebraically must produce a better ratio every time) — not independent confirming evidence, unlike the swing result which has genuine variation (0.7% of cases go the other way) because stop/target levels are also computed relative to entry price.
+
+**Win/loss size decomposition, resolves an apparent tension the user asked about directly**: win rate (54.5-56.4%) and median (positive) both look healthy, but mean R/drawdown are only marginally positive — NOT because trades usually lose, but because average losses (-5.96% breach / -5.76% pullback) are somewhat larger than average wins (+4.53% / +4.73%), so the loss side's total magnitude roughly matches or exceeds the win side's in aggregate. The pullback entry narrows this gap on both sides (bigger avg win, smaller avg loss, higher win rate) enough to flip the aggregate from net-negative to roughly breakeven-positive.
+
+**Runaway vs Pullback R-contribution — the real strategic finding, directly answers "is this whole strategy any good"**:
+
+*On the RAW/ungated breach population (n=3,896, ZERO quality filters, just `High>=trigger`)*:
+
+| Group | % of trades | Win% | Median | R-sum | % of total portfolio R |
+|---|---|---|---|---|---|
+| Runaway | 10.6% | 70.6% | +3.457% | +84.1 | **132.6%** |
+| Pullback | 89.4% | 56.1% | +1.069% | -20.7 | **-32.6%** |
+
+The rare runaway trades (10.6%) contribute MORE than the entire portfolio's total profit. The pullback majority is a net drag in aggregate. Capacity-constrained: Runaway alone cumR=+8.32@5/+17.72@10 (tight DD -0.79/-1.45); Pullback alone barely positive (+0.63@5/+0.92@10, worse DD); **combined, BOTH mixed together, cumR is NEGATIVE (-3.04@5/-1.63@10) — worse than either sub-group alone** — a crowding-out effect where the sheer volume of mediocre pullback trades occupies FCFS slots ahead of the rare, excellent runaway trades.
+
+*On the REAL production-gated population (`base_filters_pass()`, n=1,359) — this fixes it*:
+
+| Group | % of trades | Win% | Median | R-sum | % of total portfolio R |
+|---|---|---|---|---|---|
+| Runaway | 13.0% | 70.6% | +3.628% | +32.3 | 56.3% |
+| Pullback | 87.0% | 59.7% | +1.524% | +25.1 | **+43.7%** (flips positive) |
+
+Real filters (RSI band, EMA34 persistence, momentum, liquidity, trend — no RVOL, no runaway/pullback awareness at all) don't change the runaway/pullback ratio (still ~13% runaway) but substantially improve pullback quality itself, flipping it from a net drag to a genuine contributor. **Combined capacity-constrained cumR is now POSITIVE (+0.88@5/+2.33@10)** — the crowding-out problem is resolved. **Conclusion: the currently-live BC strategy is NOT suffering the "89% dead weight" problem found in the raw/ungated research population** — that was a property of the deliberately-unfiltered test population used to isolate mechanisms all session, not of what's actually live.
+
+**Cross-check against Cell C, per direct user request**: does Cell C's healthy win%/R hide the same fat-tail-loss-drag pattern? No — Cell C's avg winner (+5.80%) is BIGGER than the raw BC population's (+4.53%), avg loser is about the same (-6.03% vs -5.96%), win rate is higher (62.7% vs 54.5%), and sum-of-wins clearly exceeds sum-of-losses (1488.8 vs 968.8, ~1.5:1) — a genuinely healthy, structurally different population, not the same problem in a healthier-looking wrapper. Mechanism: Cell C's 40-day pivot + SMA200 + volume>=1.5x filters (even without RSI/EMA34/momentum) cut out most of what the completely-unfiltered 10-day raw test let through.
+
+**Final BC (real gated) vs Cell C comparison, same slots=5/10 convention**:
+
+| Metric | BC (real production-gated) | Cell C (O'Neil filtered entry) |
+|---|---|---|
+| n | 1,359 | 7,769 |
+| Win% | 61.1% | 62.7% |
+| Median | +1.712% | +2.253% |
+| Cumulative R @5 / @10 | 0.88 / 2.33 | **4.26 / 28.92** |
+| Max DD @5 / @10 | -2.89 / -3.89 | -8.41 / -11.10 |
+| Worst streak @5 / @10 | -1.80 / -1.40 | -2.76 / -3.40 |
+
+Win%/median are close (Cell C modestly better); the large cumR gap at slots=10 is mostly Cell C's ~6x trade volume filling capacity, not dramatically higher per-trade quality — consistent with the original O'Neil Benchmark finding (Cell C wins on throughput, BC wins on tightness/drawdown-per-trade).
+
+## Cell C Candidate Stack Audit — combining doesn't compound, and a caught definitional mismatch (2026-09-24)
+
+**Stack audit run exactly per critic spec**: overlap matrix (Neither/Volume-only/R2+Mom-only/Both) plus cumulative capacity audit (Original/Minus-R2Mom/Minus-Volume/Minus-Both) at slots=5/10/20/50. Overlap: Neither 79.2% (win 63.3%/+2.386%), Volume-only 19.5% (61.0%/+1.808%), R2+Mom-only 0.8% (46.7%/-0.495%), Both 0.5% (60.0%/+0.592%, thin-sample, not to be over-read). **Result: the combined filter does NOT beat either alone — at slots=20/50, "Minus BOTH" was the worst of all four variants**, even below doing nothing. Throughput guardrail cleared (5.1x BC's ~1,200), so not a "collapsed to BC" problem — specifically a non-additive/overlapping-damage interaction, closer to critic's "Scenario B.5" than clean Scenario A.
+
+**While investigating this, built a Cell C runaway-vs-pullback check that produced a dramatic but INVALID comparison — caught before trusting it.** Used a fundamentally different definition than BC's same-day intraday check: BC checks "does price dip back to trigger within the SAME breach day" (an early, largely exit-independent path property); the Cell C version checked "does price ever close back at/below the pivot at ANY POINT during the entire multi-day/multi-week holding period" (a property strongly entangled with the eventual exit itself). **Critic's read**: this is closer to "trades that spend time being weak tend to finish weaker" — descriptive, not a new predictive mechanism. Classified as **Audit Gate** (explanatory only), NOT research evidence — the 39.2%/60.8% runaway/pullback split and its dramatic R-contribution (190.9%/-90.9%) should NOT be cited as a strategic finding about Cell C.
+
+**Sanity-checked whether BC Primed made the same mistake — it did not, high confidence.** BC Primed changed only the ENTRY timestamp (EOD close -> intraday trigger touch) with the feature set staying pre-entry and the exit engine unchanged — a valid counterfactual (entry timing only). It never redefined the OUTCOME using future path information the way today's Cell C check accidentally did. The real BC issue found this session (historical win rate measured on the Confirmed/EOD population, not the IOC/Primed population actually traded) was a population-selection issue, already corrected via the Confirmed/Primed/Raw naming discipline — a different problem, already resolved, not reopened.
+
+**Direction agreed: Cell C SHOULD eventually move to a "Cell C Primed" architecture** (O'Neil 40-day pivot -> real intraday breach/touch -> our exit), putting it on the same architectural footing as BC and answering the real question ("can O'Neil's broader entry produce a high-throughput LIVE intraday population while retaining exit quality"). **But not yet** — rebuilding now would collapse the 7,769-trade multi-year research population down to the ~3-month intraday-cache window (same hard Yahoo 60-day-retention ceiling documented earlier), destroying the robustness/throughput advantage that made Volume Quality and R2+Momentum credible in the first place, and would conflate two separate questions ("does Primed work" and "which filters should Primed have") at once.
+
+**Sequencing adopted (critic-specified)**: Phase 1 — finish exploiting the 7,769-trade EOD Cell C (resolve the cumulative stack question, freeze a "Cell C v1" filtered candidate, stop searching for a Filter #3 indefinitely). Phase 2 — build Cell C Primed on the same architecture discipline as BC, then explicitly test whether the EOD-discovered filters (Volume Quality, R2+Momentum) transfer to the Primed population — this is where the runaway/pullback question properly belongs, not on the EOD population. Long history -> research discovery; short intraday history -> live-architecture validation — a deliberate division of labor, not a data limitation to apologize for.
+
+**Immediate bounded action — Incremental Contribution Audit, R2+Momentum after Volume Quality (exactly 3 outputs, no new thresholds)**:
+
+1. **Population overlap**: of R2+Momentum's 100 candidate trades, only 40% are already caught by the Volume filter — **60% (n=60) are genuinely incremental**, not redundant.
+2. **Capacity audit, Volume-alone vs Volume+R2 (slots=5/10 only)**:
+
+| Metric | Minus Volume alone | Minus Volume+R2 |
+|---|---|---|
+| n | 6,215 | 6,155 |
+| cumR@5 | 22.51 | 23.14 |
+| Max DD@5 | -9.71 | **-8.29** |
+| Worst streak@5 | -3.50 | **-2.39** |
+| cumR@10 | 70.28 | 70.91 |
+| Max DD@10 | -7.69 | **-6.46** |
+| Worst streak@10 | -3.95 | -3.73 |
+
+Adding R2+Momentum on top of Volume barely moves cumR (+0.63 at both slot counts) but meaningfully tightens drawdown (~15-16% at both) and worst streak.
+
+3. **Incremental cohort alone (n=60, R2+Mom-bad but NOT already Volume-bad)**: win%=46.7%, median=-0.495%, R-sum=-6.82, mean R=-0.1137 — **confirmed genuinely toxic standalone**, not overlap noise. The small cumR delta (not matching the full -6.82 R-sum removed) is the same FCFS scheduler-fragility effect documented repeatedly this project — removing trades changes which OTHER trades fill the freed capacity slots, so raw cumR delta doesn't map 1:1 to the removed cohort's own R-sum.
+
+**Disposition: KEEP BOTH filters.** R2+Momentum adds real, if modest (mainly risk-shape — drawdown/worst-streak — not raw cumR), incremental value beyond Volume Quality alone. Recommend freezing **"Cell C v1" = O'Neil entry + our exit + Volume Quality (bottom-20% ad_fraction) + R2+Momentum (R2<=0.25% AND mom_pct<0.1)** as the Phase 1 conclusion, then proceeding to Phase 2 (Cell C Primed construction) per the sequencing above.
+
+## PHASE 1 CLOSED — Cell C v1 frozen (2026-09-24)
+
+**Critic confirmed closure**, citing: (1) genuine incrementality (only 40/100 R2+Momentum trades overlap Volume — 60% are new exclusions, not the same cohort rediscovered); (2) the incremental cohort is independently ugly on its own numbers (n=60, 46.7% win, -0.495% median, -6.82R total, -0.114R/trade); (3) capacity result is directionally coherent (DD and worst-streak improve at both slot counts even though cumR barely moves — the scheduler-fragility explanation for the small cumR delta is the right read, not a reason to distrust the finding); (4) diminishing-return territory reached — tested the interaction rather than assumed it, filters don't compound dramatically in return but do improve the risk path, that's enough.
+
+**FROZEN DEFINITION — Cell C v1 (exact, not just names, so Phase 2 can't quietly drift)**:
+- **Entry**: O'Neil 40-day pivot architecture (`Close > high40_prior`, `Close > SMA200`, `Volume >= 1.5x` trailing-25-day median baseline excluding already-extended days)
+- **Exit**: current canonical BC/our exit engine (`check_exit("breakout_cont", ...)`, `resistance_target`, structural stop)
+- **Filter 1**: bottom 20% `ad_fraction` (20-day Accumulation/Distribution, up-day vs down-day volume fraction)
+- **Filter 2**: R2 <= 0.25% (trigger-anchored distance to nearest overhead R2 pivot) AND `mom_pct` < 0.1 (20-day momentum percentile)
+- No further threshold tuning on either filter
+- Filter interaction: independently incremental (confirmed via the Incremental Contribution Audit above)
+- **Validation status**: Phase-1 research candidate, NOT YET live/production
+- **Known limitation**: EOD Cell C population only — Primed/live population not yet validated
+
+**Phase 2 sequencing, critic-specified, exact order**: build Cell C Primed (`O'Neil 40-day pivot -> pre-entry checks -> first intraday breach/touch -> Primed entry -> same exit engine`), then answer, in order: (1) how large is the Cell C Primed population; (2) how different is it from EOD-confirmed Cell C; (3) does the frozen Volume filter transfer; (4) does R2+Momentum transfer; (5) do the two still behave independently on Primed; (6) what does same-day runaway/pullback look like on THIS population (the runaway question's proper home, not the EOD population); (7) only then consider execution-specific improvements like the Same-Day Pullback Entry finding — **explicit instruction: do not let the pullback-entry result sneak into the Cell C v1 definition yet, it's a separate execution hypothesis, not part of the frozen filter stack.**
+
+**No more EOD Cell C filter hunting** — Phase 1 formally closed, this is the cleanest point reached to make the EOD-to-live-population transition without carrying an unfinished filter-search loop forward.
+
+## Cell C Primed — Phase 2 build, corrected twice, real result (2026-09-25)
+
+**First attempt over-engineered a lookahead workaround and got the scope wrong** — tried to preserve O'Neil's volume-surge condition (`Volume>=1.5x baseline`) at the moment of intraday touch by projecting likely full-day volume from volume-so-far via the clock-time-fraction mechanism (reused from RVOL@Trigger). This restricted the population to the ~3.3-month intraday-cache window (n=446) since it needed real intraday bars just to know volume-so-far. Direct user correction: **BC's own real Primed Gate already drops the volume-surge condition entirely** (`detect_primed_entry()` requires `base_filters_pass()` but explicitly NOT `vol_zscore>=1.5`, since that needs the full day's volume and can't be checked without lookahead at the moment of touch) — detecting a breach at all (`High>=trigger` on a given day) is a plain daily-bar fact, no intraday granularity needed.
+
+**Rebuilt correctly, matching BC's precedent exactly**: daily bars only, full multi-year history, `High>=trig` (`high40_prior*1.005`) for breach detection, prior-day-known SMA200 trend check, entry_price=trigger (not Close), NO volume condition. **Result: n=11,426** (2022-07-04 to 2026-09-24, 480 unique tickers), win%=62.9%, median=+2.004% — remarkably close to EOD Cell C's 62.7%/+2.253% despite the earlier, more marginal intraday-touch entry. **This is the correct Cell C Primed population going forward.**
+
+**Throughput vs BC, precisely reconciled (3 different BC numbers exist, not interchangeable)**: BC's official production Entry Gate population ("Cell B", full gate incl. `checklist_pass`/`vol_zscore`, EOD-confirmed, full history) is n≈1,200. **BC Primed Gate** (the correct like-for-like comparison — same `base_filters_pass` gate, real intraday-touch entry, full history) is n=6,223. Cell C Primed (n=11,426) is **~1.84x BC Primed**, not the ~6.5x advantage Cell C EOD had over BC EOD — a genuinely smaller, still real, throughput edge once both sides are on the same (intraday-touch) architecture.
+
+**Filter transfer check, frozen thresholds (not re-tuned), real sample sizes this time**:
+
+| Filter | Bad cohort n | Bad win%/median | Rest win%/median | Randomization pctile |
+|---|---|---|---|---|
+| Volume Quality (bottom-20% ad_fraction) | 2,141 (18.7%) | 62.4% / +1.775% | 63.1% / +2.061% | 2.2nd |
+| R2+Momentum | 208 (1.8%) | 61.1% / +1.260% | 63.0% / +2.023% | 4.3rd |
+
+Both statistically real on win%/median (both well below the 5th-percentile bar), but weaker than the EOD magnitudes. **Capacity-constrained R/drawdown view does NOT cleanly confirm transfer for either**:
+
+| | n | cumR@5 | Max DD@5 | cumR@10 | Max DD@10 |
+|---|---|---|---|---|---|
+| Volume-bad | 2,141 | **38.64** | **-10.05** | 48.61 | **-18.01** |
+| Volume-rest | 9,285 | 30.47 | -5.78 | 63.70 | -13.98 |
+| R2mom-bad | 208 | 0.52 | -7.35 | 3.59 | -7.35 |
+| R2mom-rest | 11,218 | 19.27 | -6.79 | 61.39 | -10.62 |
+
+**Volume Quality is actually reversed on this view** — the "bad" cohort shows HIGHER cumR at slots=5 and WORSE drawdown at both slot counts, the opposite of what removing it should show. **R2+Momentum is directionally right on cumR but its drawdown comparison flips sign between slots=5 and slots=10.** Per the critic's own standing rule (portfolio economics under realistic capacity, not just per-trade stats) — **neither filter cleanly transfers to Cell C Primed.**
+
+**Profit-threshold check, per direct user request (suspicion that the 62.9% win rate is propped up by marginal wins) — suspicion NOT confirmed**: win rate degrades gracefully as the bar rises (62.9%@>0%, 57.5%@>1%, 50.0%@>2%, 41.9%@>3%) — even at a >2% threshold, half the population still qualifies. Among winners specifically: median +4.42%, mean +5.72%, only 8.6% below +1% and 3.8% below +0.5%. **The 62.9% win rate is a genuinely healthy number, not inflated by tiny marginal wins.**
+
+**Standing objective going forward**: keep hunting for Cell C Primed filters — the EOD-discovered candidates don't transfer cleanly, so this remains open, not closed.
+
+**Primed Economic Distribution Audit, critic-specified, run before any fresh filter discovery — result: genuinely healthy, not hollow.**
+
+| Metric | Winners (n=7,192, 62.9%) | Losers (n=4,234, 37.1%) |
+|---|---|---|
+| Median | +4.42% | -5.23% |
+| Mean | +5.72% | -6.33% |
+| p10/p90 | +1.14% / +11.79% | -13.23% / -0.95% |
+| Worst | +60.02% | -33.47% |
+
+**Average winner vs loser (R)**: +0.3154R vs -0.3667R — losers modestly bigger than winners (ratio 0.860), consistent with the pattern seen across every population tested this whole session, NOT the extreme "winners +4%, losers -12%" bad-case scenario the critic used as an illustration.
+
+**Profit factor**: Gross Profit R=2,268.5, Gross Loss R=1,552.6, **Profit Factor (R)=1.461** (1.535 on raw %). Mean R/trade=+0.0627. Solidly healthy, not marginal.
+
+**Concentration**: Top 5 winners only 1.6% of total R, top 100 (1.4% of all trades) = 21.7% of total R. Bottom 10 losers only -2.2% of total R (losses aren't concentrated in a handful of catastrophic trades either). Winner-decile contribution decays smoothly (29.5%->17.2%->13.2%->...->1.2%) — no cliff, no single point of failure, no pathological tail.
+
+**RETRACTION, same session — the concentration read above was wrong, used the wrong metric.** The top-5/10/25/50/100 fixed-count check reported (top 100 out of 11,426 = well under 1% of trades) badly understates real concentration by construction — a small absolute count is a tiny percentage of a large population regardless of whether concentration is actually healthy or not. Recomputed correctly, per standing project convention (top N% of the population, not a fixed count):
+
+| Top N% (of all 11,426 trades, ranked by R) | Trades | Contribution to total R |
+|---|---|---|
+| Top 1% | 114 | 172.0 R (24.0% of total) |
+| Top 5% | 571 | 569.7 R (**79.6%** of total) |
+| Top 10% | 1,143 | 912.9 R (**127.5%** of total) |
+| Top 25% | 2,856 | 1,594.3 R (222.7% of total) |
+| Top 50% | 5,713 | 2,173.1 R (303.5% of total) |
+| Bottom 5% (worst losers) | 571 | **-541.8 R (-75.7% of total)** |
+
+**This is real, significant concentration.** Top 10% of all trades contribute MORE than the entire portfolio's net profit (127.5%) — the remaining 90% of trades are net negative in aggregate. The bottom half of all trades (5,713) lose roughly -1,457 R combined, which the top half's +2,173 R has to absorb before landing at the actual net +715.9 R. The worst 5% of trades alone erase ~76% of total profit.
+
+**Corrected verdict: the "genuinely healthy, clears the way" read is RETRACTED.** The winner/loser magnitude and profit-factor numbers (section above) are still accurate and real, but the concentration picture is NOT clean — a small fraction of trades carries the system, and an equally small fraction of losers does most of the damage. This doesn't mean Cell C Primed is worthless (net R is still positive, profit factor still >1), but it means the headline 62.9%/+2.004% should NOT be read as evidence of a broadly healthy, low-concentration population — it's closer to a power-law-like distribution where results depend heavily on catching the tails correctly (both avoiding the worst losers and catching the best winners), not a story where "most trades contribute a little."
+
+## Concentration-Stability Audit — critic-specified, decisive: NOT stable, declining hard over time (2026-09-25)
+
+**Motivation**: does the concentration found above reflect an intrinsic, stable property of the strategy (fine, repeatable) or a historical artifact (a warning sign)? Split the Cell C Primed population (n=11,426) by calendar year and recomputed win%/median/net-R/profit-factor/top-N%-concentration/bottom-5%-contribution for each.
+
+| Year | n | Win% | Median | Net R | PF(R) | Top 10% | Bottom 5% |
+|---|---|---|---|---|---|---|---|
+| 2022 | 1,345 | 61.7% | +1.784% | 55.0 | 1.278 | 188.5% | -124.8% |
+| 2023 | 3,463 | **70.3%** | +2.522% | **492.0** | **2.475** | 63.2% | -28.0% |
+| 2024 | 3,136 | 61.7% | +2.202% | 184.6 | 1.417 | 137.5% | -81.1% |
+| 2025 | 1,934 | 58.1% | +1.248% | 15.7 | **1.051** | **854.2%** | -604.7% |
+| 2026 (partial, through Sep) | 1,548 | 56.2% | +1.101% | **-31.3** | **0.885** | -- | -- |
+
+**Decisive answer: NOT stable — declining hard, not a mild fluctuation.** 2023 was an exceptional outlier year (PF 2.475, relatively low concentration 63.2%) that is substantially propping up the entire multi-year average. Every metric degrades steadily after 2023: win% drifts down (70.3%->61.7%->58.1%->56.2%), profit factor collapses (2.475->1.417->1.051->**0.885, net losing**), and concentration gets dramatically worse as performance weakens (63.2%->137.5%->854.2% in 2025, where the tiny remaining net profit was carried by an almost vanishingly small sliver of trades). **2026 (the most recent, most relevant period) is outright net-negative** — PF below 1.0, net R negative.
+
+**Reframes the whole Phase 2 picture**: the aggregate 62.9%/+2.004%/PF-1.46 headline is substantially an artifact of one strong year (2023), not a durable, repeatable property of the strategy. This is a more foundational problem than the tail-discovery question originally proposed next — needs addressing before any "find the bad 5-10% cohort" filter search makes sense, since a filter discovered against a population dominated by one anomalous year risks being an artifact of that year specifically, not a real, transferable signal.
+
+## Cell C Primed — BC Transfer Batch (critic-specified, 2026-09-25)
+
+**A. BC Primed temporal control, rebuilt via the canonical `primed_engine.run_primed()`/`simulate_primed_ticker()` logic** (light wrapper added only to carry through `state["initial_risk_pct"]` for R-multiples, no decision logic duplicated). Verified against the documented reference before trusting: n=6,225 (documented 6,223), win=55.10% (documented 55.2%), mean R/trade=0.1149 (documented range 0.098-0.131) — trusted.
+
+| Year | n | Win% | Median | Net R | PF(R) |
+|---|---|---|---|---|---|
+| 2021 | 233 | 45.1% | -1.504% | -1.2 | 0.983 |
+| 2022 | 786 | 50.8% | +0.155% | 32.5 | 1.174 |
+| 2023 | 1,126 | **66.6%** | +3.016% | 369.2 | **3.640** |
+| 2024 | 1,656 | 53.5% | +0.747% | 156.5 | 1.395 |
+| 2025 | 1,316 | 54.4% | +0.674% | 86.5 | 1.308 |
+| 2026 | 1,108 | 51.8% | +0.389% | 72.0 | 1.267 |
+
+**Side-by-side, 2022-2026 overlap**:
+
+| Year | Cell C Primed PF | BC Primed PF | Cell C win% | BC win% |
+|---|---|---|---|---|
+| 2022 | 1.278 | 1.174 | 61.7% | 50.8% |
+| 2023 | 2.475 | 3.640 | 70.3% | 66.6% |
+| 2024 | 1.417 | 1.395 | 61.7% | 53.5% |
+| 2025 | 1.051 | 1.308 | 58.1% | 54.4% |
+| 2026 | **0.885** | **1.267** | 56.2% | 51.8% |
+
+**Decisive: Scenario B (critic's own framework) — BC Primed does NOT collapse the way Cell C Primed does.** Both share an exceptional, genuinely market-wide 2023 (BC's own PF 3.640 even exceeds Cell C's 2.475), but BC settles into a stable, modestly-positive baseline (PF 1.27-1.40 through 2024-2026) while Cell C keeps deteriorating past that point straight through breakeven into net-negative by 2026. **Points to something specific to Cell C's broader O'Neil 40-day-pivot entry architecture, not a market-wide phenomenon.**
+
+**B/C. Frozen-threshold filter transfer, all 4 checked, NONE survive cleanly:**
+
+| Filter | Bad n (%) | Win%/median (bad vs rest) | Mean R (bad vs rest) | R-sum (bad vs rest) | Capacity view |
+|---|---|---|---|---|---|
+| Volume Quality (ad_fraction bottom-20%) | 2,141 (18.7%) | 62.4%/+1.775% vs 63.1%/+2.061% | 0.0570 vs 0.0640 | 122.1 vs 593.8 | **Reversed at slots=5** (bad cohort higher cumR, worse DD) |
+| R2+Momentum (R2<=0.25% AND mom_pct<0.1) | 208 (1.8%) | 61.1%/+1.260% vs 63.0%/+2.023% | 0.0172 vs 0.0635 | 3.6 vs 712.3 | Right direction on cumR, **drawdown flips sign** between slots=5/10 |
+| EMA34 persistence (>=9 = "bad", frozen from earlier finding) | 8,483 (**74.2%**, majority not minority) | 63.4%/+2.033% vs 61.7%/+1.910% (**reversed**) | 0.0627 vs 0.0624 (flat) | 532.2 vs 183.6 | Randomization 17.7th pctile — null |
+| `h8_cushion_atr` (bottom quartile, frozen 0.1020 cutoff) | 4 (0.6% of the 670-trade intraday-window subset) | **Untestable** — n=4 | -- | -- | -- |
+
+**EMA34's population proportion inverted entirely** — on Cell C Primed, `ema34_rising10>=9` is 74.2% of the whole population (the norm, not a minority tail), because O'Neil's 40-day-pivot+SMA200 entry naturally selects for already-well-established uptrends. The feature that discriminated well on BC's more varied trend-persistence distribution has nothing left to discriminate here. `h8_cushion_atr` only has 6.1% intraday-window coverage (702 of 11,426 trades) to begin with, and the frozen absolute cutoff matches almost nothing in that subset — the underlying cushion distributions are apparently structurally different between the two entry architectures (40-day vs 10-day pivot).
+
+**D/E. Stacking and tail-preservation checks skipped — no survivor to test.** None of the four transferred filters cleared a real bar (2 reversed/null, 1 mixed, 1 untestable), so there's nothing to stack or check tail-preservation on.
+
+**Batch conclusion**: existing BC/EOD-derived mechanisms do NOT rescue or meaningfully improve Cell C Primed. Combined with the temporal-decay finding (Cell C-specific, not market-wide), this points toward Cell C Primed needing a genuinely fresh, Cell-C-Primed-native research direction rather than transfer or general tail-mining on the full historical population — and any fresh discovery should be weighted toward the 2024-2026 regime specifically, given 2023's outsized, non-representative contribution to the aggregate.
+
+## QUEUED NEXT — Cell C Primed Structural Drift Audit (critic-specified, not yet started, session paused here 2026-09-25)
+
+**Critic's refined framing, sharper than "which 40-day-pivot characteristic is bad"**: ask instead "what changed in Cell C's trade composition after 2023 that BC did not experience?" Working hypothesis: "the O'Neil 40-day-pivot population contains a different type of breakout whose failure mode became substantially worse after 2023" — a structural/mechanism question, not another filter search. Explicit warning: do NOT jump straight to "search 50 features against the worst 10% of Cell C" — the full-history population is confirmed non-stationary, so that risks finding "this feature predicts 2023's winners" instead of "this feature explains why Cell C stopped working."
+
+**Bounded 9-item batch, no threshold tuning, no new filters, no candidate stacking**:
+1. Cell C vs BC yearly structural distributions — distance from pivot/trigger before breach, trigger clearance, breakout-day range/ATR, volatility state, distance above SMA200, SMA200 slope, distance from recent high, pivot age/freshness, prior consolidation duration, prior 20/40-day range compression, pre-breakout return, momentum immediately preceding breakout. Question: did the KIND of trade Cell C generates change over time, not thresholds yet.
+2. 40-day vs 10-day pivot geometry decomposition specifically: (A) pivot age — how long ago was the 40-day high established; (B) distance to intermediate highs (10d/20d/40d); (C) number of prior attempts/tests of that region before finally breaching; (D) base duration; (E) pre-breakout extension (how much the stock already moved before reaching the pivot). Hypothesis to test: "Cell C increasingly captures old resistance breakouts after extended prior runs, whereas BC captures fresh short-term expansion."
+3. Predefined structural buckets, 2x2 test: 2023 vs 2024-26, Cell C vs BC — looking for an INTERACTION (feature-outcome relationship changing specifically in Cell C after 2023), not just "low X has lower returns."
+4. Early post-entry failure trajectory, once structure is understood — NOT the eventual 15-day outcome: same-day adverse excursion, same-day return, next-day behavior, early failure/continuation, breach-to-close behavior, trigger revisit, early MFE/MAE. Determines: Type A (breakout fails almost immediately) vs Type B (initially works, then stalls) — Type A is the more interesting case per the project's stated objective, and Cell C Primed (genuine intraday entry) is now a legitimate population to study this on.
+
+**Decision fork after the audit**: if a clear structural drift is found -> formulate one specific Cell-C-native mechanism hypothesis, test with proper time validation. If no obvious drift -> move to fresh native Cell C Primed discovery, but with 2024-2026 as the primary discovery/validation regime (not letting 2023 dominate), and the tail-concentration work becomes relevant again at that point.
+
+## Cell C Primed Structural Drift Audit — MAJOR FINDING: dist_40d, strongest result of the whole project (2026-09-25)
+
+**Item 1 (yearly structural distributions, Cell C n=11,426 vs BC n=5,539, medians by regime)**:
+
+| Feature | Cell C 2023 | Cell C 2024-26 | BC 2023 | BC 2024-26 |
+|---|---|---|---|---|
+| pivot_age | 1.0 | 2.0 | 1.0 | 1.0 |
+| dist_10d | 0.625 | 0.638 | 0.802 | 0.812 |
+| dist_20d | 0.474 | 0.475 | 0.590 | 0.476 |
+| dist_40d | 0.338 | 0.311 | 0.172 | -0.359 |
+| num_prior_attempts | 14.0 | 14.0 | 18.0 | 19.0 |
+| base_tightness (ATR10/ATR60) | 1.031 | 1.033 | 1.035 | 1.019 |
+| pre_breakout_ext_20d | 8.863 | 9.455 | 7.214 | 6.967 |
+| atr_pct | 2.901 | 3.213 | 2.580 | 3.203 |
+| sma200_dist_pct | 22.59 | 21.61 | 19.74 | 16.63 |
+| sma200_slope_pct | 2.397 | 2.427 | 2.014 | 1.874 |
+
+ATR% rises for both systems (shared, market-wide volatility increase, not Cell-C-specific). `pre_breakout_ext_20d` diverges mildly (Cell C candidates get more extended over time, BC's stays flat) but the 2x2 interaction test below showed this does NOT produce a genuine sign-flip interaction — both buckets decline in parallel for this feature.
+
+**Item 3 (2x2 interaction test, `pre_breakout_ext_20d` / `dist_40d` / `atr_pct`, fixed own-system median split, 2023 vs 2024-26)**: `pre_breakout_ext_20d` and `atr_pct` both show the SAME direction relationship in both regimes/both systems — parallel decline, not a genuine interaction. **`dist_40d` (distance of the prior-day close from its own trailing 40-day high) is decisively different — a massive, consistent discriminator in every single slice checked, not a 2023 artifact.**
+
+**Full-history capacity view, dist_40d fixed median split, both regimes pooled**:
+
+| | Cell C Low (n=5,713) | Cell C High (n=5,713) | BC Low (n=2,770) | BC High (n=2,769) |
+|---|---|---|---|---|
+| cumR@5 | **-25.73** | **90.80** | 2.93 | **68.31** |
+| Max DD@5 | **-30.51** | -4.78 | **-30.44** | -7.61 |
+| cumR@10 | **-35.10** | **172.82** | 21.28 | **156.40** |
+| Max DD@10 | **-44.56** | -6.87 | **-46.18** | -12.46 |
+
+**Randomization check (pooled, full history): Cell C 0.00th percentile, BC 0.00th percentile — both stronger than any other randomization result this entire project** (more extreme than all 5,000 permutations, p<0.0002 for both).
+
+**This is a clean, near-50/50 split of BOTH entire populations into a genuine loser half and a genuine winner half.** The "Low" half (prior-day close still meaningfully below its own trailing 40-day high) is outright net-negative with catastrophic drawdown (-30 to -46 R) in BOTH systems. The "High" half (prior-day close already at/near/above its own 40-day high) alone generates almost the entire portfolio's profit (68-173 R) with a tight, controlled drawdown (under -13 R) in BOTH systems.
+
+**Reframes the whole audit**: this single, simple, prior-day-known feature explains the bulk of BOTH the earlier temporal-decay finding (Cell C's Low-bucket-equivalent performance collapses hardest in 2024-26 while High stays robust/even improves) AND the earlier concentration finding (a small fraction of trades carrying the system) — it's not two separate mysteries, they're both largely downstream of this one structural split. Not Cell-C-specific either — BC shows the identical shape, meaning this is a universal, previously-untested lever applicable to both architectures, not an explanation limited to why Cell C specifically declined.
+
+**RETRACTION, same session — mischaracterized as a pre-entry structural lever, it is NOT one.** Direct user challenge: Cell C's entry condition itself requires `High >= high40_prior*1.005` — so how can any candidate be "below" the 40-day high at entry? Answer: `dist_40d` was computed using `row.Close` (the entry day's own END-OF-DAY close), not the intraday touch price. Since the real Primed entry only requires the day's HIGH to cross the trigger, the day's CLOSE can still end up anywhere — including well below the 40-day high — if the breakout fails to hold into the close. **This is the already-established Confirmed-vs-Rejected phenomenon (see the 2026-09-24 Entry Confirmation / Breach Acceptance Audit and RETRACTION sections above) restated as a continuous, more powerful measurement, NOT a new independent structural feature.** It is real, and the randomization/capacity results stand as genuine — but it is a SAME-DAY, POST-ENTRY signal (only knowable once the day's close is in, by which point the real intraday Primed entry has already happened), not a pre-entry filter that could avoid a bad trade before taking it. Reclassified as: a candidate same-day risk-management signal (connects to the P2 intraday early-warning framework, 2026-09-24), not a Cell C Primed entry filter.
+
+**Follow-up, direct user question, tested precisely — resolves why BC Primed stayed healthier despite showing the same dist_40d split**: is BC less exposed to the "Low" bucket because its shorter 10-day-pivot entry sits naturally further from the 40-day high? **Checked directly, hypothesis does NOT hold**: BC's Low-bucket SHARE actually grew MORE over time than Cell C's (42.0%->52.7% for BC vs a flat 49.5%->50.1% for Cell C, 2023 to 2024-26) — BC's raw exposure to the bad bucket worsened more, not less. **The real explanation**: BC's Low bucket is far LESS damaging per trade than Cell C's Low bucket (mean R -0.0112 for BC vs -0.0619 for Cell C, both 2024-26) — and the likely cause is a genuine CONFOUND in how Cell C Primed was built: BC's real Primed Gate requires the full `base_filters_pass()` (RSI band, EMA34 persistence, momentum, liquidity, trend — everything except the volume-surge condition), while Cell C Primed (as built) only carries over the SMA200 trend check, missing RSI/EMA34/momentum/liquidity entirely. Some of what looked like "Cell C's architecture is structurally worse than BC's" may partly be "Cell C Primed is under-filtered relative to BC Primed," not a pure entry-architecture difference.
+
+**Explicit user instruction on how to proceed, a real strategic point, not just a caveat**: do NOT blindly re-apply BC's full filter stack to Cell C Primed — that would collapse Cell C back toward being BC with extra steps, defeating the entire reason to explore O'Neil's broader entry (the real throughput advantage this whole Phase 2 effort is chasing). Instead: test BC's individual pre-entry filters (RSI band, EMA34 persistence, momentum, liquidity) ONE AT A TIME on Cell C Primed, to find which ones recover the most Low-bucket damage per unit of throughput given up — not a bundle, a selective, incremental adoption process, matching the project's established "one candidate at a time" discipline.
+
+**Status, corrected**: `dist_40d` remains a real, extremely strong result (strongest randomization significance found this project), but reclassified as a same-day risk-management signal candidate, NOT a pre-entry Cell C Primed filter. Two separate, valid next research threads identified, not yet started: (1) test dist_40d's real-time/intraday-checkpoint version as an early-warning/exit-timing signal (P2-style); (2) test BC's individual base_filters_pass() components one at a time as candidate ADDITIONS to Cell C Primed's entry, measuring the throughput-cost/benefit-recovered tradeoff for each independently.
+
+## O'Neil Benchmark v1.0 — full organism decomposition, risk_of_ruin.py built, Swap1 (40-day pivot) discovered and validated (2026-09-23)
+
+**Faithful O'Neil-Naive replica rebuilt and verified against the previously-documented result before trusting anything new.** Entry: 40-day prior high, Close>SMA200, Volume>=1.5x trailing-25-day median baseline (excluding already-extended days, same `_normal_day_volume_baseline` convention as production, reparametrized on the 40-day pivot). Exit: flat 7.5% stop, one-time raise to entry-5% once up 15%+, no continuous trail, no real profit-taking rule (his qualitative climax-top/market-weakness signals not implemented). Reproduced the documented result almost exactly: n=2,423 (exact match), win 32.69% vs documented 32.6%, mean +16.20% vs +16.12%, 1,586 stop-outs vs documented 1,587.
+
+**Organism-vs-organism (both entry+exit swapped together): current production BC clearly wins on every trustworthy metric** — win 65.3% vs 32.7%, median +2.37% vs -7.64%, stop-out rate 1.5% vs 65.5%. But flagged honestly: O'Neil-Naive's mean (+16.20%) is not trustworthy — every one of its top-15 winners exits via the arbitrary 252-day backtest-closure boundary, still rising, not a real completed exit.
+
+**Per Research Integrity Rule #9 (never attribute an entry-vs-entry gap to entries when exits differ), decomposed into a full 2x2 entry x exit cross** — the real experiment:
+
+|                | O'Neil exit              | Our exit                  |
+|----------------|---------------------------|----------------------------|
+| O'Neil entry   | A: win 32.7%, med -7.64%  | C: win 62.7%, med +2.26% (n=7,793) |
+| Our entry (BC) | D: win 31.8%, med -7.67%  | B: win 65.3%, med +2.37% (n=1,200) |
+
+**Decisive: the EXIT mechanism drives quality almost entirely, the entry barely matters for quality.** Whichever entry, our exit gives ~63-65%/positive-median; whichever entry, O'Neil's exit gives ~32%/negative-median. O'Neil's entry philosophy (extension cap, base tightness, 40-day pivot, SMA200) is NOT a quality upgrade over ours on a like-for-like exit — Cell C is marginally worse than Cell B (62.7% vs 65.3%, +2.26% vs +2.37%).
+
+**But Cell C is a real, large capacity/throughput finding**: 7,793 trades vs Cell B's 1,200 (~6.5x), at nearly identical quality. O'Neil's simpler/looser entry (no RSI, no EMA34-persistence, no momentum filter, no regime gate) finds ~4x more qualifying setups per ticker (16.27 vs 3.91 trades/ticker) at essentially the same per-trade quality once run through our own validated exit. Concentration checked clean both ways (top-10/total: 3.7% Cell C, 13.9% Cell B — no artifact).
+
+**`risk_of_ruin.py` built and committed — the project's standing deterministic capacity-constrained R-multiple methodology (used ad hoc since 2026-09-07), finally saved as reusable infrastructure instead of rebuilt from scratch each time.** Converts pnl_pct to R via each trade's real structural-stop risk at entry, then simulates a deterministic max-N-concurrent-positions cap (FCFS by entry_date, no ranking), reporting cumulative R, max drawdown (R), worst losing streak. At realistic capacity (slots=10): Cell B (n_adm=467, cum_r=31.5, max_dd=-8.8, worst_streak=-4.2R/7 trades) is the tightest/safest; Cell C (n_adm=1,001, cum_r=48.3, max_dd=-14.7, worst_streak=-4.4R/7) matches or beats B on return/day (0.251 vs 0.152%/day) while admitting far more trades — the capacity constraint doesn't erase the throughput advantage. Cells A/D's higher raw cumulative-R is substantially the same cap_or_data_end artifact (top-5 of 111 admitted A-trades at slots=10 = 55.4% of total cumulative R, all still-open/uncompleted) — and this artifact, if anything, makes A/D's drawdowns look BETTER than a fair accounting would (late uncapped "winners" inflate the equity curve near the series end). **Disposition: CUT A and D, carry forward B and C.**
+
+**Day+1-open options proxy confirms the throughput finding holds on the options side too**: B win 71.6%/median +0.40%/mean +0.51% (top-10 conc 12.1%) vs C win 71.2%/median +0.38%/mean +0.46% (top-10 conc 3.2%) — nearly identical, both concentration-clean.
+
+**Cell C's extra volume is real but not purely independent diversification, and this cuts both ways.** Trades/ticker: C=16.27 vs B=3.91 (4.2x more per name). Median gap between same-ticker re-entries: C=43 days vs B=111 days. % of re-entries within 10 days: C=10.7% vs B=2.2% (~5x higher). A real chunk of C's extra trades are the same underlying name/story re-firing soon after a prior exit. **But this is reframed as a genuine OPTIONS-specific advantage, not a flaw** — a system that naturally cycles every ~43 days (vs our own ~111) lets you exit a stalling position and get a cheap fresh re-entry when the stock shows real strength again, instead of paying theta through one long, quiet stretch — directly relevant to the theta-cost problem this project has circled repeatedly (RQ-A5-O, RQ-P1B, RQ-OX1).
+
+### RQ-ON3 — Input-by-Input Swap Audit: which O'Neil ingredient is actually carrying the advantage (2026-09-23)
+
+Tested each of the 4 input-category differences (pivot window, trend filter, volume surge, breakout confirmation) swapped INTO our own 10-day-pivot population one at a time, holding everything else at production defaults, per Rule #9:
+
+| Variant                              | n     | Tickers | Win%  | Median | Ret/day | Gap  | Re<=10d | slots10: n/CumR/DD |
+|---------------------------------------|-------|---------|-------|--------|---------|------|---------|---------------------|
+| Baseline (production)                 | 1,200 | 307     | 65.3% | +2.37% | 0.173   | 111d | 2.2%    | 467/31.5/-8.1        |
+| Volume swap (vol_zscore->O'Neil mult)  | 1,932 | 368     | 63.0% | +2.16% | 0.233   | 108d | 3.1%    | 677/28.6/-13.6       |
+| **Swap1: pivot 10d->40d**             | 1,192 | 321     | **66.2%** | **+2.42%** | **0.259** | 134d | 2.1%    | **541/36.7/-9.9**    |
+| Swap2: trend EMA34-stack->SMA200       | 1,309 | 325     | 64.3% | +2.35% | 0.250   | 112d | 2.1%    | 567/26.7/-11.9       |
+| Swap3: drop clearance%/candle-check    | 1,934 | 357     | 64.4% | +2.30% | 0.249   | 96d  | 3.7%    | 612/30.7/-13.3       |
+| Combo 1+3                              | 1,610 | 348     | 65.8% | +2.42% | 0.271   | 111d | 3.7%    | 565/30.1/-12.7       |
+
+**Swap1 (10-day -> 40-day pivot) is the standout** — not the usual "more trades, worse quality, worse drawdown" trade-off every other swap shows. Nearly identical trade count to baseline (1,192 vs 1,200) but better on almost every metric simultaneously: higher win rate, higher median, meaningfully better return/day, MORE admitted trades at real capacity (541 vs 467 at slots=10), higher cumulative R (36.7 vs 31.5), with only a modest drawdown cost (-9.9 vs -8.1, still the tightest of any non-baseline variant).
+
+**Combo 1+3 (40-day pivot + dropped clearance%/candle-quality) shows the 40-day pivot's quality benefit SURVIVES even without same-day confirmation checks** — win 65.8% (vs Swap1 alone's 66.2%, vs Swap3-alone's much worse 64.4%), median matches Swap1 exactly (+2.42%). Real implication: BREAKOUT_MIN_PCT/CLOSE_NEAR_HIGH_PCT may matter much less once the pivot itself represents a longer, more significant base. But the combo's risk profile inherits from Swap3, not Swap1 — at slots=10, drawdown (-12.7) is much closer to Swap3's (-13.3) than Swap1's tighter (-9.9). At slots=5 specifically, the combo is the best of all six variants on both cumulative R and drawdown — capacity-dependent sweet spot, not universally best.
+
+### RQ-ON3A — Swap1 Validation Batch: distribution, overlap, concentration, entry-timing audits (2026-09-23)
+
+**Distribution audit — no hidden confound.** Median values, Baseline vs Swap1: Freshness 0.265 vs 0.313 (small), EMA34 persistence 10.0 vs 10.0 (identical), extension% 2.48 vs 2.28, consolidation_days 8 vs 9, ATR% 2.84 vs 2.90, vol_zscore 4.01 vs 4.19. Swap1 is not secretly buying Freshness, extension, base-duration, or volatility under a different name.
+
+**Overlap audit — this is the real mechanism.** Common entries (both systems fire the exact same ticker+date): n=983, win=66.6%, median=+2.42% — the BEST-performing group of all. Baseline-only (10-day pivot catches, 40-day doesn't): n=217, win=59.4%, median=+1.85% — the WEAKEST group. Swap1-only (fires under 40-day pivot; exists despite Close>high40_prior mathematically implying Close>high10_prior, because different entry dates over time create different position-blocking windows between the two systems): n=209, win=64.1%, median=+2.45%. **Swap1 doesn't add great new trades broadly — it EXCLUDES a real, identifiable weak cohort (the 217 baseline-only trades) that the shorter pivot lets through.** A clean, mechanical explanation, not an unexplained correlation.
+
+**Concentration audit**: both healthy at the trade level (top10/total: 13.9% baseline vs 13.0% swap1). Real sector concentration exists in both but in DIFFERENT sectors (Baseline: Industrials 32.8% of total pnl; Swap1: Financial Services 30.8%) — not a differentiator between them. Year distribution similar (both weighted to 2023); Swap1 picks up more 2026-dated trades (10.0% vs 2.6%).
+
+**Entry timing audit**: both overwhelmingly fresh Day-1 entries (median extension_days=0 both). Swap1 modestly more so (84.0% vs 79.2% fresh-day-1) — small, real, same direction as the overall finding, not a confound.
+
+**Disposition: PROMOTE Swap1 to Tier-A Candidate (Validation Track)** — survives all four requested audits cleanly, mechanism is now understood and mechanical, not an unexplained correlation. Frozen definition: replace ONLY the breakout reference from 10-day to faithful 40-day pivot, nothing else (no 30/50-day drift, no hybrid/adaptive pivot — that would be threshold hunting). Not production. Analogous to where Freshness sat before its own robustness work.
+
+### RQ-C1 — Freshness x Structural Friction interaction, explains the earlier "Freshness inverts in Cell C" puzzle (2026-09-23)
+
+Same canonical 1,470-entry breakout_cont population from RQ-P1 (below), crossed with Freshness (prior-day row, Rule #2 convention, <=0.40 threshold):
+
+|              | Has Pivot                          | No Pivot                    |
+|--------------|--------------------------------------|------------------------------|
+| Fresh<=0.40  | n=73, win=49.3%, median=-0.03%       | n=811, win=59.7%, median=+1.68% |
+| NotFresh>0.40| n=84, win=54.8%, median=+1.31%       | n=502, win=56.8%, median=+1.38% |
+
+**Freshness does not broadly help or hurt — it INTERACTS with pivot friction.** Helps genuinely when there's no overhead obstacle (Fresh x NoPivot beats NotFresh x NoPivot: 59.7%/+1.68% vs 56.8%/+1.38%), but INVERTS when a nearby pivot is present (Fresh x HasPivot is the single worst cell, 49.3%/-0.03%; NotFresh x HasPivot is fine at 54.8%/+1.31%). Progression curves confirm the mechanism (Fresh x HasPivot oscillates and ends negative; Fresh x NoPivot climbs cleanly). Re-entry cadence: Fresh x HasPivot shows the slowest cycling of any cell (247-day median gap, 0.0% re-entries within 10 days) — the worst-quality cell is also the worst-cadence cell. Options day+1-open proxy flips the direction entirely (NotFresh beats Fresh in all four cells there) — the swing-horizon Freshness advantage does NOT translate to the immediate day+1-open horizon within this cut.
+
+**RQ-ON3B — does Swap1 (40-day pivot) absorb this interaction? No — confirmed via direct re-test.** Same 2x2 on the Swap1 population: Fresh x HasPivot n=59, win=47.5%, median=-0.31% — STILL the worst cell, if anything slightly worse than the original (49.3%/-0.03%), with an even cleaner all-negative progression path (every one of 8 checkpoints negative, vs the original's choppier partially-positive path). **Swap1 and the Freshness x Pivot-Friction interaction are independent, stackable findings, not redundant** — Swap1 removes a structurally weak cohort via a completely different mechanism (its own longer entry-pivot definition); C1's Fresh+HasPivot weak subset survives regardless of which entry-pivot window sits underneath it.
+
+### RQ-P1 — Overhead Structural Friction from prior-day R1/R2 pivots: full arc (2026-09-22/23)
+
+**Real, live origin**: same-day (2026-09-23), two real touch-and-reject events — RBLBANK touched R2=429.20 at a real high of 429.50, rejected, chopped below it for hours; MAXHEALTH touched R1=1067.10 at 1066.50, rejected. Both within ~0.1% of the exact computed level (`pivots.py`'s `daily_pivots()`, prior-day H/L/C via `shift(1)`, verified no lookahead). AEGISLOG's real reversal-day low (1382.10) also matched a computed S2 (1381.70) within 0.03% — same mechanism, support side.
+
+**Four bounded tests, each correcting the last:**
+1. Day+1 return by pivot-distance quartile (n=122, F&O, full history) — CLOSED, artifact (83% concentration-driven), wrong timescale.
+2. Same-day rejection rate near R1/R2, tight +/-0.3% band (n=247,868 general population + n=1,588 post-entry-conditioned) — CLOSED negative, no meaningful difference either way. R1/R2 proximity does NOT predict same-day rejection.
+3. **Multi-day progression path, Day+1->15, full nifty500/full-history/regime-gate-ON breakout_cont population, HAS-nearby-pivot (n=157) vs NO-pivot (n=1,313) — the real surviving signal.** HAS-pivot's %-positive stays coin-flip (44-56%) the whole 15 days, ending at 52.2%/median +0.63%; NO-pivot's %-positive climbs steadily to 58.6%/median +1.59%. Full percentile breakdown: bad-case tails (p10/p25) are comparable or slightly worse for has-pivot (not a "protects the downside" story) — the real difference is the GOOD-case upside being capped (p75/p90/max meaningfully lower for has-pivot at every day checked).
+4. Hours-to-move, intraday (n=91 vs 295, June-Sept 2026 window, regime gate had to be disabled to get any entries at all in this window — a real, separate finding of a genuine regime-drought stretch) — time-to-+1% identical (median 1hr both), time-to-+2% roughly DOUBLES with a nearby pivot (15hrs vs 7hrs median).
+
+**Confound robustness audit (RQ-P1A/P1A.2), 3 of 4 critic-specified items, all non-explanatory:** Extension and prior-day-range ARE real distributional confounds (has-pivot entries are less extended, had bigger prior-day range) but the Day-15 effect SURVIVES within the strata containing most of the has-pivot population. Gap and ATR are NOT real confounds (near-identical distributions). **Swing-high distance (via `primed_engine.find_zigzag_target()`'s real scipy-detected peaks, the critic's flagged most-dangerous confound) is ALSO not a confound** — nearly identical distribution between groups (median 4.40% vs 4.41%) — and the effect survives even more cleanly here (has-pivot's median flips negative in both swing-high-distance strata). Continuous regime-strength remains unchecked (downgraded to non-blocking after swing-high passed).
+
+**RQ-P1B (economic relevance for the option holding horizon) — genuine, disclosed, UNRESOLVED tension.** Daily-resolution version (full population) shows NO timing gap (median 2.0/3.0 days-to-+1%/+2%, identical both groups) — only a modest ~3pp hit-rate gap. Contradicts Test 4's intraday finding (2x timing gap). Two possible readings, not resolved: the friction may operate on a timescale too fast for daily bars to see (Test 4 more relevant despite smaller/regime-limited sample), or Test 4's intraday result is itself a regime-drought-period artifact (daily result, 10x bigger sample, more trustworthy). Critic never directly responded to this specific tension before the research thread moved to the combo-ideation/Swap1 work — genuinely still open.
+
+**Closeness threshold sweep (2026-09-23) — refines has_pivot from a boolean to a real distance-dependent signal.** Cumulative (<=X%) sweep on the canonical population:
+
+| Threshold | CLOSE: n, win%, median | REST: n, win%, median |
+|---|---|---|
+| <=0.25% | 43, 48.8%, -0.03% | 1,427, 58.2%, +1.54% |
+| <=0.5% | 70, 52.9%, +0.90% | 1,400, 58.1%, +1.53% |
+| <=1.0% | 110, 52.7%, +0.74% | 1,360, 58.3%, +1.57% |
+| <=1.5% | 140, 50.7%, +0.19% | 1,330, 58.6%, +1.62% |
+| <=2.0% | 149, 51.0%, +0.29% | 1,321, 58.7%, +1.63% |
+| <=3.0% | 154, 51.9%, +0.47% | 1,316, 58.6%, +1.60% |
+| <=5.0% | 156, 52.6%, +0.72% | 1,314, 58.5%, +1.58% |
+| Any distance | 157, 52.2%, +0.63% | 1,313, 58.6%, +1.59% |
+
+The tightest cut (<=0.25%) is the single worst cell in the whole sweep. Effect DILUTES, not sharpens, as threshold widens.
+
+**Weighted-average verification, prompted by a direct user question ("why does CLOSE swing but REST doesn't"), confirmed as pure arithmetic, not an artifact.** The 27 trades in the 0.25%-0.5% band have a 59.3% win rate. Added to CLOSE (n=43->70, a 63% size increase): reconstructs exactly, (43*48.8+27*59.3)/70=52.86%, matching observed. Removed from REST (n=1,427->1,400, only a 1.9% size decrease): 58.16%->58.14%, essentially unchanged — the removed subset's win rate is also close to REST's own average. **New standing audit practice adopted (not a numbered Rule)**: whenever one bucket is much smaller than another, report bucket sizes, report composition changes, and verify any swing via weighted average before reading meaning into it.
+
+**Non-overlapping bucket re-check (vs the cumulative sweep above) shows the relationship is genuinely noisy beyond the tightest cut, NOT a clean monotonic gradient**: 0-0.25%=48.8%/0.25-0.5%=59.3%/0.5-1%=52.5%/1-2%=46.2%/NoPivot=58.6% (swing); options-side (day1-open) shows the same non-monotonic bounce (67.4%/81.5%/77.5%/69.2%/70.8%). Standard-error check confirms these adjacent-bucket swings are statistically indistinguishable from noise (95% CIs of +/-15-19pp, overlapping heavily) — EXCEPT the tightest bucket (0-0.25%), which has now shown up as the worst cell across four independent cuts (original quartile split 47.5%, cumulative sweep 48.8%, non-overlapping bucket 48.8%, both Fresh/NotFresh interaction tests) — real replication, not a single noisy point estimate.
+
+**Economic relevance (median days to +1%/+2%/+3%) does not show a clean timing-delay story either**: the worst-return bucket (0-0.25%) has days-to-move nearly identical to NoPivot (2.0/3.0/4.0 both) — its badness comes from lower hit-rates and weaker downside, not from taking longer to move when it does progress. The 0.25-0.5% and 0.5-1% buckets show more of a real slowdown (4.0/6.0 days vs NoPivot's 3.0/4.0) despite having BETTER raw returns than the tightest bucket — a genuinely non-clean pattern.
+
+**Swap1 bucketed re-run — the effect is SHARPER under the 40-day pivot, not diluted, and the Freshness protection holds up better here than under the original population**: 0-0.25% x Fresh: n=17, win=29.4%, median=-2.71% (worst cell found in the whole arc). 0-0.25% x NotFresh: n=15, win=53.3%, median=+1.17% — a 24-point gap that stays wide even at the tightest proximity (unlike the original population, where the gap converged to 47.8%/50.0% at this same cut). Also shows a real, apparent two-danger-zone shape (0-0.25% bad, 0.25-1% beats the no-pivot baseline, 1-2% bad again for both Fresh and NotFresh) — not a monotonic decay, though built on small per-cell samples (n=10-32).
+
+**Ladder/rung mechanism, a real user-driven theoretical insight, checked directly.** Hypothesis: a pivot is resistance until breached; once held, it becomes support, and the next pivot up becomes the new resistance being tested. Checked which pivot (R1 or R2) is the "nearest" one in the has-pivot population: 152 of 157 (96.8%) have R2 as nearest — R1 has ALREADY been cleared by the time our entry fires. Only 5 of 157 (3.2%) still have R1 as an untested first rung (too small to compare directly). **Mechanism verified**: our own entry criteria (clear our OWN 10-day high with a real volume surge) requires a big enough move that it almost always also clears R1 (a smaller, single-prior-day-based premium) in the same session, as a side effect — we essentially never get a real sample of "entering before R1 clears." **This reframes the entire RQ-P1 arc**: what's been measured this whole time, by construction, is specifically SECOND-RUNG (R2) friction, not generic "any classic pivot" friction. Flagged, not tested: whether the R1-R2 gap WIDTH (roughly the prior day's own H-L range) matters — i.e., is proximity to R2 as a fraction of the R1-R2 gap different from proximity in absolute %. Needs a meaningfully larger base population (more history/tickers, or a relaxed entry filter) before this could be tested cleanly — the current has-pivot population (n=118-157) is already too thin to add a third stratifying dimension.
+
+**Telemetry design (research-only, no production change)**: `has_pivot` (boolean) formally renamed in research going forward to `nearby_overhead_pivot_pct` (continuous, the existing `dist_pct` calculation unchanged, NaN when no pivot exists), with research buckets Immediate (<=1%), Moderate (1-3%), Open air (no pivot within 3%, or none) for reporting rather than gating. Same Research Infrastructure disposition category as OX1 — no production wiring, no threshold adopted as a trading rule.
+
+**Disposition, full arc**: Overhead pivot proximity as a progression-friction signal — VALIDATE. Same-day rejection mechanism — CLOSED negative (permanently, do not reopen for a different volume-ratio/day-window/threshold). Freshness x Pivot-Friction interaction — VALIDATE, explains the earlier Freshness-inversion puzzle. Swap1 absorbing the interaction — CLOSED (No), confirmed independent findings. Production threshold — NOT YET, 0.5% and 1.0% are statistically too similar to call one correct; R1-R2 gap-width hypothesis needs a bigger population. RQ-P1B (options economic relevance) remains genuinely unresolved. Real trade closed same window: MAXHEALTH option exited at 19.75 (entered 19, +3.95% real gain on premium).
+
+## RQ-P1 CORRECTED — day15-proxy vs real check_exit() outcome caught, R1/R2 must not be pooled, R2-specific filter candidate re-validated (2026-09-24)
+
+**Trigger: attempting to move the "Fresh + tight pivot" filter candidate toward live wiring surfaced that the entire arc above was measuring the wrong thing.** Two separate, independent problems found, in order of discovery.
+
+**Problem 1 — population contamination.** The arc's source population (`entries.pkl` -> `rqc1_pop.csv`, n=1,470) does not enforce one-position-at-a-time per ticker — it recomputes the entry condition for every day in history, including days where a real position from an earlier signal would already be open and blocking re-entry. Verified by exact ticker+date overlap against the real production BC backtest (`baseline_on3a.csv`, n=1,200, `backtest.run(..., require_regime=True)`): all 1,200 real trades are a subset of the 1,470, but 270 rows (18.4%) are phantom same-ticker signal re-fires with no corresponding real trade (61 of them just 1 day apart from the "real" entry).
+
+**Problem 2, bigger — the swing-outcome metric itself was never the real trade P&L.** `day15_ret`/the `path` array (used for every result in the arc above) is a fixed-15-trading-day-later Close return, completely independent of the real exit engine. Verified directly against `backtest.py`: the real `check_exit()` (lines 358-408) exits via a hard structural stop, a **moving resistance target** (`resistance_target()`, lines 252-256 — first of `(pp, r1, r2)` above price, refreshed daily, ratchets up only, initialized AT ENTRY as `resistance_target(entry_price, row)`), an SMA21 trail once engaged, a climax-top exit, or a `MAX_HOLD_DAYS` cap that is actually ~21-23 days in practice, not 15. Pulled the 20 real trades that land in the original "Fresh<=0.40 & R2<=0.25%" bad cohort and compared both numbers directly — e.g. HYUNDAI: `day15_ret` = -11.6%, real `pnl_pct` = **+3.25%** (exited "resistance" on day 1). These are not noise-level differences; they measure two different events.
+
+**Mechanism (why this specific cohort is exit-sensitive, not a general population problem)**: `resistance_target()`'s candidate set `(pp, r1, r2)` is nearly the same construction as this arc's own `dist_pct` (`r1, r2` only) — a trade entered very close to an overhead pivot gets an easy, nearby exit target from day one. Not fully tautological (average holding on the real trades that exit "resistance" in this cohort was 5.1 days, not always day 1, since target ratchets), but it genuinely caps the captured gain: this cohort's resistance-exits average +2.98%/median +2.83% vs the whole population's resistance-exits average +6.16%/median +4.62% (n=597) — roughly half-size.
+
+**New Research Integrity Rule #13 — Proxy Return vs Real Exit-Engine Outcome.** Whenever a real, already-implemented exit mechanism exists for the population under study, the swing-outcome metric used for ANY feature/filter research must be the real simulated `pnl_pct` from that exact mechanism (`check_exit()`), never a fixed-horizon proxy return (day-N-later Close, or similar). A proxy measures a genuinely different question — "what does price do by a fixed calendar day regardless of what the system would have done" — and can diverge sharply, in either direction, from what the real system actually captures, especially for any population whose defining characteristic (like proximity to a pivot) also happens to interact with the exit engine's own target/stop logic. Same family as Rules #6/#7/#10 (measurement-anchor validity), specific to swing backtests where a real exit engine already exists — check this before trusting any backtest-derived filter finding going forward.
+
+**Retraction**: the original arc's specific numbers built on `day15_ret`/the contaminated population — the "filter candidate" promotion, the "two danger zones" shape, "0-0.25% is the worst cell across four independent cuts," the RQ-ON3A/critic-endorsed Swap1 bucketed re-run's 29.4%/-2.71% headline cell — are **RETRACTED as reported**. Do not cite those specific numbers going forward. The underlying qualitative instinct (tight overhead proximity matters) turns out to be correct, but for a narrower reason and at a different magnitude — see below.
+
+**R1 and R2 do not behave the same way, and pooling them was hiding the real signal — confirmed at real scale.** Re-ran the ladder check on Cell C (O'Neil-entry + our real exit engine, n=7,793, real `pnl_pct`): R1 is nearest in 696/2,581 has-pivot cases (27.0%), vs R2 in 1,885/2,581 (73.0%) — a much less extreme ratio than our own production entry's 96.8% R2 / 3.2% R1. This confirms the ladder mechanism's explanation was correct (our own entry's volume/momentum requirement usually already clears R1) rather than it being some universal law — O'Neil's looser 40-day-pivot entry doesn't have the same side effect, so R1 shows up far more often here. Bucketed by nearest rung, Fresh<=0.40 only, real `pnl_pct`:
+
+| Bucket | R1 (n, win%, median) | R2 (n, win%, median) |
+|---|---|---|
+| 0-0.25% | 69, 68.1%, +1.916% | 183, **56.3%**, **+0.880%** |
+| 0.25-0.5% | 50, 54.0%, +1.102% | 151, 62.3%, +1.950% |
+| 0.5-1% | 47, 55.3%, +1.331% | 251, 65.7%, +2.499% |
+| 1-2% | 17, 58.8%, +1.694% | 206, 62.1%, +2.189% |
+
+R2 shows a real, roughly monotonic pattern (worst when tightest, improving with distance). R1 shows the **opposite** shape (its tightest bucket is its best). An untested first rung (R1) is not the same market-structure situation as a second rung being tested after already clearing the first (R2) — **R1 and R2 must be treated as separate signals, never pooled into one "nearest pivot" metric, going forward.**
+
+**The real, corrected, scale-confirmed finding — win%/median AND the R/drawdown view together (per standing convention), real `pnl_pct`, R2-nearest only, Fresh<=0.40, Cell C n=7,793:**
+
+| Bucket | n | win% / median | cumR (full pop) | R/trade | maxDD |
+|---|---|---|---|---|---|
+| R2 0-0.25% | 183 | 56.3% / +0.880% | **-5.51** | **-0.030** | **-12.69** |
+| R2 0.25-0.5% | 151 | 62.3% / +1.950% | -0.22 | ~0 (wash) | -4.88 |
+| R2 0.5-1% | 251 | 65.7% / +2.499% | +13.93 | +0.056 | -4.00 |
+| R2 1-2% | 206 | 62.1% / +2.189% | +14.58 | +0.071 | -5.30 |
+| NoPivot | 3,427 | 61.0% / +1.998% | +233.0 | +0.068 | scales with n |
+
+**The tightest R2 bucket has genuinely negative R-expectancy at n=183** — worst drawdown of any bucket, real at this scale, on real trade P&L. 0.25-0.5% is a genuine breakeven wash (not "moderately good" as the retracted version claimed). Everything beyond 0.5% is fine and roughly matches NoPivot.
+
+**Win/loss decomposition (mechanism, not just "it's bad") — R2 0-0.25% (bad) vs R2 0.5-1% (healthy) vs whole Fresh population:**
+
+| | R2 0-0.25% | R2 0.5-1% | Whole Fresh pop |
+|---|---|---|---|
+| win% | 56.3% | 65.7% | 61.2% |
+| avg WIN (R) | 0.284 | 0.310 | 0.345 |
+| avg LOSS (R) | -0.434 | -0.434 | -0.369 |
+| loss/win ratio | 1.53x | 1.40x | 1.07x |
+
+The loss/win size asymmetry (losses ~1.4-1.5x bigger than wins) is real but **near-identical in the bad and healthy bucket** — it's a general property of this exit architecture, not what differentiates them. What actually drives the negative R is the **win-rate gap itself** (56.3% vs 65.7%, 9.4pp) plus a modest win-size compression (0.284R vs 0.310R, the capped-resistance-gain effect above). Arithmetic reproduces the observed R/trade exactly: 0.563x0.284 - 0.437x0.434 = -0.030R. Losses are dominated by `max_hold_cap` (~87-89% of losses in both buckets, avg -0.23R) not stops — true stop-outs are rare (8-10 trades/bucket) but average **-1.0 to -1.06R**, at or slightly past the nominally-planned -1.0R risk. **Flagged, not investigated**: possible gap-through-stop slippage — queued for a future session, not chased here.
+
+**A second, structurally different case, caught by direct user challenge — win%/median can be identical while R is decisively different, for a completely different reason (tail compression, not a win-rate gap).** Fresh x HasPivot (any distance) vs Fresh x NoPivot, real `pnl_pct`, Cell C n=7,793:
+
+| | Fresh x HasPivot (n=1,032) | Fresh x NoPivot (n=3,427) |
+|---|---|---|
+| win% / median | 61.7% / +1.950% | 61.0% / +1.998% |
+| R/trade | **0.033** | **0.068** |
+| maxDD @ slots=10 (matched ~770-910 admitted) | **-20.21** | -9.78 |
+| avg WIN R (median) | 0.313 (0.259) | 0.355 (0.288) |
+| p90 / p99 / max WIN R | 0.603 / 1.042 / 1.874 | 0.682 / 1.319 / 2.785 |
+| avg LOSS R | -0.420 | -0.354 |
+
+Win%/median are genuinely tied here — this is not the R2 mechanism. The R gap (2x) comes entirely from (a) a compressed tail of big winners (p99/max R materially lower for HasPivot — the capped-upside effect, invisible to median by construction) and (b) a ~19% worse average loss. **Tested whether a minimum-win-threshold redefinition (win = pnl_pct>0.5% or >1%, a cheaper proxy for magnitude-awareness) recovers this gap — it does not**: HasPivot vs NoPivot stay tied at every threshold (59.6%/57.0% vs 58.4%/55.9%), and HasPivot's micro-win rate (0-0.5% pnl) is actually *lower* (2.1% vs 2.6%), not higher. **Confirms the R/drawdown view is not replaceable by any win-rate metric, thresholded or not — a tail/skew effect requires a magnitude-summing statistic, full stop.**
+
+**Disposition (supersedes the retracted entry above)**:
+- Original day15-proxy "filter candidate," "two danger zones," and "worst cell across four cuts" claims — **RETRACTED**, do not cite.
+- Ladder mechanism (R1 usually already cleared by our own entry) — **STANDS**, but is entry-population-dependent (confirmed via Cell C's 27%/73% split vs our own 3%/97%), not a universal law.
+- R1 and R2 — **must be modeled as separate signals going forward**, never pooled into one "nearest pivot" metric.
+- Fresh<=0.40 + R2-distance<=0.25% — real, R-negative at n=183 (Cell C, O'Neil-entry population), worst drawdown of any bucket tested. **FILTER CANDIDATE, correctly scoped this time** (R2-only, real `pnl_pct`, real exit engine). **NOT yet validated on our own production BC entry population at adequate scale** (only n=20 there — too thin to trust directionally) — before any live wiring, needs re-validation on a larger real-BC-entry population (more history, or accept the Cell C/O'Neil-entry evidence as scoped to that entry track only, separately from our own BC entry track).
+- Fresh x HasPivot (any distance, not R2-specific) — downgraded from "worst cell" to a milder, tail/skew-driven effect. Real, but modest, telemetry-only, not action-worthy on its own.
+- New standing methodology practice (not a numbered rule): a win/loss decomposition (win rate vs avg win-R vs avg loss-R vs win-R percentiles p90/p99/max) should accompany any R-view comparison to explain the mechanism behind a gap, not just report that one exists — two of the cases in this correction had completely different root mechanisms (win-rate gap vs tail compression) that would have been conflated without it.
+- Options day+1 metric, R1-R2 gap-width hypothesis, RQ-P1B economic relevance — still not re-tested against the corrected real-`pnl_pct` population; carried forward as open items, not resolved by this correction.
+
+**Critic review of the corrected arc + the Cell B/C capacity comparison — PASS, disposition and protocol updated (2026-09-24).** Confirmed: old RQ-P1 swing conclusions superseded, corrected Cell C analysis authoritative, Rule #13 adopted as-is. Re-ran the Cell B vs Cell C capacity-constrained comparison at full slot granularity (5/10/20/50, not just the single slots=10 point from 2026-09-23) — **Cell B wins outright on every metric at slots=5** (cumR 18.77 vs 10.82, R/trade 0.0742 vs 0.0214, maxDD -3.26 vs -13.24); Cell C only overtakes on raw cumR from slots=10 upward, paying for it with drawdown up to 3.3x worse (-52.67R vs -15.74R at slots=50). **Filter Candidate #1, FROZEN**: removing Fresh<=0.40 + R2-distance<=0.25% (183/7,793 = 2.3% of Cell C) at slots=5 more than doubles cumR (10.82->23.94) and R/trade (0.0214->0.0483), cuts maxDD ~40% (-13.24->-7.87) — real, meaningful, does not fully close the gap to Cell B (correctly, honestly not claimed to). Options day1_open_ret metric: complete wash on this filter (71.2%->71.0% win, +0.385%->+0.384% median) — **parked, reframed as "options impact unresolved, current proxy shows no measurable incremental benefit," not "filter doesn't help options"** (ties into the new PARKING_LOT.md item #7 on the proxy's own trustworthiness).
+
+**New standing metric-priority convention for Cell C bad-cohort filtering (critic-specified)**: win rate is demoted from the primary filter-selection metric. Primary = R/trade, capacity-constrained max drawdown, cumulative R, population retained. Secondary = win rate, median P&L, expectancy, worst losing streak, return/day. Reason: a filter can barely move win rate while meaningfully reshaping the win/loss distribution (exactly what Filter Candidate #1 did) — win%/median alone would have missed it entirely, as demonstrated repeatedly this session.
+
+**New standing protocol for every future Cell C bad-cohort candidate (critic-specified, supersedes ad hoc practice)**: (1) Discovery — find the candidate bad cohort via a lookahead-free, entry-time-only mechanism. (2) Validation — real `check_exit()`-simulated `pnl_pct`, never a fixed-horizon proxy (Rule #13). (3) Portfolio impact — evaluate at slots=5/10/20/50 consistently (not just whichever slot count looks best), reporting admitted/cumR/R-trade/maxDD/worst-streak/population-retained together. (4) Independence — check whether the candidate removes a DIFFERENT cohort than previously-frozen candidates (overlap/containment audit), not just whether it looks good standalone. Do not stack filters together until several are independently validated this way.
+
+**Explicit research thesis, now the project's stated Cell C strategy**: don't need one filter removing ~30% of Cell C — find several small (each ~2-5%), genuinely independent bad cohorts whose cumulative removal materially improves R/trade and drawdown while preserving most of Cell C's ~6.5x throughput advantage over Cell B. Filter Candidate #1 (R2 proximity) is proof-of-concept that this works (2.3% removed, outsized R/DD improvement).
+
+**Next tangent, critic's explicit choice**: momentum/continuation persistence — does the breakout actually continue with sufficient strength afterward, or does it lose momentum? Chosen specifically because it targets a different failure mechanism than R2 (structural overhead vs. exhaustion), not because it's inherently more promising. Deferred: volume quality (already heavily explored this project's history), relative strength (correlation-with-existing-RS-architecture risk), base structure (potential large VCP-scale rabbit hole).
+
+**Freshness Audit on Cell C, critic-reviewed — PARTIAL VALIDATE, research-architecture change adopted (2026-09-24).** Real distribution shift confirmed (Cell C runs less-fresh than BC on average) but not a miscalibration (raw RSI14/momentum_20d ranges nearly identical between populations, both within the fixed `_percentile_from_breaks()` breakpoint table's assumed range). At 0.1-width resolution, Cell C's real weak spot is a narrow notch at freshness 0.1-0.2 (57.7% win, R/trade 0.0430, worst of any bin) — NOT the truly-freshest 0.0-0.1 bin (fine, 0.0841 R/trade) — with a second, separate dip at 0.4-0.5 (worst drawdown, -20.56). Ruled out as confounds: R2-tight concentration is actually LOWER in the weak 0.1-0.2 band (3.4% vs 4.5% population rate) — not the R2 finding leaking through. Entry-day `vol_zscore` is a real, partial confound (controlling for it roughly halves the gap) but doesn't eliminate it. One-sided (Fresh<=0.40) vs two-sided (<=0.20 OR >=0.80) capacity test does NOT cleanly replicate the old population's decisive result (mixed by slot count on Cell C) — but critic flagged this comparison itself is contaminated (the two-sided variant's own "<=0.20" tail blends the good 0.0-0.1 sub-bin with the bad 0.1-0.2 one) and should be **parked**, not trusted as-is.
+
+**Decomposition (`freshness_score = 0.5*rsi_pct + 0.5*mom_pct`) is the real finding.** `rsi_pct` alone is bumpy/directionless in Cell C (worst bin R/trade 0.0297 sits mid-range at 0.6-0.7, no clean shape). `mom_pct` alone is much cleaner — roughly monotonic win%/R-trade rise from bottom to upper-middle bins, worst drawdown of anything in either decomposition concentrated in its own bottom decile (-26.69). Checked whether BC's already-gated RSI (entry-day RSI_MIN/MAX) makes ITS rsi_pct cleaner — no, BC shows its own real bumpiness too (smaller/noisier samples, 46-372/bin). **Caught and fixed a real bug before trusting any of this**: an initial raw RSI/momentum pull used the entry day's own row instead of the prior day's (the actual `_freshness_score()` convention, Rule #2) — reconstruction sanity check caught it (max diff 0.87 vs expected ~0), fixed, reconstruction now exact to floating-point precision before proceeding.
+
+**Critic disposition, now standing for Cell C research going forward**: Candidate #1 (Fresh + R2<=0.25%) FROZEN as-is, confirmed independent of the Freshness notch. `freshness_score<=0.40` DEMOTED from discovery partition to descriptive/telemetry-only — stop opening new Cell C discovery conditioned on it. `mom_pct` PROMOTED to Tier A Candidate telemetry for Cell C discovery (same disposition tier as EMA34=2 pre-promotion) — include in every Cell C dataset, usable for bad-cohort discovery, not yet a production filter. `rsi_pct` stays a supporting/explanatory feature only. One-sided-vs-two-sided Freshness comparison PARKED — rebuild only after a real partition variable is settled, don't trust the current contaminated-tail version. **New research direction, critic's own framing**: pivot from "find bad cohorts inside Freshness<=0.40" to "find bad cohorts using Cell-C-native telemetry (mom_pct, R2 friction, volume quality, etc.), treating Freshness as descriptive only."
+
+**Next, critic-specified, exactly bounded — Momentum Persistence Audit (Cell C)**: does low `mom_pct` identify a bad cohort independently of Candidate #1? Exactly four checks, nothing else: (1) `mom_pct` deciles, (2) capacity-constrained R, (3) drawdown, (4) interaction/overlap with Candidate #1 (R2<=0.25%). If it survives, becomes Candidate #2. No threshold optimization, no additional sub-analysis.
+
+**Momentum Persistence Audit run — critic's own Check #4 (interaction with Candidate #1) overturned the "freeze it, independent" verdict. Candidate #1 UNFROZEN and RETIRED (2026-09-24).** Splitting the original Candidate #1 (Fresh<=0.40 + R2<=0.25%, n=183, raw mean R=-0.0301) by overlap with the `mom_pct` bottom decile (<0.1, n=2297 population-wide): Candidate#1-only (excl. overlap, n=83) raw mean R=+0.0183 (fine); mom_pct<0.1-only (excl. overlap, n=2197) raw mean R=+0.0605 (fine, near the +0.0668 population average); **BOTH (the overlap, n=100) raw mean R=-0.0702 — the entire negative signal originally attributed to Candidate #1 lives in this 54.6%-of-183 overlap, not the R2 condition itself.** Root cause: the original Candidate #1's Freshness gate is partially circular — `mom_pct` is literally half of `freshness_score`'s own construction (0.5*rsi_pct + 0.5*mom_pct) — so conditioning on both Fresh<=0.40 and mom_pct<0.1 was testing overlapping information, not two independent dimensions.
+
+**Verified this isn't Cell C being a generically noisy/raw population before trusting it**: Cell C's overall r_multiple std (0.406) isn't dramatically higher than BC's (0.383) — not a blanket "everything is noisier here" story. Randomization test: 5,000 random n=100 draws from Cell C's full population gave a mean-of-means of +0.0664 (std 0.0398, 1st percentile -0.0286) — the observed BOTH-cell mean (-0.0702) is more extreme than every single one of 5,000 random draws (0/5000 as low or lower). Real, not a small-sample fluke.
+
+**Rebuilt clean, without the redundant Freshness gate** — pure R2-tight-proximity (`nearest_level=='R2' & dist_pct<=0.25%`, no freshness condition) x pure momentum-weakness (`mom_pct<0.1`), full 2x2, capacity-constrained R/drawdown:
+
+| Cell | n | win% | median | cumR (full pop) | R/trade @slots=10 | maxDD @slots=10 |
+|---|---|---|---|---|---|---|
+| NEITHER | 5248 | 64.2% | +2.509% | 60.90 | 0.0638 | -5.17 |
+| R2-tight ONLY | 248 | 62.5% | +2.020% | 8.76 | 0.0353 | -6.06 |
+| Mom-weak ONLY | 2197 | 59.9% | +1.641% | 67.24 | **0.0783** | **-16.20** |
+| BOTH | 100 | 52.0% | +0.147% | **-7.02** | **-0.0702** | -9.22 |
+
+**Not a clean additive/"count the bad factors" model.** R2-tight alone is a mild drag (0.0353 vs Neither's 0.0638) — friction, not poison. Momentum-weak alone is actually the BEST R/trade of the four cells (0.0783, beats Neither) despite the lowest win rate outside BOTH (59.9%) and the worst drawdown outside BOTH (-16.20) — a genuine high-dispersion cohort (fewer, bigger winners), not a bad one on its own. Only the intersection produces the catastrophic outcome. **Economically coherent mechanism (critic's framing)**: a weak-momentum breakout can still work if it has open room to trend into fewer-but-bigger wins; put an immediate overhead ceiling (R2) directly on top of that same weak-momentum setup and it stalls immediately instead, with no room left to develop. Connects to (not yet formally merged with) prior independent threads: OX1's theta-cost-of-stalls framing, the original P1 progression-slowdown finding, and A5's dominance-loss timing work.
+
+**This also resolves the earlier Freshness-inversion puzzle (RQ-C1, 2026-09-22/23) retroactively**: Freshness wasn't "inverting" in Cell C — it was always a noisy composite blending weak-momentum, strong-momentum, and RSI state together, and the apparent inversion came from exactly the one corner of that space (weak-momentum x R2-overhead) now isolated here.
+
+**Critic disposition — Candidate #1 (revised)**: `R2_TIGHT_AND_MOM_WEAK` (R2<=0.25% AND mom_pct<0.1, n=100, 1.3% of Cell C) is the new, sole Cell C filter candidate. R2-proximity alone and momentum-weakness alone are each DEMOTED to telemetry/modifier status, not standalone avoid-signals — throwing away either the 248-trade R2-only or 2,197-trade mom-weak-only cohorts on their own would be discarding merely-below-average trades, not genuinely bad ones. Old `Fresh<=0.40 + R2<=0.25%` formally RETIRED, logged as "a research artifact caused by a composite variable," not cited as a real finding going forward.
+
+**New Research Integrity Rule #14 adopted (composite variable decomposition)**: before promoting any filter built on a composite feature, decompose it into its constituent variables and test whether the signal belongs to one component alone or only to an interaction between components — never freeze a filter while one of its components is mechanically embedded inside another conditioning variable used alongside it (as `freshness_score` was here, being half-built from the same `mom_pct` it was combined with). `freshness_score` is the canonical first example.
+
+## Entry Confirmation / Breach Acceptance Audit — a new, foundational research family, Phase 1 complete (2026-09-24)
+
+**Origin, direct user challenge**: while checking day1_open_ret behavior for the `R2_TIGHT_AND_MOM_WEAK` candidate, user questioned whether the entire backtest population (BC AND Cell C alike) is itself a biased sample — since every entry condition requires `Close > trigger` (10-day-high for BC, 40-day-high for Cell C), any real breach (`High > trigger`) that fails to hold into the close is silently excluded from every backtest this project has ever run, and has never been measured.
+
+**Phase 1 (Selection Bias Audit), full 500-ticker/full-cached-history scale, no intraday data needed (daily OHLC's own High/Low/Close already answer this)**: 96,423 total real breaches (`High > high10_prior`). Only 44,772 (46.4%) "Confirmed" (Close held above trigger) — the ONLY kind of trade any backtest in this project's history has ever counted. 51,651 (53.6%) "Rejected" (real breach, Close did not hold) — never traded, never measured, until this audit.
+
+**Confirmed vs Rejected, first pass**: distance travelled above trigger (Confirmed median 2.17% vs Rejected 0.62%), close position in day's range (Confirmed 0.794 vs Rejected 0.363 — a real weak-close/rejection-candle pattern), vol_zscore percentile (Confirmed 63rd vs Rejected 39th), give-back % of room gained (Confirmed median 42.8% vs Rejected median 255.1% — rejected closes typically land meaningfully below trigger, not marginally), freshness (no meaningful difference), gap size (minor). **Initial headline (any overhead R1/R2 pivot: 91.5% Rejected vs 47.1% Confirmed) — SUPERSEDED, see rung correction below.**
+
+**Rung correction (R1 vs R2 must never be pooled — same discipline as the Cell C ladder finding, now proven at 10x the scale).** Nearest-rung split on the full unfiltered breach population: R1 nearest 46,578 (48.3%), R2 nearest 21,770 (22.6%), no pivot 28,075 (29.1%). **R1 dominates here — the opposite of our own filtered populations (3.2% R1 in production BC, 27% in Cell C).** Mechanism: our own production filters (RSI/momentum/volume-surge gates) specifically select for breakouts strong enough to have already cleared R1 as a side effect (the original ladder-mechanism explanation, now validated at full scale) — this raw, unfiltered population includes every marginal poke above the 10-day-high that never had the force to clear R1 too.
+
+**R2-nearest ONLY, rebuilt clean**: Confirmed n=14,355, Rejected n=7,415 — confirmation rate ~66%, HIGHER than the population's overall ~46% rate. Distance distribution is only mildly different (median 0.640% Confirmed vs 0.768% Rejected; bucket shares close throughout, e.g. 0-0.25%: 19.3% vs 14.0%, 1-2%: 23.1% vs 28.9%). **"R2 overhead is a dominant cause of breach rejection" is RETIRED as a claim — the data says close to the opposite: R2-nearest breaches confirm MORE often than average, and R2-specific distance is only a mild discriminator once R1 is properly excluded.**
+
+**Two separate findings, critic-specified disposition, different evidentiary weight**:
+- **Finding A — Any-pivot presence: VALIDATED, mechanism revised.** Real statement: "marginal breaches occurring beneath an uncleared next rung (predominantly R1) are much more likely to fail end-of-day acceptance." An acceptance-stage phenomenon — not yet a production filter (Close is unknown at real entry time), but a real, large effect.
+- **Finding B — R2-specific distance/confirmation: WEAK, TELEMETRY ONLY.** Do not spend further discovery cycles refining R2 distance on the acceptance side.
+
+**Critical separation, to prevent research-thread contamination**: this Phase 1 evidence does NOT support or contradict `R2_TIGHT_AND_MOM_WEAK` (Candidate #1) — that is a POST-confirmation outcome question (given a trade survived, does R2×momentum-weak interaction produce poor P&L), entirely different from this PRE-confirmation acceptance question (does R2 make a breach less likely to survive at all — answer: no meaningful evidence). Keep these as separate research lines.
+
+**Broader methodological lesson (reinforces the standing Population Composition principle)**: the SAME underlying market, SAME 10-day trigger, shows a radically different apparent structural mechanism depending on where the population boundary is drawn — production BC (overwhelmingly R2-nearest, 96.8%) → Cell C (much more R1, 27%) → the full raw breach population (R1 dominant, 48.3%). "Never pool structurally distinct rungs" is now a hard rule, not a preference, proven across three independent population boundaries.
+
+**Phase 2 guardrail, mandatory before proceeding (critic-specified)**: any "enter at trigger" simulation for the Rejected population must be explicitly labeled a **trigger-price counterfactual**, never "actual rejected-trade P&L" — daily OHLC gives us trigger/High/Low/Close but NOT the real first-executable intraday fill price, and this project has already demonstrated (OX1) that execution can diverge materially from theoretical entry/exit prices. Phase 2 (outcome audit: Confirmed vs Rejected vs All, R1/R2/None kept separate throughout) is the next major step, not yet run.
+
+**Research priority reshuffle (critic-specified)**: Phase 2 Outcome Audit is Priority 0. Momentum Persistence (Cell C Candidate #2), additional Cell C bad-cohort discovery, and further R2 refinements all wait until Phase 2 completes — because Phase 2's entry-methodology decision could require rerunning any of them anyway.
+
+## RETRACTION — "R1 Pre-Breach Acceptance Probability" was a measurement-anchor artifact, not a real finding (2026-09-24)
+
+**The headline discovery of this entire research day — the R1-distance-collapses-confirmation-rate finding, sent to the critic, written up above as "FILTER CANDIDATE / VALIDATE," complete with what looked like a validating negative control on R2 — is fully retracted.** It was a circular measurement, not a real relationship. Third real-world catch of this project's own Research Integrity Rule #10 (Measurement Anchor Rule), after RQ-66's `dist_to_trigger_pct` and the extension-vs-Freshness correlation.
+
+**The bug**: `dist_pct` (distance from entry to the nearest overhead R1/R2) was computed as `(pivot_price - row.Close) / row.Close`, using **that same breach day's own Close** as the reference. But Close is *also* exactly what determines confirmed/rejected status (`Close > trigger`). A weak close (rejected) mechanically makes any fixed overhead pivot look farther away in %; a strong close (confirmed) mechanically makes the same fixed pivot look closer — purely arithmetically, regardless of whether the pivot caused anything. `dist_pct` and `confirmed` were never independent measurements — they were both derived from the same number.
+
+**Verified directly, full 500-ticker/full-history population (n=96,423 real breaches), both anchorings side by side**:
+- Close-anchored (the original, circular method): R1 confirmation rate collapses 88.4%→70.2%→50.3%→26.9%→10.4%→3.6% across distance buckets 0-0.25% through 3%+. R2 shows the *same* collapse (38.5%→3.4%) — meaning the original "negative control" wasn't a real validation either, it was comparing two versions of the same artifact.
+- Trigger-anchored (corrected — the trigger price is prior-day-known, fixed, genuinely independent of today's Close): confirmation rate is **flat at ~45-50% for both R1 and R2, at every single distance bucket, 0% through 3%+.** No collapse, no relationship.
+- Direct check, Confirmed vs Rejected `dist_pct` itself: R1 — Confirmed mean=0.754%/median=0.582% vs Rejected mean=0.742%/median=0.585% (essentially identical). R2 — Confirmed mean=0.900%/median=0.776% vs Rejected mean=0.895%/median=0.774% (essentially identical). R1/R2 distance genuinely does not predict same-day confirmation.
+
+**Extended composition check, per direct user request ("what predicts confirmation — R1/R2, momentum, volume, EMA, prior-10-vs-40-day, anything else — but only what's knowable at breach time"), full population, every candidate prior-day-known feature**: RSI percentile, momentum percentile, EMA trend/EMA34-rising-days, proximity to the 40-day high (vs the 10-day trigger), ATR%, liquidity, yesterday's own candle quality (prior-day close-position-in-range, not circular), consolidation days, and has-any-overhead-pivot — **every single one shows essentially no difference between Confirmed and Rejected** (e.g. RSI pct 0.304 vs 0.315; momentum pct 0.289 vs 0.292; EMA-trend-bullish rate 71.0% vs 72.3%; has-pivot rate 81.8% vs 82.3% — all near-identical). This is a much more thorough version of, and fully reconfirms, this project's own earlier standing result ("same-day rejection rate near R1/R2... CLOSED negative, no meaningful difference vs baseline") — extended here across essentially every reasonable pre-breach candidate, not just R1/R2, all null.
+
+**What survives fully intact, unaffected by this retraction**: the separate, universal, real finding that same-day EOD confirmed/rejected status (once observed, at/near the close) predicts the *rest* of a multi-day trade extremely well — Confirmed R/trade ~+0.20 to +0.27, Rejected R/trade ~-0.05 to -0.10, holding consistently across R1-nearest/R2-nearest/no-pivot alike (see "Confirmed vs Rejected split is universal" finding, same date). That finding does not depend on what predicts confirmation, only on the confirmed/rejected label itself once known — it is unaffected by this retraction.
+
+**Net conclusion, now on genuinely solid ground**: whether a given breach holds into the close appears to be **essentially unpredictable in advance** from any pre-breach setup characteristic tested (structural, momentum, volume/liquidity, or trend-based). It looks driven by same-day, intraday dynamics that don't show up in the prior day's state at all. This makes the confirmed/rejected split a genuine **post-entry, same-day risk-management signal** — real, large, and useful for how to handle a position once taken — but conclusively NOT a pre-entry filter, since nothing available before the breach predicts it. Do not revisit R1/R2-distance-predicts-confirmation without a fundamentally different, non-Close-anchored data source — this specific angle is closed.
+
+## Population Naming Discipline (frozen, 2026-09-24) — and the P0/P1/P2 plan going forward
+
+**Real-world context that triggered this**: user's actual live trading is intraday-IOC based (enters at the real trigger touch), not next-day EOD-confirmed — meaning every historical BC win-rate number (~60-65%) has only ever measured the EOD-confirmed half, never the full population an IOC-based trader actually experiences. `daily_scan.py` was almost recommended for migration to Primed Gate before the user clarified its real, distinct purpose: it is an **end-of-day confirmed-entry scanner** for the stock-swing strategy, journaling, and historical reconciliation — not the live IOC entry engine. Both populations are intentional and should coexist; the risk was researching on one while trading the other without realizing it.
+
+**Frozen population naming, use going forward, no more ad hoc terms**:
+| Population | Canonical use |
+|---|---|
+| **Confirmed Population** (`detect_entry_eod`) | Stock-swing backtests, `daily_scan.py`'s own EOD scanner, confirmation research |
+| **Primed Population** (Primed Gate / `detect_primed_entry`) | Live IOC entries, options backtests, fakeout/Type-A research |
+| **Raw Breach Population** (`High > trigger`, no other gate) | Methodology/acceptance audits only, not a trading population |
+
+**Explicitly CLOSED (do not reopen without a fundamentally different data source)**:
+- R1/R2 pre-breach-distance-predicts-confirmation — methodology artifact (see retraction above), no residual credit as telemetry or candidate evidence.
+- "Find another pre-breach predictor of same-day rejection" — a remarkably broad set already tested null (RSI, momentum, EMA trend, 40d-high proximity, ATR, liquidity, prior-day candle quality, consolidation days, pivot presence, R1/R2 distance, across both 10-day and 40-day breach populations). Real, meaningful negative evidence — stop searching for a pre-breach variable; the evidence says rejection is revealed by what happens *after* the breach, not by a clean pre-breach setup characteristic.
+
+**NOT closed, classified as FOUNDATIONAL POPULATION FINDING (not a filter)**: the confirmed/rejected decomposition itself — same-day event status producing enormous downstream outcome separation, validated across two independent breakout definitions (BC 10-day, O'Neil 40-day), and economically real (not cosmetic) because confirmed trades win more often AND have bigger winners AND smaller losses, all three compounding. The problem is purely temporal: known at EOD, which is workable for the stock-swing leg (multi-day hold, can manage around the evolving path) but potentially too late for options (theta + delta damage happens well before EOD).
+
+**Priority map, critic-specified, going forward**:
+- **P0 — Freeze population definitions** (this table). Documentation/discipline only, no code or research change.
+- **P1 — Type-A Retrospective Revalidation, bounded to exactly two candidates**: `EMA34=2` and `RVOL@Trigger` — the two most historically-invested-in previously-closed signals. Reproduction audit first (reproduce the exact old definition, do NOT optimize thresholds yet), run against Raw Breach → Primed Population → Confirmed Population, and explicitly check whether the old null result was real or only appeared after the EOD-confirmation selection had already removed most of what the signal would detect. Report per candidate: Type-A/immediate-adverse-excursion rate, real `check_exit()` P&L, R/trade, loss rate, early adverse movement, coverage, stock vs options separately. Do NOT reopen OI buildup, acceptance/streak-confirmation, supply exhaustion, candle geometry, etc. yet — bounded to these two only.
+- **P2 — Options-specific intraday early-warning study**: reframe from "predict rejection before it happens" (closed, doesn't work) to "once the breach has happened, does the first 15-90 minutes contain enough information to identify a developing rejection while there's still time to protect the option." Uses the constrained ~3-month real intraday window. Exactly four feature families, no feature zoo: (1) price vs. trigger — has price established real distance yet; (2) give-back — has the initial move been materially retraced; (3) range development — how much of the eventual day's range has already printed; (4) time + excursion — has the stock gone nowhere despite enough time having passed. Checked at 15/30/60/90-minute checkpoints against the eventual same-day confirm/reject label. The key output is not classification accuracy — it's the earliest checkpoint where conditional rejection probability becomes meaningfully different, and how much of the bad outcome is still avoidable at that point.
+- **Later, only if P1 or P2 produces something real**: threshold selection, intervention design, stock/options-specific deployment, capacity impact, robustness, production RQ.
+
+**Standing rule for all future Type-A/acceptance research**: report which of the three canonical populations (Raw/Primed/Confirmed) any result was computed on, every time — this is now a permanent header requirement, not optional context. A Type-A hypothesis cannot be evaluated on a population whose definition has already conditioned on surviving Type A; every historical EMA34/RVOL/etc. result that was only ever evaluated on the Confirmed Population needs to earn its conclusion again on the Primed Population before being trusted either way.
+
+## Runaway vs Pullback — lever at breach time (2026-09-24)
+
+**Motivating question, distinct from everything above**: given a real breach (Primed-equivalent population, ~3-month intraday window, n=3,896 candidates from `p2_full_pop.csv`), the confirmed/rejected split isn't the only outcome axis. Within trades that go on to run, roughly a third never pull back to the trigger again after the breach bar ("runaway", best-performing cohort, established earlier) vs two-thirds that do pull back at least once ("pullback", worse cohort). Question: is there a lever *at or before breach time* that lets you tell which type you're looking at, so you can choose IOC-immediately vs wait-for-pullback conditionally rather than as a blanket policy? Runaway rate in this population: 10.57% (412/3,896) — thinner than the historically-cited 23-31% because this population is intraday-window-limited, not the full history.
+
+**Result 1 — `body_atr` (breach bar's own `|Close-Open|/ATR14`, on the specific 5-min bar that crosses the trigger): REAL, the strongest lever found.** Runaway median=0.332 vs Pullback median=0.167 — a genuine ~2x gap, reproducing the historically-flagged strongest-ever feature for this label (rank-corr 0.223 in prior work). This is an at-breach-time, non-lookahead feature (only uses the breach bar itself).
+
+**Result 2 — every pre-breach (prior-day-known) feature re-tested against this new label: null, same pattern as the confirmation-prediction search.** RSI pct, momentum pct, EMA-trend-bullish, ATR%, liquidity, prior-candle-quality, and R1/R2 presence/distance (trigger-anchored, non-circular) all show negligible separation (e.g. has-pivot: Runaway 71.6% vs Pullback 70.5%; dist_pct when present: 0.744 vs 0.688). Consistent, now on a second independent label, with the standing conclusion that pre-breach setup characteristics don't discriminate breach outcomes — only breach-time information does.
+
+**Result 3 — `breach_bar_vol`: NOT trusted, mean/median disagree in direction.** Mean says Runaway (556,615) > Pullback (378,983); median says the reverse (19,476 < 31,997) — classic sign of outlier concentration skewing the mean. Not used as a lever until an outlier-concentration check is run (not yet done).
+
+**Result 4 — EMA distance-from-price ("how extended is price above the EMA") at breach: real but weak, likely redundant with `body_atr`.** Daily-8-EMA/1H-8-EMA/1H-34-EMA distance-above all show the same direction as `body_atr` (Runaway trades sit further above all three EMAs) but at ~1.27-1.45x separation vs `body_atr`'s ~2x — plausibly the same underlying "how forceful was the move" signal restated three ways, not independently verified. Correlation with `body_atr` not yet checked.
+
+**Result 5 — "did price touch the EMA anywhere in the prior 20-30 bars" (base-period touch, not breach-bar-specific): NULL, and for a clear reason — the feature is saturated.** 94-100% of the whole population touches its Daily-8/1H-8/1H-34 EMA at some point in a 20-30 bar lookback (routine price oscillation, not a distinctive event) — no discriminating power, "no-touch" comparison buckets too thin to mean anything (n=13, n=2, n=270). Superseded by Result 6 below (the user's actual intent was breach-candle-specific, not base-period).
+
+**Result 6 — breach-candle-specific support/rejection test (the corrected version of the "support" concept): real, 3-way split, direction opposite the naive hypothesis.** For each of Daily-8-EMA/1H-8-EMA/1H-34-EMA, checked whether the *breach candle itself* (breach day's daily bar, or the specific hourly bar containing the breach) dipped its Low to/through the EMA and where it closed relative to that level — using the last EMA value known *before* the breach candle (non-contaminated reference).
+- Touch rate is now genuinely selective (12.6% / 16.2% / 3.9%), unlike Result 5.
+- **Touching at all is a mild NEGATIVE signal, not positive**: Runaway rate given touched (5.2-7.9%) is lower than given not-touched (10.2-11.1%), all three EMAs. Reads consistently with `body_atr`: the cleanest, most forceful breakout candles never dip far enough to test an EMA in the first place; needing a support test is itself a sign of a more labored, wickier candle.
+- **Touched-and-broke-down (closed back below the EMA) is a clean, decisive kill signal: 0% runaway, combined n=150 (50+83+17) across all three EMAs.** Most solid single result of this sub-investigation — consistent direction, three independent EMA definitions, reasonable combined sample.
+- **Touched-and-held (closed back above): among these, reclaim strength (`pin_strength` — how much of the pierce got reclaimed relative to how deep it went) does tilt toward Runaway** (e.g. Daily median 10.5 vs 4.9; both 1H EMAs show the same gap) — but on a thin sample (runaway n=33/30/11) and **not yet verified with a randomization check** — flagged, not yet trusted.
+- The naive "combo: above/below both 1H EMAs" idea (checked earlier, at breach time not breach-candle) is dead: 99.7% of the population is already above both, no usable contrast population.
+
+**Net state, not yet closed**: `body_atr` remains the only fully-trusted lever. The breach-candle broke-down=0% result is promising and independently corroborated three ways but not yet folded into a classifier. Pin-strength-among-held needs a randomization check before use. Queued next: base-building volume contraction in the days before breach (Minervini-style "volume dries up, then expands") re-tested against this same runaway/pullback label — this concept was previously tested only against the *confirmation* label (see Supply Exhaustion / RQ-S1 above, tested null there), never against runaway-vs-pullback specifically.
+
+**Base-building volume contraction, retested against runaway/pullback: NULL again, and where there's motion it's opposite the theory.** `tight_ratio` (ATR10/ATR60, base tightness) is completely flat (0.940/0.930 Runaway vs 0.945/0.934 Pullback). Volume-trend features (`vol_slope10`, `vol_slope20`, `vol_contraction_ratio`) are all positive for BOTH groups (volume rising into breach, not drying up) with Runaway showing somewhat *more* volume increase, not less — the reverse of "sellers dry up, then buyers surge." `vol_contraction_ratio`'s mean gap (23%) is much larger than its median gap (5%), flagging outlier skew. Second time this exact concept (volume dry-up before breakout) has tested null — once against confirmation (Supply Exhaustion/RQ-S1), now against runaway/pullback. Treat as closed on both outcome axes.
+
+**`body_atr` — formally verified via label-randomization test (5,000 iterations): observed median gap (0.1646) sits at the 100th percentile of the random-label null distribution, p < 1/5000.** No longer just directionally suggestive — this is the strongest-confirmed lever in this entire sub-investigation.
+
+**`breach_bar_vol` — RETIRED, don't use.** Outlier-concentration check confirms the mean was distorted (Runaway group: single largest trade = 27% of the group's entire volume sum, top-5 = 56%; Pullback group's top-5 is only 19% by comparison) — but trimming the top/bottom 1% doesn't rescue a clean signal either: trimmed mean flips to Runaway>Pullback (268,829 vs 213,225, matching the raw mean's direction) while the raw **median still says the opposite** (19,476 vs 31,997). The distribution shapes disagree with each other depending on how you summarize them — no single trustworthy direction survives. Drop this feature rather than try to rescue it further.
+
+**CLOSING VERDICT — real economic outcome test, `body_atr` quartiles vs `broke_down` override (n=3,896, entered at the original breach, R-multiple via `risk_of_ruin.py`, slots=5/10 only).** This is the test that actually decides whether the lever-at-breach-time investigation produces something usable, not just statistically real.
+
+| `body_atr` quartile | n | Runaway rate | Swing win%/median | Options win%/median | cumR@5 | cumR@10 | maxDD@5 |
+|---|---|---|---|---|---|---|---|
+| Q1 (lowest) | 974 | 2.2% | 58.9% / +1.256% | 49.4% / -0.021% | -4.47 | -1.42 | -4.95 |
+| Q2 | 974 | 6.4% | 57.7% / +1.451% | 51.4% / +0.056% | -1.67 | -1.22 | -3.61 |
+| Q3 | 974 | 12.6% | 58.2% / +1.307% | 51.8% / +0.112% | **+7.44** | +6.17 | -0.68 |
+| Q4 (highest) | 974 | 21.1% | 55.7% / +1.184% | 52.9% / +0.205% | +1.21 | +3.34 | -4.23 |
+
+**Runaway rate climbs cleanly and monotonically with `body_atr` (2.2%→21.1%) — confirming the earlier randomization result — but real swing R-multiple performance does NOT track it: Q3, not Q4, is the standout (cumR +7.44@5, tightest drawdown), and Q4 (the bucket that would be classified "enter IOC immediately") is only mediocre on swing.** Options (`day1_open_ret`) is the one metric that does improve monotonically with `body_atr` (win% 49.4→52.9%, median -0.02%→+0.21%), but modestly. **Conclusion: `body_atr` predicts the runaway *label* well but does not reliably predict which immediate entries make more money — the originally-envisioned two-branch policy ("high body_atr → IOC now, low body_atr → wait for pullback") is NOT supported as a real strategy.**
+
+**What IS clean and decisive: `broke_down` (breach candle touches an EMA support and fails to reclaim it by close) as a kill-switch, independent of `body_atr` level.** Rare (3.0% of population, 118/3,896) but devastating:
+- Q1 (low body_atr): broke_down=False → 59.2%win/+1.30% swing, 50.7%win/+0.02% options. broke_down=True (n=29) → 51.7%win/+0.40% swing, **6.9%win/-2.14% options.**
+- Q4 (high body_atr): broke_down=False → 57.2%win/+1.34% swing, 55.3%win/+0.34% options. broke_down=True (n=42) → **23.8%win/-5.71% swing, 0.0%win/-3.23% options** — flips a good bucket into a clear loser, options win rate goes to zero.
+
+**Net actionable output of this entire arc**: not a body_atr-based timing strategy — instead, a narrow, defensive filter: **treat any breach where the candle touches an EMA (Daily-8/1H-8/1H-34) and fails to reclaim it by close as a skip/avoid signal**, regardless of how strong the candle otherwise looks. Small population (3%) but clean, consistent across three independent EMA definitions, and now confirmed with real `check_exit()` swing P&L and the options proxy both agreeing. `body_atr` itself remains statistically real (confirmed via randomization) but is retired as a standalone entry-timing lever given it doesn't move real P&L cleanly.
+
+**Follow-up, per direct user request — search for PRE-breach (not at-breach) information that could avoid the trade, either as a filter or telemetry, since `broke_down` itself is only knowable once the breach candle closes.** Re-tested every already-computed pre-breach feature (RSI/momentum pct, EMA-trend-bullish, ATR%, liquidity, prior-candle quality, R1/R2 distance, base tightness, volume trend) specifically against `broke_down` (not confirmation or runaway/pullback) — all null or too small/unstable to trust (e.g. `vol_slope10` looked promising, 2.3x gap, but `vol_slope20` disagreed in direction — same instability flag as `breach_bar_vol`).
+
+**New feature, real: "cushion" — how close price was already sitting to its own EMA *before* the breach candle even starts** (yesterday's daily close vs its own daily 8 EMA; the last COMPLETED hourly bar's close vs its own 1H 8/34 EMA — genuinely pre-breach, known before the IOC fires). Daily cushion: null (68.9th percentile). **Hourly cushion is real**: `h8_cushion` at the 99.3rd percentile of a 5,000-permutation randomization test, `h34_cushion` at 94.7th (weaker, borderline). Mechanically sensible: less room to spare before a breach attempt raises the odds of dipping through during it.
+
+**Per direct user instruction — a feature that looks marginal alone can combine with another to become real; ATR-normalizing the cushion (divide by the stock's own ATR%, since a 0.5% gap means something different for a calm vs volatile stock) sharpened BOTH**: `h8_cushion_atr` 99.3rd->**99.7th** percentile, `h34_cushion_atr` 94.7th->**99.4th** (borderline became clearly real). New standing research reminder logged to memory: don't discard a marginal feature without checking whether normalizing/combining it with another sharpens the signal.
+
+**Economic validation, `h8_cushion_atr` quartile (Q1=tightest cushion, real `check_exit()` outcomes, slots=5/10 only)**: `broke_down` rate is now cleanly monotonic (Q1 4.5% -> Q2 3.8% -> Q3 2.7% -> Q4 2.0%), and **Q1 is unambiguously the worst bucket on every single metric** — swing 52.6%win/+0.484%median (worst), options 46.1%win/-0.163%median (worst, and the only quartile with a negative options median), cumR -3.47@5 (worst). Q2/Q3/Q4 don't cleanly rank against each other (Q2 actually beats Q4 despite having less room), so "more room = monotonically better" is NOT supported — but "tightest cushion = worse" is completely consistent across every metric checked.
+
+**Genuinely new, actionable output**: the first real PRE-breach avoidance signal from this whole investigation. Skip or flag any candidate where price is already sitting very close to its own 1-hour 8 EMA relative to its own ATR right before a breach attempt — known before the IOC fires (unlike `broke_down`, which requires waiting for the candle to close), cuts ~25% of candidates, backed by consistent underperformance across swing win%, swing median, options win%, options median, and cumR — not just a higher `broke_down` rate. Arc closed, but this specific lever (`h8_cushion_atr` Q1 avoidance) is the one candidate from today worth carrying into an actual filter/telemetry design next.
+
+**Mechanism check, user's own two competing theories about WHY tight cushion is bad, directly tested against each other**: Theory A — near support + a confirmed defended bounce (pin bar) = buyers defending = a coiled-spring push straight into the breach = should be the BEST group. Theory B — near support = squeezed between defense below and resistance above = more likely to stall, not push. Crossed cushion (tight/loose) with recency-of-last-defended-bounce (from the earlier touch-and-hold work) into three real groups (n=3,896, real `check_exit()` outcomes):
+- **A (tight cushion + recently defended, the "push" candidate)**: n=1,617, cumR -2.42@5/-5.16@10, options median +0.021%.
+- **B (tight cushion + NOT recently defended, the "hemmed-in" candidate)**: n=158 (thin — a recent touch is common, so "tight but undefended" is the rare case), the worst of the three on every metric — 51.3%win swing, 44.9%win options, cumR -4.51@5/-5.58@10.
+- **C (loose cushion, "dangling")**: n=1,774, the BEST of the three and the only group with positive cumR at either slot count (+3.07@5/+4.09@10), best options median (+0.075%).
+- **Verdict: Theory A REJECTED** (the defended-bounce group A is worse than the dangling group C, not better) — **Theory B directionally supported but modest, not a clean reversal**: both tight-cushion groups underperform loose cushion, and within tight cushion, "recently defended" (A) is somewhat less bad than "not defended" (B) — a defended bounce softens a bad situation, it doesn't turn proximity-to-support into an edge. Net: distance from support (more room = better) is the real, consistent driver; the "energetic push off a defended level" mechanism is not supported by the data.
+
+## Critic disposition on the 2026-09-24 batch, and P0/P1 robustness follow-up (2026-09-24)
+
+**Critic verdicts, this batch**: EMA34=2 REOPENED and promoted to **Tier A Candidate (Primed population only)** — the earlier "plateau" closure was population-dependent, not a real null; do not inherit BC-era conclusions. RVOL@Trigger **retired permanently** for Type-A discovery (given a fair honest-population retest, stayed null). 90-minute early-warning signal and `broke_down`: both real but explicitly **post-entry only** — reclassified as "Management Infrastructure," same tier as OX1's reconstructed option value, not entry infrastructure. `body_atr`: **telemetry only** — "predicts label, not economics" (Q3>Q4 on real R, despite Q4 having the highest runaway rate) — new standing research principle logged: *don't promote a classifier unless it improves the downstream economic objective, label-prediction accuracy alone doesn't count.* `h8_cushion_atr`: **Tier A Filter Candidate — telemetry-first**, pending exactly two audits before promotion (below). Theory A vs Theory B mechanism test: critic reframes the conclusion as "the data supports geometry (more room above support), not narrative (buyers defending a level)" — keep that wording, don't anthropomorphize.
+
+**New cross-cutting hypothesis from critic, not yet declared true, but steering backlog priority**: successful discoveries this whole project (EMA34-Primed, `h8_cushion_atr`, the R2+momentum interaction) all share a "structural positioning before breakout" theme; failures (RVOL, volume contraction, prior-candle geometry, gap size) cluster around "demand-quality/immediate-event" variables instead. Tentative steer: **Type-A fakeouts seem more sensitive to structural positioning than demand-quality** — informs what to try next, not yet a closed finding.
+
+**Permanently closed per critic** (do not reopen without new evidence): RVOL@Trigger, volume contraction as a Type-A discriminator, EMA-touch-anywhere-in-window saturation idea, R1/R2 pre-breach acceptance-distance hypothesis.
+
+**P0 — Robustness audit (critic-specified, exactly two checks, Q1 threshold FIXED from the original full-population split, not re-tuned):**
+
+*Time split* (chronological halves of the n=3,549 population, split 2026-07-29): Q1 (tight `h8_cushion_atr`) stays worse than Rest on 9 of 10 metric-comparisons across BOTH the discover half (Jun17-Jul28) and validate half (Jul29-Sep23) — swing win/median and options win/median all hold direction in both halves (validate-half Q1 swing median even turns negative: -0.172% vs Rest's +0.341%). The one exception: cumR@10 in the validate half, where Q1 is marginally less bad than Rest. Note the whole market got tougher in Aug-Sep (even "Rest" degraded across the board) — consistent with critic's own regime-window concern — but the RELATIVE Q1-vs-Rest gap survives it.
+
+*Sector split* (Financials n=646, Pharma/Healthcare n=459, Industrials n=631, Others n=1,813): Q1 underperforms Rest on swing/options in **all 4 buckets** — no single sector explains the effect (passes critic's stated bar: "if effect survives broadly, confidence rises substantially"). Two honest weak spots: Industrials shows no `broke_down`-rate gap (3.1% vs 3.0%, though P&L still worse for Q1), Pharma/Healthcare's swing gap is a near-wash (61.6% vs 61.9%) though its options gap still holds clearly (41.4% vs 51.4%).
+
+**P1 — Capacity/R audit (critic-specified exact Cell C framework, Q1 fixed, before/after removing the 25% tightest-cushion candidates):**
+
+| Metric | Before | After Q1 removed (slots=5) | After Q1 removed (slots=10) |
+|---|---|---|---|
+| Trades removed / % population | — | 888 / 25.0% | same |
+| R/trade (mean, all candidates) | -0.0005 | +0.0077 | +0.0077 |
+| Cumulative R | 3.13 | 0.25 | -1.55 -> **+2.67** |
+| Max DD | -4.34 | **-2.32** | -9.90 -> **-3.53** |
+| Worst streak R | -4.34 | -2.14 | -3.60 -> -3.01 |
+| Avg concurrent open | 4.93 | 4.92 (throughput preserved) | 9.84 -> 9.83 (throughput preserved) |
+
+R/trade, Max DD, and worst-streak improve consistently at both slot counts (drawdown more than halved at slots=5, cut ~65% at slots=10); throughput essentially untouched. **One mixed number, flagged not hidden**: cumulative R drops at slots=5 (3.13->0.25) but flips negative-to-positive at slots=10 (-1.55->+2.67). Read as scheduler-fragility noise (this project has an exact documented precedent for this mechanism — the ITM-next-vs-adaptive-20 case: under a tight fixed-slot FCFS cap, removing candidates changes WHICH specific trades get admitted, independent of average quality), not evidence against the filter, given R/trade and drawdown both improve cleanly everywhere.
+
+**Net: clears 3 of critic's 4 stated production-candidate criteria (population removed in the 20-30% range, drawdown materially better, throughput preserved), with the cumR@5 anomaly as the one open asterisk.** Awaiting critic's read on whether this promotes `h8_cushion_atr` beyond telemetry-only.
+
+## FINAL DISPOSITION — critic's closing decisions on the whole 2026-09-24 batch (production candidate board adopted)
+
+**`h8_cushion_atr` PROMOTED to Production Candidate #2** (not just telemetry) — cleared chronological split, sector split, permutation test, capacity audit, and throughput audit; the cumR@5 anomaly explicitly accepted as scheduler behavior, not a contradiction, given R/trade/drawdown/worst-streak all improved. Production definition: **avoid the tightest 25% of candidates by `h8_cushion_atr`.**
+
+**Freshness x Tight-R2 (previous "Candidate #1") — RETIRED, archived as a superseded hypothesis, not even kept as telemetry.** Root cause: the interaction audit showed tight-R2-alone is only mildly worse, weak-momentum-alone actually produces larger average winners, and the toxicity is concentrated ONLY in the intersection — the original filter was accidentally proxying for the real mechanism (momentum weakness), not measuring something real on its own.
+
+**Freshness as a variable — demoted, no longer the primary partition variable for Cell C research.** BC and Cell C have different freshness distributions; the clean BC 0.40 cutoff doesn't replicate (Cell C shows a notch at 0.1-0.2, not a monotonic edge); momentum carries most of the real predictive information. Freshness stays available as telemetry only, not a filter candidate, until redesigned.
+
+**EMA34 persistence (2-8 days) — REOPENED**, per the P1 revalidation above. Mechanism read: EMA34 was likely detecting Type-A fakeouts all along, but earlier tests evaluated it only on the Confirmed population, where many fakeouts had already been silently excluded.
+
+**RVOL@Trigger — CLOSED, permanently.** Failed on both Confirmed and Primed populations; randomization confirms the apparent edge is noise. No more cycles here.
+
+**R1/R2 pivot story — arc closed.** Survives: tight overhead pivots matter economically in some contexts, and interact with momentum (see R2_TIGHT_AND_MOM_WEAK, though now downstream of the retirement above). Does NOT survive: acceptance probability, distance-predicts-confirmation, the original R1 "collapse" story — all retracted.
+
+**Cell C (O'Neil 40-day pivot entry + our own exit engine, n=7,793) LOCKED IN as the primary research population going forward, not the old BC population (~1,200 trades)** — similar trade quality to BC after applying the exit engine, ~6.5x more trade throughput. Reframed objective: remove the weakest ~30-40% of Cell C while preserving throughput and re-entry cadence — not "optimize BC forever."
+
+**Research parking lot, do not reopen without new evidence**: RVOL@Trigger (closed), R1 acceptance probability (retracted), Freshness 0.40 threshold (retired for Cell C), O'Neil-vs-BC entry/exit decomposition (settled), Swap1 robustness (settled).
+
+**Active production candidate board (adopted, replaces open-ended telemetry sprawl)**:
+| Candidate | Purpose | Status |
+|---|---|---|
+| 40-day Pivot Entry (Swap1) | Replace 10-day pivot entry architecture | Candidate |
+| EMA34 Persistence (2-8 days) | Type-A fakeout filter | Candidate (needs robustness — same 2-audit protocol as `h8_cushion_atr`) |
+| `h8_cushion_atr` (avoid tightest quartile) | Pre-breach avoid filter | **Candidate, promoted** |
+| Momentum-weakness interaction | Research mechanism only | Telemetry |
+
+**New backlog philosophy, adopted**: "don't optimize one leg forever — find one meaningful result, freeze it, move to another independent lever." Priority A (independent Cell C filters, highest value): (1) momentum persistence audit using `mom_pct` directly, not freshness; (2) volume quality audit, a genuinely new angle, not a RVOL@Trigger rerun; (3) relative strength audit (stock RS vs sector RS); (4) O'Neil base-tightness vs `consolidation_days` audit. Priority B (options-specific, kept isolated from swing entry discovery): early-warning exits, OX1 improvements, IOC execution behavior. Priority C (Primed-population revalidation): intentionally tiny list — EMA34 (done, reopened) and RVOL (done, closed) — explicit instruction not to reopen ten historical RQs speculatively.
+
+## Volume Quality Audit — Cell C, Priority A item #2 pursued (2026-09-24)
+
+**Cell C rebuilt from scratch first** (the prior session's version lived only in a session-isolated scratchpad, not persisted) — O'Neil-naive entry (40-day prior high, Close>SMA200, Volume>=1.5x trailing-25-day median baseline excluding already-extended days) run through our own real exit engine (`check_exit("breakout_cont", ...)`), full 500-ticker universe, one-trade-at-a-time per ticker. Verified against the documented result before trusting it: n=7,769 (documented 7,793, 99.7% match), win%=62.72% (documented 62.7%), median=+2.253% (documented +2.26%) — high-fidelity reproduction, trusted.
+
+**New feature, genuinely distinct from RVOL@Trigger**: `ad_fraction` — the classic O'Neil Accumulation/Distribution concept, fraction of total volume occurring on up-days vs down-days over the 20 days strictly before entry (prior-day-known, no lookahead). RVOL@Trigger measured volume LEVEL at a single moment; this measures volume COMPOSITION over the pre-breach window — a different dimension entirely.
+
+**Decile result (Cell C, n=7,769)**: swing median trends from +1.808%/+1.741% (D0/D1, distribution-heavy) up to +2.539%/+2.575% (D8/D9, accumulation-heavy) — a real, fairly clean upward trend, not perfectly monotonic bar-to-bar but unambiguous bottom-vs-top. Options shows a DIFFERENT shape — rises from D0/D1 (~0.34-0.37%) to a peak at D3-D7 (~0.40-0.42%), then DECLINES again at D8/D9 (0.360%, 0.352%) — a hump, not a monotonic climb. Real structural difference: extreme accumulation (D8/D9) is swing's best zone but options' worst zone among the top half.
+
+**Bottom-20% (`ad_fraction<=0.567`) vs Rest, economic validation — cleaner than `h8_cushion_atr`, no anomalous metrics**:
+
+| Metric | Bottom 20% | Rest |
+|---|---|---|
+| n | 1,554 | 6,215 |
+| Swing win%/median | 61.0% / +1.781% | 63.2% / +2.360% |
+| cumR@5 / @10 | 6.05 / 34.01 | **22.51** / **70.28** |
+| Max DD@5 / @10 | -13.80 / **-17.92** | -9.71 / -7.69 |
+| Worst streak@5 / @10 | -5.38 / -6.55 | -3.50 / -3.95 |
+| Options win%/median | 70.6% / +0.361% | 71.3% / +0.394% |
+
+Every swing/R metric worse for Bottom-20%, at both slot counts, with zero mixed signals (unlike `h8_cushion_atr`'s cumR@5 anomaly). Randomization check: observed median gap sits at the **0.2nd percentile** of 5,000 permutations — strong significance, same tier as `body_atr`. **Options moves the same direction but far more weakly** (~8.4% relative gap vs swing's ~24.5% relative gap) — real, not a wash, but a much smaller effect, consistent with the decile hump shape above. Overlap check against `h8_cushion_atr`'s bad cohort was attempted but flagged as not meaningful — the two live on entirely different populations by construction (Cell C's 40-day O'Neil entries, 2022-2026, vs the cushion population's BC/Primed 10-day-trigger real breaches, Jun-Sep 2026 only), so the small n=477 accidental overlap isn't a real same-population interaction test.
+
+**Robustness — time split (threshold fixed from full population, not re-tuned) — CLEANER pass than `h8_cushion_atr`, zero metric flips**:
+
+| Period | Group | n | Swing win%/median | Max DD@5/@10 |
+|---|---|---|---|---|
+| Discover (2022-07 to 2024-04) | Bottom20 | 732 | 64.6%/+2.066% | -8.87/-15.04 |
+| Discover | Rest | 3,140 | 68.2%/+2.873% | -2.96/-4.15 |
+| Validate (2024-04 to 2026-09) | Bottom20 | 821 | 58.0%/+1.480% | -10.90/-17.79 |
+| Validate | Rest | 3,068 | 58.1%/+1.698% | -4.28/-7.25 |
+
+Every metric holds direction in both halves, no exceptions — drawdown gap especially stays large and consistent (~3-4x worse for Bottom20) across both periods, though the win%/median gap narrows substantially in the later period (58.0 vs 58.1, nearly tied).
+
+**Sector split — swing holds in all 4 sectors cleanly; options does NOT survive the sector split (flips in 3 of 4 sectors)**: Financials, Pharma/Healthcare, Industrials, Others all show Bottom20 worse on swing win%/median with no exceptions. Options win% and/or median flips direction (Bottom20 better than Rest) in Financials (median), Pharma/Healthcare (win%), and Others (win%) — only Industrials shows options fully consistent with the aggregate.
+
+**Disposition, own read (pending critic)**: real, strong, well-verified SWING candidate — passes robustness more cleanly than `h8_cushion_atr` did. Options effect is real in aggregate but weak and NOT sector-robust — should be reported as a swing-specific candidate, not dual-purpose, distinct from `h8_cushion_atr` which showed a real (if smaller) options effect throughout its own audits.
+
+**Critic disposition: "Candidate #3 (Pending Capacity Audit)"** — clears every promotion criterion except the capacity/R audit (large population, prior-day-known, time-split, swing sector robustness, permutation test all pass; capacity/R not yet run at the time of review). Critic explicitly classifies options as "swing-specific filter, not validated for options" — a genuine negative finding, not a failure, and an explicit instruction not to force every filter to work for both products. Exactly one audit required: capacity/R at slots=5/10/20/50, nothing else (no rerunning time splits, no inventing overlap studies).
+
+**Capacity/R audit run (slots=5/10/20/50, Bottom-20% by `ad_fraction` removed, threshold fixed)**:
+
+| Metric | Before | After (slots=5) | After (slots=10) | After (slots=20) | After (slots=50) |
+|---|---|---|---|---|---|
+| R/trade (mean) | 0.0669 | 0.0709 | 0.0709 | 0.0709 | 0.0709 |
+| Cumulative R | 32.27 | 22.51 | 55.21 -> **70.28** | 103.03 -> **127.83** | 250.81 -> **270.22** |
+| Max DD | -8.40 | -9.71 | -9.78 -> **-7.69** | -23.14 -> **-16.53** | -51.02 -> **-35.81** |
+| Worst streak R | -3.15 | -3.50 | -2.83 -> -3.95 | -6.35 -> -5.29 | -12.19 -> -11.91 |
+| Avg concurrent open | 4.92 | 4.90 | 9.79 -> 9.74 | 19.37 -> 19.13 | 45.80 -> 43.91 |
+
+**3 of 4 slot counts (10/20/50) show clean cumR AND drawdown improvement simultaneously — only slots=5 shows the same scheduler-fragility anomaly `h8_cushion_atr` already showed at that slot count.** R/trade improves in aggregate; throughput preserved at every slot count (avg concurrent barely moves even at slots=50 with 20% of raw candidates removed). This is a stronger capacity result than `h8_cushion_atr` originally got (which only had 2 slot counts checked, one anomalous) — 3 of 4 checked levels agree cleanly here.
+
+**Critic PROMOTED to Production Candidate #3 (Volume Quality, swing-only)** — clears every criterion (independent mechanism, time/sector robustness, capacity audit 3-of-4, throughput preserved), options explicitly scoped out ("swing-specific filter, not validated for options — don't force every filter to work for both products"). Reading of the slots=5 anomaly: scheduling noise given 3 independent capacity settings agree, not evidence against the filter. Next recommended: Relative Strength audit (stock RS vs sector RS), motivated by the live RBLBANK observation, as a genuinely different mechanism (leadership, not price/volume structure) unlikely to overlap with the volume-based candidates.
+
+## Relative Strength Audit — Cell C, CLOSED negative (2026-09-24)
+
+**Motivation**: does true leadership (stock RS AND its sector RS both strong) beat an isolated mover (stock strong, sector weak) or a sector-riding laggard (stock weak, sector strong)? Both `rs_rating()` (IBD/Minervini-style, 126-day return percentile vs the Nifty 500 universe) and `sector_rs()` (sector's own mean return percentile vs other sectors) already existed in the codebase, called with the PRIOR day's date (no lookahead).
+
+**Framing 1 — median-split 2x2 leadership grid**: win%/median nearly flat across all four cells (61.5-63.4% win, +2.06 to +2.40% median) — no leadership-tier separation at all. Only "Weak Both" (stock AND sector below median) showed a real-looking drawdown gap (Max DD@10 -20.03 vs -15.21 for the rest) — but win% actually pointed the WRONG direction (63.0% for the "bad" cohort vs 62.7% for the rest), and a randomization check on the median gap landed at only the **5.9th percentile** — real but far below the <1st-percentile bar `body_atr`/`ad_fraction` both cleared.
+
+**Framing 2 — sharpened to extreme quartiles (bottom-Q both vs top-Q both)**: the effect got WEAKER, not stronger — randomization percentile dropped to 36.3rd (indistinguishable from noise), and "Extreme Strong Both" (the group the leadership hypothesis says should be best) actually had the LOWEST win% of the three groups (61.2%). Sharpening the cut killed the finding rather than clarifying it — a real, informative signal that the effect isn't concentrated in the extremes at all.
+
+**Framing 3 — stock RS alone, decile check**: bumpy, no clean bottom-to-top trend; bottom-20% vs rest randomization check: 25.9th percentile, not significant. One loose thread, NOT stress-tested, flagged only: D9 (top 5.8%, RS 94.2-99.8) shows median +3.321%, meaningfully above every other decile (1.9-2.4%) — a possible "seek the best" signal, distinct from an avoid-filter, left for a future thread if revisited.
+
+**Framing 4 — sector RS alone, decile check**: no discernible trend at all (D6 highest +2.756%, D7 lowest +1.865%, no monotonic shape).
+
+**Disposition: CLOSED negative.** Four independent framings (median-split combination, extreme-quartile combination, stock-alone, sector-alone), none produce a usable, robust bad-cohort avoid-filter on Cell C. The "true leadership" hypothesis specifically is not supported — extreme strong-both was not the best-performing group in the one framing that isolated it. Genuine negative result, not merely parked — don't reopen without a fundamentally different RS construction (e.g., a different lookback window, or RS-trend/acceleration rather than a point-in-time level).
+
+**Critic confirmed CLOSED, no reopening** — endorsed as "a good negative," consistent with the project's own "don't optimize forever" philosophy: four framings tried (not just one), consistent failure each time, real evidence the live RBLBANK "strong stock/weak sector" intuition doesn't generalize into a portfolio-level filter. Explicitly separated the one loose end (top-decile stock RS ~95+) as a "seek the best" research question, distinct from and not to be mixed with the current "avoid the worst" objective. Candidate board unchanged (RS added as Closed, everything else stable).
+
+**RBLBANK reference, recovered from raw session log (2026-09-24, this exact connection was missing from both FINDINGS.md and memory before this)**: real `live_checkpoint.py` dashboard output showed RBLBANK as a genuine Tier-2 ("kept going, still near trigger") live candidate — `band=[411.93,413.16] price=415.05 quality=0.44 Financial Services (sector RS 9)` — i.e., the stock itself looked strong enough to be a real tradeable candidate while its own sector (Financial Services) had a `sector_rs` of just 9 (9th percentile, one of the weakest sectors in the market at that moment). That divergence (strong stock, weak sector) is the literal real-world observation that motivated the Relative Strength audit above. Confirmed the audit tested the right thing — the closure stands.
+
+## Base Structure Audit — Cell C, next Priority A item (2026-09-24)
+
+**Research question (critic-specified)**: is O'Neil's base tightness adding independent information beyond the existing `consolidation_days` feature, or is it redundant telemetry? Bounded to exactly 3 checks: (1) correlation audit — are they measuring the same thing; (2) 2x2 interaction table (Tight/Loose x High/Low consolidation); (3) capacity audit ONLY if the interaction is real. If correlation is very high, delete one feature. If low and the interaction is real, promote. If neither, close.
+
+**Features**: `tight_ratio` (ATR10/ATR60, the same reconstruction used in the earlier Supply Exhaustion work) vs the existing production `_consolidation_days()` (count of quiet near-high10_prior days in a trailing 20-day window, `live_checkpoint.py`) — used exactly as-is, not reparametrized to Cell C's 40-day pivot, since the question is about the EXISTING feature specifically.
+
+**Check 1 — Correlation audit**: Pearson -0.234, Spearman -0.216 (n=7,769, 100% coverage). Low, in the expected direction (more quiet days -> tighter ATR ratio) but far from redundant — does not clear "delete one feature."
+
+**Check 2 — 2x2 interaction table, real and genuinely counterintuitive**:
+
+| Cell | n | Swing win%/median | cumR@5/@10 | Max DD@5/@10 |
+|---|---|---|---|---|
+| A: Tight + High Consolidation (textbook ideal) | 2,252 | 63.0% / **+1.928%** (lowest median) | 27.56 / 44.86 | -7.62 / **-14.89** (worst) |
+| B: Tight + Low Consolidation | 1,633 | 60.3% / +2.169% | **53.38** / **78.30** (highest) | -6.29 / -11.70 |
+| C: Loose + High Consolidation | 1,688 | 63.5% / +2.086% | 28.57 / 45.50 | -7.83 / -11.04 |
+| D: Loose + Low Consolidation | 2,196 | 63.6% / **+2.949%** (highest median) | 36.32 / 55.63 | -6.37 / -8.58 |
+
+**The textbook-ideal cell (A: tight base + quiet consolidation, exactly what Minervini/O'Neil theory says should be best) is the WORST cell on nearly every metric** — lowest median, worst Max DD@10, tied-lowest cumR. Consistent with this project's repeated pattern of "compression/quiet-base" theories failing (echoes the earlier Supply Exhaustion null and the breach-candle support-defense finding).
+
+**Check 3 — Capacity audit, run since the interaction is real and strong (randomization check on Cell A vs Rest: 0.1st percentile — the strongest significance of the whole session)**:
+
+| Slots | cumR Before->After | Max DD Before->After | Worst streak Before->After |
+|---|---|---|---|
+| 5 | 32.27->20.58 (worse) | -8.40->-7.08 (better) | -3.15->-3.53 (worse) |
+| 10 | 55.21->47.24 (worse) | -9.78->-13.46 (worse) | -2.83->-5.14 (worse) |
+| 20 | 103.03->85.94 (worse) | -23.14->-21.18 (better) | -6.35->-5.04 (better) |
+| 50 | 250.81->246.65 (worse) | -51.02->-34.73 (better) | -12.19->-10.14 (better) |
+
+**Cumulative R is worse at every single slot count** — unlike either promoted candidate. Removing Cell A cuts 29.0% of the population (2,252 trades, larger than `h8_cushion_atr`'s 25% or `ad_fraction`'s 20%), and the raw throughput loss outweighs the per-trade quality gain on cumR specifically, even though R/trade improves modestly (0.0669->0.0695) and drawdown/streak split 3-of-4 favorable.
+
+**Own disposition (pending critic)**: the strongest per-trade statistical signal of the entire session (0.1st percentile), but does NOT cleanly clear the capacity bar the way the two promoted candidates did — cumR uniformly worse. Reads as a real quality-context/ranking signal (useful for choosing among same-day candidates) rather than a hard portfolio-level avoid-filter, given how large a slice of the population it represents.
+
+**Critic disposition: TELEMETRY/RANKING ONLY, not a production candidate.** Confirms every criterion except the last two decisive ones (portfolio improvement, throughput preservation) — statistically the strongest signal of the session (0.1st percentile) but fails the portfolio test, removing 29% of the population for a net cumR loss. **New standing promotion rule adopted, worth remembering**: *"A bad cohort must improve portfolio economics under realistic capacity constraints, not just per-trade statistics — a statistically bad cohort is not automatically an economically removable cohort."* Cell A (the textbook-ideal tight+quiet setup) is full of mediocre trades but also full of real winners; removing all of them throws away too much opportunity, unlike `ad_fraction`'s bottom-20% which was consistently damaging across every portfolio metric. Explicit instruction: do NOT chase smaller thresholds/deciles/3x3 grids on this feature pair — the interaction has already answered the question (not a good hard filter), further threshold-hunting would be exactly the "optimize one tangent forever" pattern this project is trying to avoid.
+
+**Project-level pattern now three-for-three against "quiet/compressed base" theory on Cell C**: Supply Exhaustion/VCP-style volume compression (mostly null), Tight base + high consolidation (worst-performing interaction cell), vs Volume Quality (`ad_fraction`, real, but about accumulation DIRECTION not compression). Coherent read: **Cell C's winners come more from quality of demand than from quietness before breakout** — a real project-level observation, not to be overgeneralized beyond Cell C specifically.
+
+## PRIORITY A CLOSED — full scorecard (2026-09-24)
+
+All four independent Priority A levers now resolved:
+
+| Lever | Outcome |
+|---|---|
+| Momentum persistence | Skipped/already-answered — telemetry (interaction-only, R2+momentum combo now itself retired) |
+| Volume quality (`ad_fraction`) | **Production Candidate #3** (swing-only) |
+| Relative strength (stock RS x sector RS) | **CLOSED negative** |
+| Base structure (`tight_ratio` x `consolidation_days`) | **Telemetry/ranking only** — hard-filter hypothesis closed, features retained |
+
+**Full day's net scorecard**: 2 promoted (`h8_cushion_atr` swing+options, `ad_fraction` swing-only) · 2 closed/demoted (Relative Strength, Base Structure) · 1 revalidated positive (EMA34, reopened as Tier A Primed candidate) · 1 revalidated negative (RVOL@Trigger, retired permanently) · 1 retracted (R1/R2 acceptance-probability, measurement-anchor artifact).
+
+**Updated Production Candidate Board (frozen)**:
+| Candidate | Scope | Status |
+|---|---|---|
+| 40-day Pivot Entry (Swap1) | Swing + Options | Production Candidate |
+| EMA34 Persistence (2-8 days) | Primed/Type-A | Candidate (needs robustness — same 2-audit protocol as the others) |
+| Tight 1H EMA Cushion (`h8_cushion_atr`) | Swing + Options | Production Candidate |
+| Volume Quality (`ad_fraction`) | Swing only | Production Candidate |
+| Relative Strength (stock/sector RS) | — | Closed |
+| Base Tightness x Consolidation Days | — | Telemetry/Ranking only |
+
+**Priority A formally closed per critic** — explored four independent mechanisms, promoted one, closed one, demoted two (momentum, base structure) to telemetry. A healthy research cadence, not over-optimizing a single tangent. Next: Priority B (options-specific work — early-warning exits, OX1 improvements, IOC execution — deliberately isolated from swing-entry discovery).
+
+## Liquidity/`MIN_TRADED_VALUE` filter — decision note, revisited (2026-09-25)
+
+**Prompted by today's Filter Transfer Ladder re-confirming (on fresh raw-population data, both 10-day/BC-style and 40-day/Cell-C-style pivots) that the liquidity-removed cohort outperforms the kept cohort** (mean R 0.0696 vs 0.0419 for 10-day; 0.0784 vs 0.0402 for 40-day). Traced this against the full prior history:
+
+- **2026-08-30 original ablation** (`signals.py` lines 30-56): removing `MIN_TRADED_VALUE`/`MOMENTUM_20D_MIN` together IMPROVES the backtest (median +0.82%->+1.09%, better win rate). Kept anyway purely as a candidate-list-size/UX control (dropping both would 5x monthly signal count, 197->1047).
+- **RQ-48 liquidity-bucket decomposition**: swing win%/median essentially flat across all liquidity buckets once two real bugs were fixed (concentration-metric top-N-vs-top-N% bug, freshness look-ahead bug). Final sign-off: keep >=100cr not because lower-liquidity trades perform worse, but because real options tradability collapses below it (ATM contract availability: 79% at 100cr+ -> 58%/48%/30%/0% in lower buckets).
+
+**Conclusion, per user's own framing**: liquidity was never a genuine backtest quality filter — every independent test across three separate research passes (2026-08-30, RQ-48, today) agrees the removed cohort is as good or better than the kept cohort on pnl/R terms. It functions as (a) a candidate-list-size/UX control and (b) a proxy for real F&O options-tradability, not a stock-quality signal. **Standing note for future Cell C filter-adoption work: do NOT propose a liquidity/traded-value threshold as a swing quality filter** — if a workload/tradability control is needed, prefer checking direct `fo_universe.csv` membership over a continuous rupee-value threshold, since the threshold conflates two different jobs (workload control + tradability gate) that a direct universe check would separate cleanly.
+
+## Freshness / Fragility tested as candidate filters on raw populations, both pivot windows (2026-09-25)
+
+**Research question**: BC's live dashboard already computes two telemetry signals at candidate time — `_freshness_score()` (0.5*RSI-percentile + 0.5*momentum-percentile, lower=fresher) and `_fragility_risk()` (freshness x body/ATR14 quartile lookup -> Robust/Watch/Precise). Both are fully reconstructable from a historical breach day's own OHLC/ATR14 and the prior day's RSI/momentum (no live/intraday data actually required — confirmed by direct reading of `live_checkpoint.py`). Tested one-by-one, same methodology as the 5 base filters (SMA200/RSI/EMA34/Momentum/Liquidity), on the same raw, unfiltered trigger populations (`rawpop10_full.csv` n=23,682, `rawpop40_full.csv` n=13,226).
+
+**Freshness (kept = freshness_score<=0.40, matching the standing population-choice convention; removed = extended >0.40)** — fails as a raw-population quality filter, direction-consistent on both pivots:
+
+| Pivot | Removed% | KEPT win/median/meanR | REMOVED win/median/meanR | cumR@10 ALL->KEPT | Efficiency |
+|---|---|---|---|---|---|
+| 10-day | 27.5% | 61.6% / +1.832% / 0.0540 | 65.0% / +2.329% / 0.0674 | 66.21->60.70 | -0.20 |
+| 40-day | 44.6% | 60.6% / +1.708% / 0.0535 | 65.0% / +2.316% / 0.0701 | 45.26->41.03 | -0.095 |
+
+The "extended" (removed) cohort wins more, has a higher median, and a higher mean R than the "fresh" (kept) cohort on BOTH windows — the opposite of what the freshness<=0.40 convention implies. **This is in tension with the standing `feedback_population_choice_for_backtests` convention and needs a sanity check before either side is treated as settled** — the convention was adopted for population SELECTION to mirror production's already-filtered candidate stream, not validated as a raw-population quality claim; this test is on the fully raw/ungated trigger population, a different context. Flagged, not yet resolved either way.
+
+**Fragility (kept = Robust/Watch, removed = Precise)** — real, pivot-dependent edge, R-multiple concentrated not win%/median:
+
+| Pivot | Removed% | KEPT win/median/meanR | REMOVED win/median/meanR | cumR@10 ALL->KEPT | Efficiency |
+|---|---|---|---|---|---|
+| 10-day | 7.8% | 62.4% / +1.955% / 0.0605 | 64.4% / +1.979% / 0.0249 | 66.21->64.49 | -0.22 |
+| 40-day | 12.3% | 62.6% / +2.009% / 0.0677 | 62.8% / +1.795% / 0.0130 | 45.26->49.61 | **+0.35** |
+
+"Precise" trades' mean R is roughly a quarter of the kept cohort's on both windows, despite near-identical win%/median pnl_pct — the damage is R-multiple-concentrated (larger stop distance relative to outcome), invisible to a plain win%/median view. On the 40-day/Cell-C-style pivot this clears the Tier B bar cleanly (cumR@10 improves while removing 12.3% of trades). On the 10-day/BC-style pivot it's closer to neutral/mildly negative. **This sits in direct tension with this project's own prior critic ruling that Fragility should never be a hard filter** ("fragile trades include real winners... would repeat the mistake the acceptance/pullback/Body-ATR gates already made") — that ruling should be re-examined, since it was likely made against a different (already-filtered) population than this raw one, not necessarily wrong on its own terms.
+
+**Both results queued for critic per Research Integrity Rule #14 (Architecture Transfer Rule) before any action is taken** — neither is being treated as a settled filter decision yet.
+
+## EMA34_RISING_DAYS_MIN full threshold sweep, both raw pivot windows (2026-09-25)
+
+**Prompted by revisiting the 9->2 history** (original first-commit default was 9, swept and demoted to 2 via RQ-52/2026-09-18 on a choppy-window/lag argument, promoted live 2026-09-20). Re-swept 0-10 on the same raw, unfiltered trigger populations used for the Filter Transfer Ladder (`rawpop10_full.csv` n=23,682, `rawpop40_full.csv` n=13,226), reusing each trade's own prior-day `ema34_rising10` count (0-10 scale).
+
+**10-day/BC-style pivot — real, gentle, monotonic gradient**: win 62.5%->64.0%, median +1.958%->+2.098%, meanR 0.0577->~0.065 climbing from thresh=0 through thresh=9-10, with most of the gain already visible by thresh~4-5. Population shrinks fast (100%->42.6% by thresh=9).
+
+**40-day/Cell-C-style pivot — nearly flat, filter barely bites**: win 62.6%->63.4%, median +1.978%->+2.061% across the ENTIRE 0-10 range — a much weaker gradient, and population barely shrinks at low thresholds (98.1% still present at thresh=2, only down to 68.6% by thresh=9). Consistent with the earlier Cell C Primed BC Transfer Batch finding that EMA34 only removed 0.9% of that population — Cell C's own 40-day-high+SMA200 entry condition already implicitly selects for established-uptrend names, making EMA34 persistence close to redundant there.
+
+capacity-constrained cumR@5/@10/DD/worst-streak columns were computed but are noisy/non-monotonic at these small slot counts even between adjacent thresholds on near-identical populations — win%/median/meanR are the trustworthy read for this sweep, not the capacity numbers.
+
+**Reconciling with the 9->2 promotion decision, not a contradiction**: this raw-population sweep shows thresh=9 modestly beats thresh=2 on per-trade quality (10-day pivot: 64.0%/+2.088%/0.0645 vs 63.3%/+2.032%/0.0642) — but RQ-52's case for 2 was never a per-trade-quality argument, it was a responsiveness/lag argument (9-of-10 persistence requirements systematically lag in a choppy market, and real Nifty streak data showed 98.9% of streaks <=5 days, 0% reaching 9+, making a 9-day qualification bar near-permanently stale). The two findings measure different axes and don't conflict — 9 is marginally better on raw per-trade stats, 2 wins on real-market responsiveness, and responsiveness is what got promoted. On the 40-day pivot the whole question is close to moot given how flat the curve is.
+
+**CORRECTION, same session — "near-inert for Cell C" was wrong; re-run with the BASELINE row included, per new standing methodology (see `feedback_show_baseline_with_kept_removed`).** The aggregate >=threshold sweep above buried a real, small, toxic tail because a tiny removed cohort dilutes into almost nothing at the aggregate level. Re-ran the same EMA34_RISING_DAYS_MIN thresholds as a genuine 3-way split (BASELINE full population / KEPT >=thresh / REMOVED <thresh), R and drawdown for both:
+
+**40-day/Cell-C-style pivot (BASELINE n=13,226: win=62.6%, median=+1.978%, meanR=0.0609, cumR@10=45.26/DD@10=-13.98):**
+
+| thresh | | n | win | median | meanR | cumR@10 / DD@10 |
+|---|---|---|---|---|---|---|
+| >=2 | KEPT | 12,981 | 62.8% | +2.000% | 0.0631 | **70.52** / -19.61 |
+| | REMOVED | **245** | **49.4%** | **-0.124%** | **-0.0536** | **-11.19** / -18.17 |
+| >=4 | KEPT | 12,453 | 62.9% | +2.006% | 0.0626 | 55.06 / -10.96 |
+| | REMOVED | 773 | 57.1% | +1.416% | 0.0349 | 24.59 / -12.88 |
+| >=9 | KEPT | 9,077 | 63.3% | +2.039% | 0.0619 | 32.21 / -10.72 |
+| | REMOVED | 4,149 | 61.1% | +1.832% | 0.0589 | 46.07 / -19.13 |
+
+**Real Tier A candidate for Cell C, hiding inside the earlier "flat sweep" read**: at thresh>=2 (the current BC live default), the removed cohort is only 245 trades (1.9% of population) but is genuinely toxic — net R-negative on its own (cumR@10=-11.19), not just below-average — and cutting it improves the KEPT population's cumR@10 from the 45.26 baseline to 70.52, a +56% improvement, from a throughput cost under 2%. By thresh>=4/9 the removed cohort is bigger but only mediocre, not toxic — the badness is concentrated at the very bottom (0-1 rising days), which the coarser >=threshold sweep's aggregate view buried.
+
+**10-day/BC-style pivot (BASELINE n=23,682: win=62.5%, median=+1.958%, meanR=0.0577, cumR@10=66.21/DD@10=-26.62)** — a different, more nuanced shape once baseline is shown:
+
+| thresh | | n | win | median | meanR | cumR@10 / DD@10 |
+|---|---|---|---|---|---|---|
+| >=2 | KEPT | 17,295 | 63.3% | +2.032% | 0.0642 | 59.96 / -15.15 |
+| | REMOVED | 6,387 | 60.3% | +1.722% | 0.0402 | 44.38 / -24.32 |
+| >=4 | KEPT | 15,368 | 63.8% | +2.083% | 0.0670 | 92.40 / -14.09 |
+| | REMOVED | 8,314 | 60.2% | +1.712% | 0.0404 | 57.31 / -27.00 |
+
+At thresh>=2, cumR@10 actually DROPS against baseline (66.21->59.96) — the removed 6,387 trades still contribute +44.38 R of their own, more than the DD improvement (-26.62->-15.15) recovers. This is a genuine risk/return trade-off (smoother curve, less total return), not a free cut like Cell C's tiny toxic tail. At thresh>=4 it flips to a clean win on both axes (66.21->92.40 cumR, -26.62->-14.09 DD). Population size/shape matters as much as the threshold itself here.
+
+**New standing methodology adopted mid-session, applies going forward**: every KEPT-vs-REMOVED filter report must show the BASELINE/full-population row too, not just the two cohorts against each other — a KEPT cohort can look "fine" in isolation while a tiny, genuinely toxic REMOVED tail (like Cell C's n=245 case) is invisible without it. See `feedback_show_baseline_with_kept_removed` (persistent memory).
+
+## Priority 2 (Temporal Decay Rebuild) executed — 4-filter 2023-vs-2024-26 split, both raw pivot windows, BASELINE/KEPT/REMOVED (2026-09-25)
+
+Critic's own Priority 2, never previously executed: check each of the four remaining candidate filters (RSI, Momentum, Fragility, EMA34>=2) split by regime (2023 alone vs 2024-26) before trusting any of them, given Cell C Primed's known non-stationarity (PF 2.475->0.885, 2023->2026). Run on the raw, unfiltered trigger populations (`rawpop10_full.csv`, `rawpop40_full.csv`/`rawpop*_with_freshfrag.csv`), BASELINE/KEPT/REMOVED per regime per filter, both pivot windows.
+
+**Two filters are regime-stable (real in both 2023 and 2024-26, no reversal):**
+- **Fragility** (exclude "Precise"): KEPT beats REMOVED on meanR in BOTH regimes, BOTH pivot windows (e.g. Cell C 40-day: 2023 0.1534 vs 0.0618; 2024-26 0.0281 vs -0.0099, REMOVED net-negative). The most robust of the four candidates.
+- **EMA34>=2** (current live default): 2023 is a near-wash on both pivots (removed cohort not yet toxic), but the 2024-26 removed cohort is genuinely catastrophic on Cell C's 40-day pivot (n=170, win 43.5%, median -2.075%, meanR -0.1119) — WORSE than the pooled full-history number from earlier this session suggested. **The toxicity is concentrated in the 2024-26 regime specifically, not a 2023 artifact** — this is the opposite of the failure mode this whole audit was checking for, and strengthens rather than weakens the earlier n=245 toxic-tail finding.
+
+**Two filters are regime-CONDITIONAL (reverse in 2023, only real in 2024-26):**
+- **RSI band**: 2023 REVERSES on both pivots (removed cohort has HIGHER meanR than kept — e.g. Cell C 40-day 2023: kept 0.1392 vs removed 0.1852). 2024-26 is a clean win on Cell C's 40-day pivot (cumR@10 10.69->23.07, DD@10 -13.24->-10.67, both improve) but mixed/noisy on BC's 10-day pivot (per-trade meanR right direction, capacity numbers noisy).
+- **Momentum**: identical shape to RSI — reverses in 2023 on both pivots (e.g. Cell C 40-day 2023: kept 0.1319 vs removed 0.1656), clean win in 2024-26 on Cell C's 40-day pivot (cumR@10 10.69->21.33, DD@10 -13.24->-9.71), mixed on BC's 10-day pivot.
+
+**Honesty flag, not glossed over**: RSI's 2024-26 clean-win result here (tested on the RAW population, only SMA200 applied) is *better* than the same filter's 2024-26 result from the earlier BC Filter Transfer Ladder (tested on the FULLY-BUILT Cell C Primed v2 population, which already carries Volume Quality + R2/Momentum) — there, cumR@10 improved but DD *worsened*. This is a real architecture-dependent discrepancy (RSI's effect appears to interact with what else is already filtered), not a contradiction to silently resolve in whichever direction is convenient — flagged for critic per Rule #14.
+
+**Updated survivor list for a real stacked Cell C Primed v3**: Fragility and EMA34>=2 are the strongest, regime-stable candidates. RSI and Momentum are real but explicitly regime-conditional (2024-26 only, both pivots reverse in 2023) — if adopted, should be understood as "current regime" filters, not universal ones, and RSI specifically needs the architecture-interaction question resolved before being trusted at a specific DD number.
+
+## Cell C Primed v3 verification plan, Step 0+1 executed — feature reconstruction + 6-pair overlap matrix (2026-09-25)
+
+Critic's post-batch verification plan (Phase 1-6, 5 RQs) assumed Volume Quality (`ad_fraction`) and R2+Momentum (`r2_dist_pct`+`mom_pct`) already exist on the Primed/touch population — they don't; both were only ever computed on the EOD-confirmed Cell C population. Reconstructed fresh on `cell_c_primed_v2_pop.csv` (n=11,426) per production source formulas (O'Neil A/D volume-composition over the 20 days strictly before entry for `ad_fraction`; `daily_pivots()`'s trigger-anchored r2 distance for R2+Momentum, avoiding the same-day-Close circularity bug that hit the original R1/R2 arc). Sanity-checked: `ad_fraction<=0.567` gives 18.7% of this population (documented original: ~20% on a different but related population) — trusted.
+
+**6-pair overlap matrix** (EMA34, Fragility, Volume, R2+Mom — all 4 candidates now merged on one master file `cellc_v3_master.csv`):
+
+| Pair | n(A-bad) | n(B-bad) | overlap n | %ofA | %ofB |
+|---|---|---|---|---|---|
+| EMA34 x Fragility | 101 | 1,589 | 5 | 5.0% | 0.3% |
+| EMA34 x Volume | 101 | 2,141 | 52 | 51.5% | 2.4% |
+| EMA34 x R2+Mom | 101 | 208 | 0 | 0.0% | 0.0% |
+| Fragility x Volume | 1,589 | 2,141 | 105 | 6.6% | 4.9% |
+| Fragility x R2+Mom | 1,589 | 208 | 4 | 0.3% | 1.9% |
+| Volume x R2+Mom | 2,141 | 208 | 103 | 4.8% | 49.5% |
+
+**Two independent clusters, not a redundancy problem.** Fragility is essentially independent of all three others (0.3-6.6% overlap both directions) — catches a genuinely different failure mode. EMA34 and R2+Mom each share meaningful overlap with Volume specifically (51.5%/49.5% of their OWN bad cohorts) — Volume is the "biggest net," partially subsuming both, so expect diminishing returns stacking Volume+EMA34 or Volume+R2Mom, while Volume+Fragility should stay close to fully additive. Nothing near critic's 90% redundancy threshold — no pair gets dropped. Cross-check: Volume x R2+Mom's 49.5%/50.5% split closely matches the original documented EOD-population result ("60% of R2+Momentum genuinely incremental beyond Volume") — different population, same shape, reassuring.
+
+**Architecture-interaction flag, not averaged away**: both EMA34's and Fragility's 2024-26 exclusive-bad cohorts are milder on this SMA200-pre-filtered Primed population than on the raw (no-SMA200) population tested earlier this session (e.g. Fragility-bad-only 2024-26 meanR now +0.0075/+0.0085 here vs -0.0099 on raw) — SMA200 already absorbs some of what both filters would otherwise catch. Real, matters for expectation-setting on incremental value once SMA200 is already in the stack.
+
+**Next**: cumulative stack audit (Baseline -> +Volume -> +Volume+R2Mom -> +Volume+R2+EMA34 -> +Volume+R2+EMA34+Fragility), per critic's Phase 3 order (Volume/R2Mom first since they cluster, Fragility last since it's independent).
+
+## Cell C Primed v3 verification plan, Step 2 executed — cumulative stack audit (2026-09-25)
+
+Baseline -> +Volume -> +Volume+R2Mom -> +Volume+R2+EMA34 -> +Volume+R2+EMA34+Fragility (full v3), both full-history and 2024-26-only, slots=5/10, BASELINE row included throughout.
+
+**Full history (n=11,426 baseline)**: full v3 (n=7,654, 67.0% kept) is a clean win — best meanR (0.0729 vs baseline 0.0627), best median (+2.095% vs +2.004%), best DD@10 (-10.94 vs -16.08), best streak@10 (-3.38 vs -6.27). cumR@10 improves (47.48->54.17) but doesn't fully recover to what +Volume alone achieved on its own (63.62) — the middle stages (R2Mom, EMA34) show a large cumR swing (63.62->36.29->48.92) on very small population deltas (~150 trades), consistent with the FCFS scheduler-noise effect documented repeatedly this project at small slot counts.
+
+**2024-26 only (n=6,618 baseline) — the regime that matters for a production decision, honest result, not softened**: meanR improves a real +28% (0.0255->0.0327), median improves too — but cumR@10 barely beats baseline (11.34 vs 10.67, essentially a wash) and worst-streak is actually WORSE than baseline (-6.15 vs -5.24). Per-trade quality genuinely improves; the capacity-constrained portfolio view does NOT show a clean win in the current regime specifically. Applying the project's own standing rule ("a statistically bad cohort is not automatically an economically removable cohort") to the full stack, not just a single filter — full v3 has not yet cleared the portfolio-level bar in 2024-26, even though every individual filter and the full-history view look good.
+
+**Next**: narrower 2025-26-only check (critic's Phase 4, dropping 2024 as a "transition year") to see whether this ambiguity sharpens toward a clean answer or confirms a real composition problem.
+
+## Cell C Primed v3 verification plan, Step 3 executed — 2025-26-only regime validation, SERIOUS finding, not softened (2026-09-25)
+
+Narrowed the ambiguous 2024-26 result to 2025-26 only (n=3,482, still comfortably above Research Integrity Rule #4's 500-trade minimum), same 5-stack progression:
+
+| stack | n (%) | win | median | meanR | cumR@5 | DD@5 | cumR@10 | DD@10 | streak@10 |
+|---|---|---|---|---|---|---|---|---|---|
+| Baseline | 3,482 (100%) | 57.3% | +1.178% | -0.0045 | -8.68 | -7.57 | -9.27 | -10.97 | -7.34 |
+| +Volume | 2,769 (79.5%) | 57.1% | +1.301% | -0.0036 | 9.95 | -3.14 | 2.74 | -6.35 | -6.30 |
+| +Volume+R2Mom | 2,737 (78.6%) | 57.1% | +1.313% | -0.0033 | 11.41 | -2.85 | 10.95 | -7.07 | -6.89 |
+| +Volume+R2+EMA34 | 2,718 (78.1%) | 57.2% | +1.335% | -0.0025 | 1.59 | -8.30 | -3.80 | -11.32 | -5.81 |
+| Full v3 | 2,266 (65.1%) | 57.0% | +1.341% | +0.0015 | -8.21 | -8.84 | -7.70 | -9.62 | -3.53 |
+
+**Cell C Primed's own baseline is already net-negative in 2025-26** (meanR=-0.0045, cumR@10=-9.27) — before any filtering, the strategy loses money under realistic capacity constraints in the current window. Every filter stage genuinely helps directionally (meanR climbs to +0.0015, a real sign flip) — but full v3's cumR@10 stays negative (-7.70). This resolves the ambiguous 2024-26 result: it wasn't scheduler noise, 2024's inclusion was propping up an otherwise-negative current regime. Against critic's own stated v3 milestone bar ("materially improve R/trade and drawdown in 2025-26") — R/trade flips sign but stays barely above breakeven, drawdown improves only modestly (~12% relative), and the portfolio-level headline number never turns positive.
+
+**Verdict, not softened: Cell C Primed v3 has NOT cleared the bar for a real trading decision in the regime that matters.** This is a stop-and-reconsider finding, not a green light to proceed to Phases 5-6 (throughput guardrail, tail audit) on this stack as constructed. Queued for critic before any further v3 work.
+
+## Diagnosis: why baseline/full-v3 went net-negative in 2025-26, and the fix (2026-09-25)
+
+Investigated directly per user request, before sending the stop-and-reconsider finding to critic.
+
+**Ruled out market-wide**: BC Primed stays clearly positive across the identical 2025-26 window (meanR=0.0654, cumR@10=+12.28, degraded from full-history but never negative) — the problem is Cell-C-specific, not a general breakout-strategy regime collapse.
+
+**Mechanism confirmed via exit-reason mix shift**: `resistance` (target-hit, winning exit) share dropped 49.9%->44.7% from full-history to 2025-26; `max_hold_cap` (expired without hitting target, losing on average) rose 46.3%->49.5%. Both buckets' own average outcome also worsened (max_hold_cap mean -2.93%->-3.44%; resistance mean +6.04%->+5.30%). Cell C's O'Neil-style breakouts are genuinely following through less in 2025-26 — a real, measurable change in setup quality, not a data artifact.
+
+**The actual fix — Momentum, tested stacked (not isolated) on top of the other 4 filters**:
+
+| Window | Full v3 cumR@10 | v3+Momentum cumR@10 | Full v3 meanR | v3+Momentum meanR |
+|---|---|---|---|---|
+| Full history | 54.17 | 84.76 | 0.0729 | 0.0746 |
+| 2024-26 | 11.34 | 28.52 | 0.0327 | 0.0398 |
+| 2023 only | 36.52 | 31.73 | 0.1479 | 0.1408 |
+| 2025-26 | -7.70 | +7.48 | 0.0015 | 0.0125 |
+
+Momentum was set aside from the original v3 stack purely because an ISOLATED test (Priority 2 temporal split, on the raw population) showed it reversing in 2023. Tested stacked on top of Volume+R2Mom+EMA34+Fragility instead: it improves win/median/meanR in EVERY window including 2023 (cumR@10 dips slightly there, 36.52->31.73, immaterial against 2023's outsized baseline) and flips 2025-26 cumR@10 from negative to positive. The earlier 2023 reversal does not reproduce once combined with the other filters — a genuine non-additive interaction effect, consistent with this project's repeated finding that filters don't compose additively (same shape as the earlier R2+Momentum-weak interaction). Cross-checked RSI the same way (stacked, not isolated) — RSI does NOT help (2025-26 cumR@10 worsens to -9.15) — confirms RSI correctly stays excluded while Momentum should not have been.
+
+**Real cost, flagged not hidden**: v3+Momentum keeps only ~53-54% of the SMA200-only baseline population (vs ~65-67% for v3 alone) — a materially bigger cut, into Red-Zone-adjacent throughput territory per critic's own tiering. Needs the throughput guardrail check (Phase 5) before being trusted, not just the cumR number.
+
+**Revised verdict**: not "Cell C Primed v3 fails" — "v3 as originally scoped was missing one filter (Momentum), and v3.1 = Volume+R2Mom+EMA34+Fragility+Momentum resolves the 2025-26 portfolio-negative result cleanly across every window tested." Pending throughput guardrail and tail audit before treating v3.1 as production-ready.
+
+## Cell C Primed v3.1 verification plan, Step 5 executed — throughput guardrail, FAILS badly (2026-09-25)
+
+Critic's Phase 5 guardrail check, run on v3.1 (Volume+R2Mom+EMA34+Fragility+Momentum) vs baseline (SMA200 only):
+
+| Metric | Guardrail | v3.1 result | Verdict |
+|---|---|---|---|
+| Trades removed | prefer 5-25%, red flag >35% | 45.5% (full history), 47.0% (2025-26) | **FAIL** -- nearly double the red-flag line |
+| Concurrent positions | <10% reduction | avg concurrent 127.21->72.51 full-history (-43%), 93.23->51.28 2025-26 (-45%) | **FAIL** -- 4-4.5x over guardrail |
+| Unique tickers | stay broad | 480->475 full-history (99%), 480->437 2025-26 (91%) | PASS |
+| Monthly trade count | no starvation | min 14/month, median 94/month, zero months <10 | PASS |
+
+Two of four guardrails fail cleanly, not marginally. **Specific, pointed detail**: v3.1's full-history population is n=6,232 -- almost exactly BC Primed's own population size (n=6,225). The entire reason Cell C exists is O'Neil's broader entry giving ~1.8x BC's raw throughput while selectively cutting bad trades; v3.1, in the act of fixing the 2025-26 portfolio economics, has converged to essentially BC's own scale. This is the "quietly turn Cell C back into BC" failure mode this project has explicitly guarded against since inception (see the original Cell C Design Principle, critic-specified) -- not a hypothetical risk, an observed outcome.
+
+**Real strategic fork for critic, not resolved here**: (1) accept v3.1 at BC-scale throughput, which defeats Cell C's original purpose; (2) find a cheaper way to fix the 2025-26 economics without Momentum's throughput cost (e.g. a looser Momentum threshold, or a different filter combination); (3) accept the 2025-26 weakness in v3 (without Momentum) and treat it as a smaller, tolerable regime dip rather than a disqualifying result, leaning on full-history/2024-26 being more representative going forward. No default chosen -- queued for critic judgment.
+
+## Correction to the throughput guardrail framing — Momentum's own marginal cut checked directly, kept vs removed (2026-09-25)
+
+Caught by direct user question: does the 45-47%-removed number reflect Momentum's own contribution being wasteful, or is that cohort genuinely toxic? The 45-47% figure conflates the CUMULATIVE effect of all 5 filters (measured against the raw SMA200-only baseline) with Momentum's OWN marginal cut on top of the already-applied Volume+R2Mom+EMA34+Fragility, which is actually only ~18-20% of the v3-kept population, not 45-47%.
+
+Checked Momentum's own removed cohort directly, by regime (v3-kept population as the reference baseline):
+
+| Window | v3 baseline meanR | v3.1 kept meanR | Momentum-REMOVED meanR | Momentum-REMOVED cumR@10 |
+|---|---|---|---|---|
+| Full history | 0.0729 | 0.0746 | 0.0654 (still positive) | 42.22 |
+| 2024-26 | 0.0327 | 0.0398 | 0.0001 (flat/breakeven) | 7.07 |
+| 2025-26 | 0.0015 | 0.0125 | **-0.0465 (genuinely negative)** | **-13.99** |
+| 2023 only | 0.1479 | 0.1408 | **0.1756 (higher than kept)** | 35.47 |
+
+**In 2025-26 specifically, Momentum's removed cohort is genuinely toxic** (win 51.4%, median +0.171%, meanR -0.0465, cumR@10 deeply negative) — a real bad-trade-avoidance cut in the regime that matters, not an arbitrary sacrifice. **But in 2023, Momentum removes trades that were BETTER than what it keeps** (meanR 0.1756 removed vs 0.1408 kept) — the regime-conditionality holds even at this specific marginal-cut level, not just in aggregate.
+
+**This resolves "should we take Momentum" (yes, well-justified in the current regime) but NOT the deeper structural concern** (v3.1's total population still converges to BC's scale) — that's a property of all five filters compounding multiplicatively (Volume alone already ~19%, four more filters each taking their own bite), not a flaw specific to Momentum. The strategic fork from Step 5 stands unchanged.
+
+## BC vs Cell C opportunity-set overlap audit — resolves whether the count convergence is real (2026-09-25)
+
+Critic (after a direct, correct user challenge that "40-day-high vs 10-day-high entries can't be assumed to be the same trades just because they converge to the same count") proposed comparing trade IDENTITY, not just population size, before treating v3.1's ~6,232-trade convergence with BC Primed (n=6,225) as meaningful. Built ticker+date proximity matching (`rq_opportunity_overlap.py`): exact (ticker,entry_date) overlap, ticker-set Jaccard, nearest same-ticker entry gap in trading days (both directions), and "genuinely unique" = no same-ticker entry on the other side within 60 trading days.
+
+**Baseline (unfiltered Cell C Primed, n=11,426) vs BC (n=6,225)**: exact same-day overlap only 13.9%/25.6%. Genuinely unique: BC 19.5%, Cell C baseline 36.1% — Cell C's raw opportunity set is nearly double BC's in genuine uniqueness, not just raw count.
+
+**v3.1 (n=6,232, count-matched to BC) vs BC**: exact overlap 12.5% both sides (essentially unchanged from baseline's 13.9%). Genuinely unique: BC 32.3%, Cell C v3.1 35.6% — **barely moved from the unfiltered baseline's 36.1%, despite the population shrinking nearly in half to match BC's scale.**
+
+**Decisive conclusion**: if filtering were converging Cell C toward BC's specific trades, the unique-opportunity share should have collapsed toward 0% as the population shrank to BC's size. It stayed essentially flat (36.1%->35.6%). The five filters thinned the WHOLE population roughly proportionally, not selectively stripping Cell C's distinctive opportunities to leave a BC-shaped remainder. **The count convergence (~6,232 ~ 6,225) is a coincidence of scale, not a convergence of identity** — Cell C retains a real, independent reason to exist regardless of this number matching BC's.
+
+**Secondary texture**: ~68-69% of trades on either side have SOME same-ticker entry within 60 days on the other strategy's radar, with a short median gap (5-13 days) but very long mean (75-123 days) — a bimodal pattern (a real chunk are the same breakout episode caught at two structural levels days apart; a separate chunk are the same name but unrelated cycles months apart). The ~35% "no match within 60 days at all" figure is the cleaner signal of genuine architectural difference.
+
+**Unblocks**: the Minimum Sufficient Stack Audit (leave-one-filter-out: v3.1 minus Volume / minus R2+Momentum / minus EMA34 / minus Fragility, each reporting 2025-26 first then full-history) that critic queued directly behind this.
+
+## Minimum Sufficient Stack Audit (leave-one-filter-out), corrected xBC ratios, proposes v3.2 (2026-09-25)
+
+Critic's queued RQ (Cell C Primed - Minimum Sufficient Stack Audit): leave-one-filter-out from v3.1 (Volume+R2Mom+EMA34+Fragility+Momentum), 2025-26 first then full-history, with a regime-matched xBC throughput ratio (BC 2025-26 n=2,424; BC full-history n=6,225 -- corrected mid-analysis, the first pass mistakenly used BC's full-history count as the denominator for the 2025-26 table too).
+
+**2025-26 (Cell C baseline n=3,482):**
+
+| stack | n (%) | xBC(2025-26) | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|
+| Cell C baseline | 3,482 (100%) | 1.44x | -0.0045 | -9.27 | -10.97 |
+| Full v3.1 | 1,844 (53.0%) | 0.76x | 0.0125 | 7.48 | -11.98 |
+| v3.1 - Volume | 2,041 (58.6%) | 0.84x | 0.0119 | 1.51 | -11.80 |
+| v3.1 - R2+Momentum | 1,844 (53.0%) | 0.76x | 0.0125 | 7.48 | -11.98 |
+| v3.1 - EMA34 | 1,853 (53.2%) | 0.76x | 0.0114 | -0.61 | -10.06 |
+| v3.1 - Fragility | 2,292 (65.8%) | 0.95x | 0.0060 | 7.12 | -12.00 |
+
+**Full history (Cell C baseline n=11,426):**
+
+| stack | n (%) | xBC(full) | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|
+| Cell C baseline | 11,426 (100%) | 1.84x | 0.0627 | 47.48 | -16.08 |
+| Full v3.1 | 6,232 (54.5%) | 1.00x | 0.0746 | 84.76 | -12.78 |
+| v3.1 - Volume | 6,823 (59.7%) | 1.10x | 0.0755 | 42.51 | -21.08 |
+| v3.1 - R2+Momentum | 6,232 (54.5%) | 1.00x | 0.0746 | 84.76 | -12.78 |
+| v3.1 - EMA34 | 6,250 (54.7%) | 1.00x | 0.0745 | 64.24 | -14.30 |
+| v3.1 - Fragility | 7,695 (67.3%) | 1.24x | 0.0655 | 61.85 | -16.70 |
+
+**Three decisive per-filter answers**:
+1. **R2+Momentum is 100% redundant, not partially overlapping** -- "v3.1 - R2+Momentum" produces IDENTICAL numbers to full v3.1 in every column, both windows. Every trade R2+Momentum would remove is already removed by one of the other four. Drop for free -- cleaner than the earlier pairwise-overlap estimate (49.5%) suggested, since that measured only pairwise overlap with Volume, not full conditional redundancy against all four.
+2. **EMA34 earns its place, disproportionately** -- removing it barely changes throughput (+9 trades 2025-26, +18 full-history, under 1%) but costs almost the entire 2025-26 repair (cumR@10 flips 7.48->-0.61). Keep.
+3. **Volume is real, not expendable, contradicting critic's own suspicion** -- removing it frees real throughput (+197 2025-26, +591 full-history) but cumR@10 and DD both get meaningfully worse in both windows (2025-26: 7.48->1.51; full-history: 84.76->42.51, DD -12.78->-21.08) despite meanR staying flat. Real portfolio-level work beyond per-trade stats. Keep.
+4. **Fragility is the one to drop, despite the best standalone evidence of the four** -- removing it gives back the most throughput of any variant (0.95x BC in 2025-26, 1.24x BC full-history -- the ONLY variant clearing BC on both counts) while barely costing the 2025-26 repair (7.48->7.12) and staying solidly positive full-history (84.76->61.85, still well above the 47.48 baseline). Matches critic's own distinction exactly: "a good filter" is not automatically "necessary in the final strategy."
+
+**Proposed v3.2 = Volume + EMA34 + Momentum** (drop R2+Momentum as fully redundant, drop Fragility as unnecessary-though-good): n=2,292 2025-26 (0.95x BC, cumR@10=7.12), n=7,695 full-history (1.24x BC, cumR@10=61.85) -- the first variant in the whole exercise to clear 1x BC in full-history while keeping the 2025-26 repair intact. Not yet independently re-verified as its own combined run (this table only shows single-filter-removed variants, not the two-filter-removed v3.2 combination directly) -- queued next.
+
+**v3.2 independently re-verified as a direct 3-filter run (Volume+EMA34+Momentum), not just inferred**: produces IDENTICAL numbers to "v3.1 - Fragility" in both windows (2025-26 n=2,292/0.95x BC/cumR@10=7.12; full-history n=7,695/1.24x BC/cumR@10=61.85) -- confirms no hidden two-filter interaction from dropping R2+Momentum and Fragility simultaneously, since R2+Momentum was already fully redundant on its own. Safe to treat v3.2 as verified, not just inferred from single-drop variants.
+
+**v3.2 status**: strongest candidate stack produced this session -- clears 1x BC in full-history (1.24x) for the first time in the whole exercise, keeps the 2025-26 repair intact (cumR@10 positive, 7.12 vs baseline's -9.27), and is built from exactly 3 filters instead of 5 (simpler, easier to reason about and maintain). Not yet: tail audit (Phase 6, deliberately paused until a candidate stack existed), or a re-check of whether v3.2 depends on 2023 the way v3.1 did. Queued for critic before any further step.
+
+## Tail preservation audit on v3.2 (Phase 6), sobering result — not surgical tail-avoidance (2026-09-25)
+
+Critic's Phase 6 ("the don't kill the winners audit"), run on v3.2 (Volume+EMA34+Momentum): worst-5%-losers-removed vs top-10%-winners-removed, by R-multiple, both current-regime (2025-26) and full-history.
+
+| Window | Worst-5%-losers removed | R eliminated (% of tail) | Top-10%-winners removed | R sacrificed (% of tail) | Net ratio (loser-R eliminated per winner-R sacrificed) |
+|---|---|---|---|---|---|
+| 2025-26 | 55.7% (97/174) | -100.31 (56.5%) | 48.3% (168/348) | 115.56 (48.8%) | 0.87 |
+| Full history | 49.0% (280/571) | -277.24 (51.2%) | 42.8% (489/1,143) | 401.34 (44.0%) | 0.69 |
+
+**v3.2 is NOT doing surgical tail-avoidance** — it removes winners and losers at almost the same rate (43-56% of both tails in every window), and in raw R terms gives up MORE winner-R than it saves in loser-R at both windows (ratio below 1.0 both times). This directly contradicts the natural assumption that "since aggregate meanR/cumR@10 improved, the filter must be cutting bad trades and keeping good ones" — that's not the mechanism here.
+
+**Real read**: v3.2's portfolio-level improvement (meanR 0.0627->0.0655, cumR@10 47.48->61.85 full-history) comes from raising the average quality of the broad MIDDLE of the distribution, not from precision tail-surgery. This is exactly the failure mode Phase 6 was designed to catch, and it's present, though not catastrophic — tails are cut proportionally rather than lopsidedly toward winners specifically, but there is no protective margin favoring loser-elimination over winner-preservation either. A real tempering factor on v3.2's status, not a disqualifier — queued for critic alongside everything else, not folded into an unqualified "all clear."
+
+## Breakout Lookback Frontier, Phase 1 — same architecture (Primed touch + SMA200 only), L10/L15/L20/L30/L40 (2026-09-25)
+
+Prompted by user's own question after the v3.2 work: is 40-day-vs-10-day (Cell C vs BC) actually the fundamental variable, or is there a "right" lookback in between, or genuinely two distinct regimes? Critic agreed this should come before freezing v3.2. Built the missing L15/L20/L30 rungs via the exact same `rebuild_raw_populations.py` methodology already used for L10/L40 (real check_exit()-based blocking, prior-day-known filter flags, entry_price=trigger), filtered to SMA200-only (matching Cell C Primed's own minimal architecture), no quality filters applied yet (that's Phase 3).
+
+| lookback | n | tickers | win% | median | meanR | cumR@10 | DD@10 | avg hold | top10% R-share | bottom5% R-sum |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 10 | 16,101 | 484 | 62.97% | +2.029% | 0.062 | 81.67 | -13.41 | 14.9d | 146.1% | -899.9 |
+| 15 | 14,323 | 482 | 63.03% | +2.013% | 0.061 | 76.05 | -12.80 | 15.1d | 142.2% | -770.3 |
+| 20 | 13,061 | 481 | 63.16% | +2.015% | 0.062 | 58.50 | -11.76 | 15.2d | 136.6% | -672.1 |
+| 30 | 11,652 | 479 | 62.84% | +1.999% | 0.063 | 54.64 | -19.37 | 15.3d | 131.4% | -570.1 |
+| 40 | 10,827 | 478 | 63.04% | +2.048% | 0.064 | 51.42 | -13.98 | 15.4d | 125.9% | -516.9 |
+
+**Win%/median/meanR are essentially flat across the entire range** (within noise). **Population size declines smoothly and monotonically**, no discontinuity. **Concentration (top-10% R-share) improves smoothly and monotonically with longer lookback** (146.1%->125.9%), and bottom-5% R-sum shrinks roughly proportionally with population size.
+
+**Direct read**: lookback is a throughput/concentration dial, not a quality dial — a longer lookback does not produce a per-trade-better setup, it produces fewer trades with a somewhat less top-heavy profit distribution. The smooth, continuous, no-discontinuity shape across all five points argues against "two distinct regimes" at the aggregate-statistics level — but identical aggregate numbers could still hide completely different underlying trades at each rung, which only a trade-identity overlap check (Phase 2) can resolve.
+
+**Anomaly flagged, not chased**: L30's DD@10 (-19.37) breaks the otherwise-smooth pattern between L20 (-11.76) and L40 (-13.98) — almost certainly the FCFS scheduler-noise effect documented repeatedly this project at small slot counts, not a real structural signal. Not investigated further per standing discipline against single-metric noise-chasing.
+
+**Next**: Phase 2 — pairwise opportunity-set overlap/transition structure across the ladder (reusing the BC-vs-Cell-C overlap methodology), to test whether the smooth aggregate transition also holds at the trade-identity level.
+
+## Breakout Lookback Frontier, Phase 2 — MAJOR reconciliation, adjacent-rung overlap is enormous (2026-09-25)
+
+Pairwise trade-identity overlap across the L10/L15/L20/L30/L40 ladder (same minimal architecture, SMA200-only, no quality filters, matching Phase 1):
+
+| Pair | exact overlap | ticker Jaccard | unique share (both sides) |
+|---|---|---|---|
+| L10 vs L15 | 68.0% / 76.4% | 0.996 | 0.7% / 0.3% |
+| L15 vs L20 | 74.9% / 82.1% | 0.998 | 0.9% / 0.3% |
+| L20 vs L30 | 73.3% / 82.2% | 0.996 | 1.8% / 0.4% |
+| L30 vs L40 | 82.0% / 88.2% | 0.998 | 2.0% / 0.4% |
+| L10 vs L40 (full span) | 44.7% / 66.5% | 0.988 | 5.1% / 0.5% |
+
+**Mechanical explanation, not coincidence**: an N-day high is a max over a window, so a 40-day high is always >= the 10/15/20/30-day high over the same trailing period. Any day clearing the 40-day high necessarily also clears every shorter-window high on that ticker, same day (modulo occasional re-entry-blocking skips). L40's trigger population is almost mathematically a subset of L10's. At the full 10-vs-40 span, only 0.5% of L40 trades have no L10 match within 60 days at all.
+
+**This directly contradicts and reconciles the earlier "BC vs Cell C, 36.1%/19.5% genuinely unique" result** (see "BC vs Cell C opportunity-set overlap audit" above). That comparison used BC's FULL production filter stack (RSI, EMA34-persistence, Momentum, Liquidity all simultaneously required) against Cell C's raw, minimally-filtered population — a confound between lookback AND filter-stack. This test isolates lookback alone (same minimal SMA200-only architecture both sides) and shows the lookback window itself produces almost total trigger-day overlap.
+
+**Revised interpretation, more sobering than the earlier report**: the earlier "Cell C is architecturally distinct from BC" finding was very likely driven by BC's quality filters reshaping BC's population, not by the 10-vs-40 lookback difference itself. The real differentiator between BC and Cell C may not be "different entry architecture" — it may be "BC's filters select a different-shaped subset of a largely shared trigger population." This needs to be sent back to critic before v3.2 or any Cell-C-vs-BC framing is treated as settled, since it changes the interpretation of results already sent.
+
+**Queued next**: re-run the BC-vs-Cell-C overlap check using BC's OWN raw L10+SMA200-only population (not BC's full filter stack) against Cell C's raw L40+SMA200-only population, to get a clean, unconfounded lookback-only comparison at the same level Phase 2 just used for the internal ladder — this is functionally already answered by the "L10 vs L40 full span" row above (44.7%/66.5% exact overlap, 5.1%/0.5% unique), but should be explicitly reframed as "the BC-vs-Cell-C raw comparison," not just an internal ladder rung, since that's the comparison that actually matters for the standing project question.
+
+## The Swap Test — direct proof that FILTERS, not pivot window, is the real lever (2026-09-25)
+
+User's own precise test design: if pivot-day-count really is the only structural difference between BC and Cell C, then swapping just that one parameter (keeping each system's own filters fixed) should reveal the same trades; swapping filters instead (keeping pivot fixed) should reveal the real differentiator. Built the missing piece (Cell C's own filters -- ad_fraction/R2+Momentum/Fragility -- computed fresh on the L10 raw population, `rq_compute_cellc_filters_on_L10.py`) to run a clean 2x2: {BC filters, Cell C filters (v3.2 = Volume+EMA34+Momentum)} x {L10, L40}.
+
+**Economics:**
+
+| Cell | n | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|
+| BC filters @ L10 (native BC) | 4,364 | 64.7% | +2.069% | 0.0519 | 49.95 | -12.81 |
+| BC filters @ L40 (swapped) | 4,066 | 63.9% | +2.011% | 0.0496 | 45.95 | -13.20 |
+| Cell C filters @ L10 (swapped) | 8,116 | 64.1% | +2.218% | 0.0662 | 60.57 | -8.64 |
+| Cell C filters @ L40 (native v3.2) | 7,695 | 63.8% | +2.175% | 0.0655 | 61.85 | -16.70 |
+
+**Same filters, different pivot** (BC-filters@L10 vs @L40; CellC-filters@L10 vs @L40): economics barely move (win/median/meanR within ~1pt), trade-identity overlap is high (68.9-76.8% exact, only ~4% genuinely unique).
+
+**Same pivot, different filters** (BC-filters vs CellC-filters, at either L10 or L40): Cell C's filter recipe beats BC's filter recipe at BOTH pivots (meanR 0.0662 vs 0.0519 at L10; 0.0655 vs 0.0496 at L40). BC's filters are almost a SUBSET of Cell C's (91.7%/90.9% of BC's own filtered trades also pass Cell C's filters) — Cell C's filters admit a much larger, looser population BC's stricter RSI+Liquidity requirements reject (40.7% of CellC-filtered-L10 trades don't match BC's set at all).
+
+**Decisive conclusion: pivot window is NOT the real lever — filters are.** Swapping only pivot (filters fixed) barely changes anything. Swapping only filters (pivot fixed) changes both which trades get picked and how well they perform. There is no hidden "correct pivot number" to find — the real, persistent difference between BC and Cell C has always been the filter recipe, and Cell C's recipe (Volume+EMA34+Momentum) outperforms BC's recipe (RSI+EMA34+Momentum+Liquidity) at every pivot tested.
+
+**Bigger implication, not yet validated across regimes**: this suggests BC itself might benefit from Cell C's filter recipe, independent of the whole Cell-C-vs-BC architecture question. Needs the same 2023-vs-2024-26 regime check every other candidate this session got before being treated as settled -- not yet run.
+
+## CORRECTION to the Swap Test framing — caught by direct user question, "Cell C filters" is not an independent recipe (2026-09-25)
+
+User's direct catch: v3.2 (Volume+EMA34+Momentum) is not an independently-derived rival filter system to compare against BC's. Two of its three components (EMA34, Momentum) ARE BC's own production filters, literally transferred onto Cell C earlier this session (same formulas, same thresholds: EMA34_RISING_DAYS_MIN=2, MOMENTUM_20D_MIN=1.05). Only Volume Quality (`ad_fraction`) is genuinely Cell-C-native.
+
+**Correct framing, replacing the earlier "Cell C's filters beat BC's filters at both pivots" claim**: v3.2 is BC's own four-filter recipe (RSI+EMA34+Momentum+Liquidity) with RSI and Liquidity removed and Volume Quality substituted in their place. The swap test's real, non-circular finding is therefore: **BC's own RSI and Liquidity filters are the weak links in its stack, and swapping them for Volume Quality improves the recipe at BOTH pivot windows** — not "two competing architectures, one wins," but an ablation result about BC's own filter set. This is fully consistent with, not a new surprise relative to, everything already established this session: Liquidity has failed as a quality filter across three independent passes; RSI is regime-conditional and mixed even on BC's own native pivot.
+
+**The genuinely standalone, actionable result, re-read correctly**: at BC's OWN native 10-day pivot, "BC filters" (meanR=0.0519) underperforms "BC filters with RSI/Liquidity swapped for Volume Quality" (meanR=0.0662) — a concrete finding about BC's own live strategy, entirely independent of the Cell-C-vs-BC architecture question. Not circular, just mislabeled in the original write-up — corrected here before being sent to critic.
+
+## Staged Progression Audit — Cell C's genuine incremental throughput is LOWER quality, not higher (2026-09-25)
+
+User's sharper hypothesis: what if BC and Cell C aren't two rival architectures, but two STAGES of the same underlying breakout-continuation phenomenon — BC catching it early (10-30 day highs), Cell C catching it later/more mature (40-day highs)? Directly testable: for each Cell C (L40, SMA200-only) trigger, check whether the SAME ticker had a BC (L10) trigger recently BEFORE it (a genuine "later stage of the same move" reading), same-day (the dominant overlap case), or no L10 trigger at all nearby (a genuinely fresh, independent opportunity).
+
+Classification (STAGE_WINDOW=40 trading days), full L40 population n=10,827:
+
+| Bucket | n (%) | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|
+| SIMULTANEOUS (10d & 40d break same day) | 7,204 (66.5%) | 64.0% | +2.149% | 0.0687 | 64.59 | -9.77 |
+| STAGED (40d break follows a 10d break, 1-40d earlier, same ticker) | 3,276 (30.3%) | 61.2% | +1.832% | 0.0565 | 37.55 | -25.71 |
+| FRESH (genuinely new 40d break, no 10d precursor within window) | 347 (3.2%) | 60.2% | +1.332% | 0.0438 | 14.63 | -7.36 |
+
+**The dominant, best-performing bucket (66.5%) is the SIMULTANEOUS case — BC's own 10-day trigger would have caught the identical trade, same ticker, same day.** Not incremental to BC at all.
+
+**The genuinely incremental part of Cell C's population (STAGED + FRESH, 33.5% combined) is meaningfully WORSE, not better.** STAGED trades (a 40-day breakout arriving after an earlier 10-day breakout on the same name, i.e. catching a later/more extended leg of an already-running move) show by far the worst drawdown of the three (-25.71 vs SIMULTANEOUS's -9.77). FRESH trades (no 10-day precursor at all) are both the rarest bucket (3.2%) and weakest on win%/median/meanR.
+
+**Sobering, load-bearing conclusion**: Cell C's genuine extra throughput over BC is not a free lunch of untapped good opportunities — it's disproportionately composed of later-stage, worse-risk trades. The "more quantity" Cell C offers isn't quantity-plus-quality; on this decomposition, the quantity that's genuinely additive to BC is lower quality than the quantity that overlaps with BC. This is a serious challenge to the standing thesis that Cell C's broader 40-day entry provides valuable additional throughput — needs to go to critic before any further Cell C promotion work, and directly informs (likely reverses) the "quantity + quality" objective that's been driving this whole multi-day arc.
+
+**Not yet done**: the symmetric check from BC's side (do L10 trades that later get "confirmed" by an L40 trigger on the same name perform differently from L10 trades that don't) — queued as the natural next step to complete the picture.
+
+## Symmetric BC-side confirmation check — checked and mechanically explained, NOT a real finding (2026-09-25)
+
+Mirror of the Staged Progression Audit from BC's side: for each L10 (BC, SMA200-only, n=16,101) trigger, classify whether the same ticker later (within 40 trading days) also fired an L40 trigger ("LATER-CONFIRMED"), fired same-day ("SIMULTANEOUS"), or never confirmed within the window ("NOT-CONFIRMED").
+
+| Bucket | n (%) | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|
+| SIMULTANEOUS | 7,204 (44.7%) | 65.5% | +2.348% | 0.0961 | 92.86 | -9.06 |
+| LATER-CONFIRMED | 5,935 (36.9%) | 79.7% | +3.255% | 0.2438 | 227.05 | -6.33 |
+| NOT-CONFIRMED | 2,956 (18.4%) | 23.1% | -4.921% | -0.3876 | -257.24 | -259.24 |
+
+An enormous gap (79.7% vs 23.1% win rate) -- far bigger than anything else this session -- immediately flagged as suspicious given the magnitude, and checked before being treated as real, per this project's own dist_40d precedent.
+
+**Confirmed mechanically explained, not a new signal**: exit_reason mix accounts for nearly all of it. LATER-CONFIRMED is 66.3% `resistance` (target-hit) exits; NOT-CONFIRMED is only 18.2% resistance, dominated instead by `max_hold_cap` (62.1%, mean -5.29%) and `stop` (17.8%). Reaching a resistance target requires the same underlying continued price strength needed to later clear a 40-day high -- "did this stock later confirm at a new 40-day high" is mostly a relabeling of "did this trade already win by running far enough to hit its target," not independent information. Same failure mode as the retracted `dist_40d` finding (a post-entry, same-price-action classification dressed up as external signal).
+
+**Honest residual, not over-claimed**: even within the SAME exit_reason (max_hold_cap only), LATER-CONFIRMED still beats NOT-CONFIRMED (-0.296% vs -5.293% mean pnl) -- not 100% pure circularity, a weaker real signal about sustained stock strength may exist underneath. But it is still built entirely from post-entry (often post-exit) information, so it cannot be a pre-entry filter, and given how much of the headline gap the exit-mix confound explains, this residual should not be trusted as a clean, actionable finding without much more scrutiny.
+
+**Verdict: no real, actionable "later confirmation improves BC" signal.** Checked and explained, not promoted, not a discovery -- logged as a non-finding per the project's standing discipline of documenting debunked-looking-too-good results, not just successes.
+
+## Freshness/Fragility layered on the improved-BC recipe @ L10 (2026-09-25)
+
+Per standing discipline (condition new questions on the already-validated filter, not the raw population): tested Freshness and Fragility on top of the improved BC recipe (SMA200+Volume+EMA34+Momentum @ L10, n=8,116, meanR=0.0662, cumR@10=60.57).
+
+| cohort | n | win | median | meanR | cumR@5 | DD@5 | cumR@10 | DD@10 | streak@10 |
+|---|---|---|---|---|---|---|---|---|---|
+| BASELINE (base recipe alone) | 8,116 | 64.1% | +2.218% | 0.0662 | 38.07 | -5.92 | 60.57 | -8.64 | -7.37 |
+| + Freshness<=0.40 KEPT | 2,543 | 62.4% | +1.882% | 0.0588 | 32.70 | -5.98 | 50.48 | -9.36 | -5.79 |
+| Freshness REMOVED | 5,573 | 64.9% | +2.361% | 0.0696 | 35.47 | -5.58 | 60.61 | -9.16 | -4.96 |
+| + Fragility(not Precise) KEPT | 6,603 | 63.9% | +2.280% | 0.0746 | 36.40 | -4.91 | 67.74 | -14.06 | -4.74 |
+| Fragility REMOVED | 1,513 | 65.0% | +2.011% | 0.0294 | 9.00 | -4.32 | 5.37 | -9.36 | -4.11 |
+| + BOTH Fresh&Frag KEPT | 2,403 | 62.4% | +1.897% | 0.0612 | 29.94 | -7.33 | 70.15 | -12.09 | -4.86 |
+| BOTH REMOVED (either fails) | 5,713 | 64.9% | +2.338% | 0.0683 | 43.99 | -5.54 | 75.96 | -11.87 | -4.78 |
+
+**Freshness fails again (6th+ confirmation this session)**: KEPT (fresh) underperforms REMOVED (extended) on every metric -- same reversed pattern found on every other population tested. Do not add.
+
+**Fragility adds real value on top of the improved recipe**: KEPT (not-Precise) improves meanR (0.0662->0.0746) and cumR@10 (60.57->67.74) over baseline. REMOVED (Precise) collapses to meanR=0.0294, cumR@10=5.37 despite a HIGHER win rate (65.0%) -- damage is R-multiple-concentrated, invisible to win% alone, same shape as every prior Fragility result.
+
+**Combining both is worse than Fragility alone** -- Freshness drags per-trade quality down (combined meanR 0.0612 vs Fragility-alone's 0.0746) at a much steeper throughput cost (29.6% kept vs 81.4%), even though a sequencing/scheduler quirk makes combined cumR@10 look nominally highest (70.15).
+
+**Clean recommendation, 5-piece recipe**: SMA200 + Volume + EMA34 + Momentum + Fragility, at BC's own 10-day pivot -- drop Freshness, keep Fragility. Still needs the 2023-vs-2024-26 regime check (not yet run for any part of this whole Lookback Frontier / Swap Test / improved-BC-recipe thread) before being treated as settled.
+
+## Regime check on the new 5-piece BC candidate — mixed in 2024-26, not a clean win (2026-09-25)
+
+2023 vs 2024-26 vs full-history split, BC's real filters vs the new candidate (SMA200+Volume+EMA34+Momentum+Fragility), both @ L10, BASELINE included:
+
+| Regime | recipe | n | win% | median | meanR | cumR@10 | DD@10 | streak@10 |
+|---|---|---|---|---|---|---|---|---|
+| 2023 | BC real | 1,027 | 72.2% | +2.341% | 0.1272 | 19.77 | -9.27 | -3.31 |
+| 2023 | NEW 5-piece | 1,986 | 71.0% | +2.768% | 0.1439 | 24.24 | -6.32 | -2.89 |
+| 2024-26 | BC real | 2,983 | 62.0% | +1.948% | 0.0274 | 28.28 | -14.08 | -7.15 |
+| 2024-26 | NEW 5-piece | 3,832 | 60.3% | +1.989% | 0.0398 | 11.74 | -14.46 | -10.42 |
+| Full history | BC real | 4,364 | 64.7% | +2.069% | 0.0519 | 49.95 | -12.81 | -8.74 |
+| Full history | NEW 5-piece | 6,603 | 63.9% | +2.280% | 0.0746 | 67.74 | -14.06 | -4.74 |
+
+**2023 and full-history both show a clean win** for the new recipe on nearly every metric, with meaningfully more trades throughout.
+
+**2024-26 (the regime that matters most, per this project's own standing discipline) is genuinely mixed, not softened**: per-trade quality improves (meanR 0.0274->0.0398, +45% relative) but the capacity-constrained portfolio view gets WORSE — cumR@10 drops from 28.28 to less than half (11.74), and worst-streak deepens from -7.15 to -10.42. Same shape as prior mixed results on BC's 10-day pivot this session (e.g. Momentum's earlier "meanR/DD better, cumR@10 lower" pattern in 2024-26) -- may be a structural feature of how BC's own capacity-constrained dynamics behave in the current regime, not necessarily a flaw specific to this filter combination, but not yet independently verified as such.
+
+**Honest net verdict**: real improvement in aggregate and a clean win in 2023, but the edge in the regime that matters most is a genuine trade-off (better trade quality, worse portfolio drawdown/streak), not a free upgrade. Reporting exactly as measured, not rounded up to "wins everywhere" -- queued for critic with this caveat explicit.
+
+## Dig into the 2024-26 trade-off — capacity dilution, not a real quality problem (2026-09-25)
+
+Checked directly rather than accepted at face value: BC real filters vs NEW 5-piece, 2024-26, admission rate and uncapacitated (no slot limit) total R.
+
+| | n_total | n_admitted @10 slots | admission rate | uncapacitated total R | capacity cumR@10 | top-10% R-share |
+|---|---|---|---|---|---|---|
+| BC real | 2,983 | 669 | 22.4% | 81.62 | 28.28 | 238.5% |
+| NEW 5-piece | 3,832 | 637 | 16.6% | 152.42 | 11.74 | 186.4% |
+
+**NEW 5-piece's total, uncapacitated profitability is nearly DOUBLE BC's (152.42 vs 81.62)** — the underlying edge is real and bigger than meanR alone suggested. But it generates 849 more candidates competing for the same fixed 10 concurrent slots, so a SMALLER fraction gets admitted (16.6% vs 22.4%) -- capacity dilution, not lower quality.
+
+**Confirmed by slot sweep (5/10/15/20/30/50)**:
+
+| Slots | BC real cumR | NEW 5-piece cumR |
+|---|---|---|
+| 5 | 23.17 | 6.91 |
+| 10 | 28.28 | 11.74 |
+| 15 | 34.82 | 29.40 |
+| 20 | 36.65 | 43.28 |
+| 30 | 50.14 | 67.25 |
+| 50 | 63.38 | 92.38 |
+
+**NEW 5-piece overtakes BC real filters cleanly from slots=20 upward, and the gap widens with more capacity.** At tight capacity (5-15 slots) BC's fewer, more selectively-admitted candidates fit better; at looser capacity (20+) the new recipe's larger total opportunity set wins and keeps pulling ahead. Exactly the same dynamic already documented for Cell B vs Cell C ("Cell B wins outright at slots=5... Cell C only overtakes from slots=10 upward").
+
+**Revised caveat, more precise than "genuine trade-off"**: this is not a real-vs-fake quality question, it's a capacity-dependent crossover. The new recipe is a clean upgrade above ~15-20 concurrent positions; BC's current real filters remain better suited to a tighter (~10-slot) capacity constraint in the current regime specifically. Whether to adopt depends on how many concurrent positions can realistically be run, not on which recipe is "better" in the abstract.
+
+## Phase A — BC v2 Filter Stack verification (A1-A4), critic-specified checklist (2026-09-25)
+
+**A1, incremental contribution audit** (SMA200 -> +Volume -> +Volume+EMA34 -> +Volume+EMA34+Momentum -> +Volume+EMA34+Momentum+Fragility="BC v2"): meanR climbs monotonically at every stage, both full-history (0.0616->0.0632->0.0637->0.0662->0.0746) and 2024-26 (0.0209->0.0203->0.0224->0.0338->0.0398, Volume roughly flat there but the rest climb steadily). Capacity-constrained cumR@10 is non-monotonic -- consistent with the capacity-dilution mechanism already diagnosed, each filter shrinks the population further and in a tight 10-slot regime that costs more than the quality gain buys back.
+
+**A2, capacity sweep (5/10/15/20/30 slots), full history**:
+
+| Slots | BC real cumR | BC v2 cumR |
+|---|---|---|
+| 5 | 31.32 | 36.40 |
+| 10 | 49.95 | 67.74 |
+| 15 | 65.53 | 111.09 |
+| 20 | 93.19 | 149.36 |
+| 30 | 118.53 | 206.17 |
+
+**BC v2 wins outright at EVERY slot count on full-history** -- a much stronger, cleaner result than the earlier 2024-26-only sweep (where BC v2 needed slots>=20 to win).
+
+**A3, year-by-year (capacity reset annually)**:
+
+| Year | BC real cumR@10 | BC v2 cumR@10 | BC real meanR | BC v2 meanR |
+|---|---|---|---|---|
+| 2022 | 9.58 | 17.22 | 0.0400 | 0.0693 |
+| 2023 | 19.77 | 24.24 | 0.1272 | 0.1439 |
+| 2024 | 19.68 | 20.22 | 0.0534 | 0.0716 |
+| 2025 | 4.07 | 8.41 | 0.0196 | 0.0250 |
+| 2026 (partial) | 2.14 | -1.87 | -0.0148 | -0.0140 |
+
+**BC v2 wins in 4 of 5 years, including 2024 AND 2025 individually** -- only underperforms in the partial, still-in-progress 2026, where both strategies are roughly flat/negative and nearly tied on meanR. **This directly reconciles the earlier "2024-26 pooled, BC v2 loses at slots=10" finding**: that result came from running 2024+2025+2026 as ONE continuous capacity-constrained simulation, where trades from all three years compete for the same rolling 10 slots. Resetting capacity per year shows BC v2 winning individually in both 2024 and 2025 -- the earlier "needs 20+ slots" conclusion was an artifact of continuous multi-year pooling, not a fixed property of the recipe.
+
+**A4, tail audit** (BC v2 vs raw SMA200-only baseline, not vs BC real):
+
+| | worst-5%-losers removed | R eliminated | top-10%-winners removed | R sacrificed | ratio |
+|---|---|---|---|---|---|
+| Full history | 89.4% | -1214.06 of -1354.14 | 80.0% | 1776.15 of 2189.53 | 0.68 |
+| 2024-26 | 89.7% | -782.28 of -869.94 | 82.0% | 1082.55 of 1306.67 | 0.72 |
+
+BC v2 removes 72% of the raw population overall (a much bigger cut than Cell C's v3.2 ablation), so it inevitably removes most of both tails -- but the same imbalance survives: it sacrifices more winner-R than it eliminates loser-R (ratio below 1.0, matching the earlier v3.2 tail-audit shape). Confirms this is middle-of-distribution quality improvement, not precision loser-avoidance -- consistent, not a new surprise.
+
+**Phase A synthesis**: each filter adds real per-trade value (A1). BC v2 wins outright on every full-history metric at every slot count, and wins individually in 4 of 5 years (A2/A3) -- the earlier "mixed in 2024-26" and "needs 20+ slots" framings were artifacts of continuous multi-year capacity pooling, not real weaknesses. The one caveat that survives all this scrutiny is the tail shape (A4): middle-distribution improvement, not precision bad-trade avoidance, at a winner-R-sacrificed-exceeds-loser-R-eliminated ratio below 1.0. Ready for Phase B (lookback frontier 10-80, opportunity progression buckets, reverse progression) per critic's next priority.
+
+## Phase B, Test 2 — finer opportunity-progression buckets, NOT monotonic (2026-09-25)
+
+Critic's refined bucketing (Simultaneous / 1-5d / 6-15d / 16-40d / Fresh), replacing the earlier coarse STAGED/FRESH split, with an explicit hypothesis to test: "I suspect degradation is monotonic with delay."
+
+| Bucket | n (%) | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|
+| SIMULTANEOUS | 7,204 (66.5%) | 64.0% | +2.149% | 0.0687 | 64.59 | -9.77 |
+| 10->40 (1-5d) | 1,712 (15.8%) | 61.8% | +1.889% | 0.0524 | 36.50 | **-29.97** |
+| 10->40 (6-15d) | 1,086 (10.0%) | 61.5% | +1.802% | **0.0687** | 52.77 | -15.59 |
+| 10->40 (16-40d) | 478 (4.4%) | 58.4% | +1.832% | 0.0435 | 21.54 | -13.96 |
+| FRESH (no L10 before) | 49 (0.5%) | 69.4% | +2.169% | 0.0890 | 4.36 | -2.66 |
+| FRESH (no L10 within 40d) | 298 (2.8%) | 58.7% | +1.135% | 0.0364 | 10.32 | -7.14 |
+
+**Hypothesis NOT confirmed -- degradation is NOT monotonic with delay.** The fastest follow-through (1-5 days) has the WORST drawdown of any bucket (-29.97), worse even than the slowest (16-40d, -13.96), while the middle bucket (6-15d) actually recovers to nearly match SIMULTANEOUS's meanR (0.0687 vs 0.0687). A very quick re-confirmation looks more like an overextended, reversal-prone move than a healthy, measured continuation -- the opposite of "sooner is better." Two of the FRESH sub-buckets are thin (n=49, n=298) and should not be over-read individually, but the core 1-5d vs 6-15d reversal is well-powered (1,712 and 1,086 trades) and real.
+
+## Phase B, Test 1 — full lookback frontier (10-80) with identical BC v2 filters (2026-09-25)
+
+Critic's Test 1: same filter set (SMA200+Volume+EMA34+Momentum+Fragility, "BC v2") applied identically at every lookback, not just SMA200-only as in the earlier Phase 1. Built L15/L20/L30/L55/L80 with the full feature set (one combined per-ticker pass, `rebuild_full_lookback.py`) alongside the already-built L10/L40.
+
+| Lookback | n | win% | median | meanR | cumR@10 | DD@10 | top-10% R-share |
+|---|---|---|---|---|---|---|---|
+| L10 | 6,603 | 63.9% | +2.280% | 0.0746 | 67.74 | -14.06 | 105.0% |
+| L15 | 6,174 | 64.0% | +2.272% | 0.0748 | 74.98 | -10.21 | 103.9% |
+| L20 | 5,957 | 64.0% | +2.281% | 0.0749 | 58.44 | -17.49 | 105.0% |
+| L30 | 6,034 | 63.7% | +2.259% | 0.0760 | 66.42 | -15.77 | 104.1% |
+| L40 | 6,232 | 63.6% | +2.249% | 0.0746 | 84.76 | -12.78 | 105.2% |
+| L55 | 5,612 | 63.8% | +2.298% | 0.0797 | 58.80 | -11.73 | 98.4% |
+| L80 | 5,260 | 63.8% | +2.313% | 0.0799 | 74.22 | -13.60 | 97.4% |
+
+Overlap vs L10 (exact, both directions, and L10's own unique share):
+
+| vs | exact overlap | L10-unique share (no match <=60d) |
+|---|---|---|
+| L15 | 83.2%/89.0% | 3.2% |
+| L20 | 75.8%/84.0% | 5.3% |
+| L30 | 71.0%/77.7% | 5.9% |
+| L40 | 66.7%/70.7% | 5.7% |
+| L55 | 60.9%/71.6% | 9.0% |
+| L80 | 55.6%/69.8% | 12.2% |
+
+**Two distinct findings, not one flat conclusion.** (1) Concentration (top-10% R-share) is now remarkably stable (97.4-105.2%) across the ENTIRE frontier once the full quality filter stack is applied -- a real improvement over the raw/unfiltered Phase-1 sweep's 125.9-146.1% range, confirming Fragility+Volume genuinely normalize tail concentration regardless of lookback. (2) But at the far end of the tested range (L55/L80), the unique-trade share roughly DOUBLES relative to the 10-40 range (9.0%/12.2% vs 3.2-5.9%), AND this more-distinct population shows the BEST meanR of the whole frontier (0.0797/0.0799, clearly above the 0.0746-0.0760 range everywhere else).
+
+**Revised read**: "lookback barely matters" holds cleanly for the 10-40 day range (small, gently-growing uniqueness, no economics gain) -- but 55-80 days looks like a genuinely different, and possibly better, regime, not just a further point on the same flat line. Worth a dedicated look, not yet done, before concluding the lookback question is fully settled.
+
+## Phase B, Test 3 — reverse progression, pre-entry-only variables. A NEW, properly-computed dist_40d candidate emerges (2026-09-25)
+
+Critic's Test 3: for every BC breakout, measure only pre-entry-known variables, avoiding the exit-reason confound Test 2's symmetric check was caught on. Computed `dist_40d_preentry_pct` = (40-day-high as of YESTERDAY's close - yesterday's Close) / yesterday's Close * 100 -- fully knowable before today's session starts, no same-day-close circularity like the retracted original `dist_40d` (which used the breach day's own EOD Close).
+
+Quartile split, BC (L10, SMA200-only) population, n=16,101:
+
+| Quartile | dist range | n | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|---|
+| Q1 (closest, 0-1.1%) | | 4,026 | 65.3% | +1.975% | 0.0549 | 48.20 | -10.81 |
+| Q2 (1.1-3.0%) | | 4,025 | 63.8% | +2.158% | 0.0657 | 57.88 | -13.17 |
+| Q3 (3.0-7.3%) | | 4,025 | 63.2% | +2.062% | 0.0774 | 85.71 | -16.31 |
+| Q4 (furthest, 7.3-81.1%) | | 4,025 | 59.7% | 1.884% | 0.0483 | 72.43 | -28.81 |
+
+**A real, coherent, pre-entry-valid pattern**: BC entries firing while the stock is still FAR (>7.3%) below its own 40-day high -- a 10-day breakout from deep within a still-weak longer-term range -- show the worst win rate, worst median, and by far the worst drawdown (-28.81, nearly 3x Q1's -10.81). Q1-Q3 show a subtler shape: being SOMEWHAT close to the 40-day high (Q3) gives the best meanR/cumR@10 (enough room to run, real underlying strength); being RIGHT AT it (Q1) has the best win rate but less room to continue (lower cumR@10 despite good win%, consistent with immediate resistance).
+
+**Status: flagged lead, not a confirmed finding.** This is the properly pre-entry, non-lookahead version of the idea that failed previously for the wrong reason (same-day-Close circularity in the original `dist_40d`, and exit-reason-mix confound in the Test-2-adjacent symmetric check). Needs the standard verification protocol before trusting it: randomization check on the Q4-vs-rest gap, and a 2023-vs-2024-26 regime split (given how many other candidates this session turned out regime-conditional). Not yet run.
+
+## Verification of the dist_40d_preentry lead — real but regime-conditional, risk-side more robust than return-side (2026-09-25)
+
+Randomization check (Q4 vs Rest median pnl_pct gap, 5,000 permutations): observed gap -0.172%, sits at the **4.58th percentile** -- real under a typical 5% bar but well short of this project's strongest findings (0.1-0.2th percentile).
+
+Regime split (fixed Q4 threshold=7.29% from the full population, not re-quantiled per subset):
+
+| Regime | | n | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|---|
+| 2023 | Q4 | 965 | 68.5% | +2.732% | 0.1902 | 58.13 | -7.72 |
+| 2023 | Rest | 3,706 | 70.4% | +2.467% | 0.1439 | 42.48 | -5.00 |
+| 2024-26 | Q4 | 2,678 | 56.5% | +1.404% | -0.0027 | 11.71 | -24.77 |
+| 2024-26 | Rest | 7,012 | 61.0% | +1.827% | 0.0299 | 18.73 | -14.31 |
+
+**Regime-conditional, same pattern as RSI and Momentum earlier this session.** In 2023, Q4 actually WINS on meanR and cumR@10 (0.1902 vs 0.1439; 58.13 vs 42.48) -- the reverse of the full-history direction, though win% still slightly favors Rest. In 2024-26 the effect is much stronger and in the expected direction (meanR near zero/negative for Q4, dramatic drawdown gap).
+
+**One part is regime-stable**: drawdown is worse for Q4 in BOTH regimes (2023: -7.72 vs -5.00; 2024-26: -24.77 vs -14.31, smaller but never reversed) -- the risk-side metric is more robust than the return-side metrics, which do flip in 2023.
+
+**Verdict**: real, current-regime-conditional signal, not a universal law -- the pooled full-history significance (4.58th percentile) understates its 2024-26-specific strength, since 2023's partial reversal dilutes it. If adopted, should be labeled a current-regime risk/drawdown-control signal (avoid BC entries far below the 40-day high), not a blanket historical filter. Matches the disposition already given to RSI and Momentum.
+
+## Phase C -- Incremental Engine Audit (P0), critic-rescoped business question (2026-09-25)
+
+Critic reframed the Cell C survival question: not "Cell C vs BC" but "BC portfolio vs BC portfolio + Cell C's genuinely incremental trades only." Three experiments, C1-C3.
+
+**C1 -- is the incremental engine profitable standalone?** Kept only Staged 6-15d + Fresh (both sub-buckets), with Cell C's own quality filters (Volume+EMA34+Momentum+Fragility) applied on top -- n=582 (down from 1,433 raw, filters cut it hard but concentrated it). Result: win=64.6%, median=+2.231%, meanR=0.1044 (higher than BC v2's own 0.0746), cumR@5=34.69/DD@5=-5.48, cumR@10=52.59/DD@10=-7.89. **Yes, decisively profitable standalone.**
+
+**C2 -- merged portfolio simulation (the real deployment question).** BC v2 alone vs BC v2 + Cell C incremental (C1), same shared capacity slots, same-ticker exclusivity enforced (can't hold two positions on one name at once):
+
+| Regime | Slots | BC alone cumR/DD | BC+CellC cumR/DD | CellC trades admitted | conflicts seen |
+|---|---|---|---|---|---|
+| Full history | 5 | 36.40/-4.91 | 42.32/-6.52 | 50 | 26 |
+| Full history | 10 | 67.74/-14.06 | 77.26/-11.43 | 93 | 48 |
+| 2023 only | 10 | 25.16/-5.20 | 32.34/-5.19 | 26 | 13 |
+| 2024-26 | 10 | 29.02/-14.06 | 31.89/-11.43 | 50 | 27 |
+
+**Merging Cell C's incremental engine improves cumR at every slot count and in BOTH regimes tested** -- not a 2023 artifact. Drawdown improves or stays flat too (2024-26: -14.06->-11.43; 2023: -5.20->-5.19). Same-ticker conflicts are real but rare (13-48 out of 500-1000+ admitted trades).
+
+**C3 -- conflict resolution, honestly incomplete.** Critic asked for 3 policies (BC wins / Cell C wins / earliest wins). Only "earliest wins" (whoever is already open keeps the ticker) is mechanically valid in this simulation -- "BC wins"/"Cell C wins" would require force-displacing an already-open position at its REAL price on the specific conflict day, which needs reloading that ticker's daily bar for that day (not reconstructable from the cached merged-trade fields alone). Not implemented. Reporting the one valid policy's conflict count instead of faking three distinct policies.
+
+**Phase C verdict: Cell C survives, but only as a small incremental add-on to BC's own portfolio, not a second, independent strategy.** The revised thesis holds: "Cell C = continuation opportunities BC intentionally ignores" (the staged/fresh, non-simultaneous population), not "Cell C = BC plus free extra quantity." Genuinely incremental, genuinely positive, genuinely regime-stable -- just small in absolute size (50-93 extra trades against BC's own ~6,600-9,000).
+
+## Fragility Marginal Audit (P1) -- promoted to Tier A Production, strongest in current regime (2026-09-25)
+
+Critic's P1: is Fragility giving a 2% or 20% improvement on top of the 3-filter stack (Volume+EMA34+Momentum) alone? Regime-split answer:
+
+| Regime | 3-filter meanR | +Fragility meanR | relative gain | removed cohort meanR | removed cohort cumR@10 |
+|---|---|---|---|---|---|
+| Full history | 0.0662 | 0.0746 | +12.7% | 0.0294 | 5.37 |
+| 2023 | 0.1310 | 0.1439 | +9.9% | 0.0735 | 9.85 |
+| 2024-26 | 0.0338 | 0.0398 | +17.7% | 0.0067 | -4.27 (negative) |
+
+**Fragility's relative contribution is 10-18%, not a marginal 2% -- and it's LARGEST in 2024-26, the regime that matters most.** The removed ("Precise") cohort is consistently much weaker than kept in every regime, and in 2024-26 specifically it's outright toxic (cumR@10 negative). **Verdict: Fragility clears necessity -- promoted from Tier A Candidate to Tier A Production. BC v2 is confirmed a 4-filter stack (Volume+EMA34+Momentum+Fragility), not 3.**
+
+**P0/P1/P2 all complete.** P2 (Portfolio Merge Simulation) is exactly Phase C's C2 experiment, already run and holding in both regimes. Ready to compile for critic.
+
+## Cell C Incremental engine stability audit — FAILS critic's own decision rule, real decay not a small-sample artifact (2026-09-25)
+
+Critic's requested 10-minute sanity check before trusting the incremental engine's suspiciously-high meanR (0.1044, higher than BC v2's own 0.0746 on only n=582 trades): year-by-year stability, explicit decision rule stated in advance ("if it survives 2025 individually, I'm convinced; if it's only a 2023 engine, don't deploy it").
+
+| Year | n | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|
+| 2022 | 81 | 69.1% | +3.215% | 0.1953 | 12.97 | -2.07 |
+| 2023 | 154 | 66.2% | +2.336% | 0.1446 | 17.74 | -3.58 |
+| 2024 | 160 | 68.8% | +2.781% | 0.1287 | 17.11 | -2.74 |
+| 2025 | 108 | 56.5% | +1.779% | 0.0225 | 3.13 | -3.98 |
+| 2026 | 79 | 59.5% | +1.696% | -0.0047 | 0.26 | -4.58 |
+
+**meanR declines monotonically and severely (0.1953->0.1446->0.1287->0.0225->-0.0047). FAILS the stated decision rule** -- this is not "surviving 2025 individually," it's a real, severe decay: 2025 is barely positive (a massive drop from 2022-2024) and 2026 is outright negative. Not a "2023 engine" as critic's hypothetical failure mode framed it -- worse, it's specifically a 2022-2024 phenomenon that has decayed to flat-to-negative in exactly the two most recent years, the regime that matters most for a live decision.
+
+**Explains a hidden artifact in the earlier C2 "2024-26 pooled" result**: that comparison (cumR 29.02->31.89) looked like a clean win, but pooling 2024 (still strong, meanR=0.1287) with 2025-2026 (weak/negative individually) masked the same kind of multi-year-aggregation effect already caught and corrected for BC v2's own capacity analysis (A3) -- except here it reveals a genuine decay trend, not just a scheduling artifact.
+
+**Verdict, real retraction of part of the Phase C conclusion, not a footnote**: the Cell C Incremental engine, as currently constructed (Volume+EMA34+Momentum+Fragility on the staged-6-15d+fresh population), does NOT currently deserve deployment or even an unqualified "future research engine" label -- its historical edge is concentrated in 2022-2024 and has not survived into 2025-2026. If kept in the research branch at all, it needs this decay flagged prominently, not glossed over as "already survived Phase C."
+
+## Final disposition — BC v2 promoted, Cell C Incremental v1 retired, research question stays open (2026-09-25)
+
+Critic's final resolution after the incremental-engine decay correction, closing this multi-day arc.
+
+**The decay is structural, not noise — three observations preserved verbatim per critic's request:**
+1. The decline starts before 2025 (2024's own meanR, 0.1287, is already down from 2022's 0.1953 and 2023's 0.1446) — this is a multi-year fade, not a single bad year.
+2. 2024 is still profitable enough (meanR=0.1287) to hide the problem when pooled with 2025-26 in aggregate analysis — exactly the artifact that caused the earlier C2 "2024-26 pooled" result to look like a clean win.
+3. 2026 crossing below zero (meanR=-0.0047) suggests the edge may have been arbitraged away, or depends on a market environment that has genuinely changed — not something a filter tweak should be expected to rescue.
+
+**Final disposition board:**
+
+| Item | Disposition | Reason |
+|---|---|---|
+| BC v2 | **Promote to Production** | Passed architecture, regime, capacity, and necessity audits (Phase A, A1-A4). |
+| Cell C Incremental v1 | **Retire** | Fails current-regime stability after removing the pooling artifact — monotonic decay to negative by 2026. |
+| 40-day continuation hypothesis | **Research question remains open** | The idea survives; this specific implementation ("staged 6-15d + fresh, BC v2 filters") does not. Matches how Freshness was handled — a concept isn't retired until multiple independent tests agree, only this one architecture is. |
+| dist_40d_preentry | Telemetry only | Risk/drawdown signal, not a production filter (unchanged from earlier disposition). |
+
+**Project reduced to two branches going forward**: Branch 1 (Production, active) = BC v2 exactly as specified (10-day breakout, SMA200, Volume Quality, EMA34>=2, Momentum, Fragility) — everything else frozen. Branch 2 (Research, paused) = the continuation-engine hypothesis, paused until a genuinely new architecture/hypothesis exists — explicitly NOT "keep tuning filters on the same staged-trades population."
+
+## Research Integrity Rule #16 — Never pool years when evaluating regime stability (2026-09-25)
+
+Adopted after the Cell C Incremental engine's decay was hidden by a pooled "2024-26" analysis that looked like a clean win (cumR 29.02->31.89) while the individual years underneath told a completely different story (2024 meanR=0.1287, still strong; 2025=0.0225; 2026=-0.0047, negative). The same underlying mechanism also explained an earlier BC v2 capacity artifact this same session (the "needs 20+ slots" finding turned out to be a multi-year continuous-capacity-pooling effect, not real).
+
+**Rule, adopted going forward for every production-candidate promotion decision:**
+1. Never pool multiple years into one aggregate "recent regime" number when deciding whether a candidate is currently working — a single strong year can mask deterioration in the years that actually matter for a live decision.
+2. Every production candidate must pass an INDIVIDUAL check on the two most recent years specifically (this session: 2025 and 2026 YTD) — a pooled "2024-26" or "last 3 years" result is not sufficient on its own.
+
+This rule directly prevented what would otherwise have been a false promotion of the Cell C Incremental engine — its pooled multi-year number looked clearly positive and regime-stable; only the individual-year breakdown revealed the real, disqualifying decay.
+
+## Promotion Audit — real implementation-parity gap found and resolved (2026-09-25)
+
+Critic's requested Promotion Audit (implementation parity across `daily_scan.py`, `primed_engine.py`, `backtest.py`, `live_checkpoint.py`). Code reading confirmed the base filters (RSI/EMA34-persistence/Liquidity/Momentum/trend) are a genuine single source of truth -- all four files import and call `signals.py`'s `base_filters_pass()` directly, no duplicated logic, no drift risk there.
+
+**But a real gap was found: every population built for today's entire BC v2 research (Swap Test, Phase A, Phase B, Phase C) used a synthetic `sma200_ok` gate (stock's own 200-day SMA) that DOES NOT EXIST anywhere in the real production system.** `base_filters_pass()`'s actual trend condition is `trend_bullish = Close > ema34 and ema8 > ema34` -- an EMA8/EMA34 stack, never a stock-level SMA200. (The only real SMA200 reference in the codebase is `market_trending()`'s optional NIFTY-INDEX-level regime gate, a completely different, separately-controlled mechanism, not part of `base_filters_pass()`/`entry_signal()`/the Primed Gate at all.)
+
+**Verified the impact directly** -- recomputed the real `trend_bullish` flag on the L10 population and rebuilt both BC-real and BC-v2 using it instead of the synthetic SMA200 gate:
+
+| | n | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|
+| TRUE BC (real `base_filters_pass`) | 4,945 | 64.4% | +2.056% | 0.0501 | 49.83 | -17.06 |
+| TRUE BC v2 (real trend, no SMA200/RSI/Liquidity) | 7,670 | 63.9% | +2.258% | 0.0725 | 77.73 | -10.45 |
+| Synthetic BC (used all day) | 4,364 | 64.7% | +2.069% | 0.0519 | 49.95 | -12.81 |
+| Synthetic BC v2 (used all day) | 6,603 | 63.9% | +2.280% | 0.0746 | 67.74 | -14.06 |
+
+The synthetic SMA200 gate admitted ~13-16% FEWER candidates than the real trend condition (it was an extra restriction not in production), but per-trade quality metrics are nearly identical between true and synthetic versions, and **BC v2's advantage over BC holds up cleanly with the real condition -- if anything slightly stronger** (DD improves -17.06->-10.45, a bigger gain than synthetic showed).
+
+**Verdict: the gap is real, worth fixing, but does not invalidate today's conclusions.** BC v2 should be implemented directly against `base_filters_pass()`'s real `trend_bullish` condition (removing RSI/Liquidity, adding Volume Quality + Fragility), not a new SMA200 check. Any further research on this thread should use the true condition going forward, not the SMA200 proxy, to avoid this drift recurring. This is exactly the class of silent research/production mismatch these audits exist to catch.
+
+**Implementation surface for BC v2, mapped**: `base_filters_pass()` (signals.py) needs RSI/Liquidity removed, Volume Quality (`ad_fraction`, currently doesn't exist anywhere in production) and Fragility (`live_checkpoint.py`'s `_fragility_risk()`, currently descriptive telemetry only, never wired as a gate) added. Because `primed_engine.py`, `daily_scan.py`, `backtest.py`, and `live_checkpoint.py` all call this single function, updating it in one place propagates correctly everywhere -- confirmed by the parity check above, no separate per-file changes needed for the gate logic itself. `ad_fraction` needs a new feature-computation step added wherever indicators are built (`build_indicators()` in signals.py); Fragility needs its existing `_fragility_risk()` output wired into the gate as a boolean condition, not just displayed.
+
+## Golden Dataset Audit — no implementation bugs found (2026-09-25)
+
+Critic's final pre-production gate: verify BC current and BC v2 produce exactly the expected candidate inclusion/exclusion and identical exits for shared trades, protecting against a silent implementation bug (same spirit as the earlier `detect_entry`->`detect_entry_eod` rename audit).
+
+**Full-population consistency (broader than the requested ~100-trade sample -- covers all 3,609 shared trades)**: TRUE BC and TRUE BC v2 populations, merged on shared (ticker, entry_date) pairs -- 0 exit_date mismatches, 0 pnl_pct mismatches. Confirms no divergence in the underlying exit simulation between the two filter constructions.
+
+**ad_fraction manual spot-check, one trade per year 2022-2026**: POONAWALLA/PARADEEP/HINDALCO/NIACL/HONASA, each independently recomputed from raw daily OHLCV -- exact match (to 6 decimal places) against the stored value every time.
+
+**Fragility end-to-end trace, HINDALCO 2024-04-25**: manually recomputed `freshness_score` (0.8330) and `body_atr` (0.6932) from raw daily bars, called the real `_fragility_risk()` function (imported directly from `live_checkpoint.py`, not reimplemented) -- produced "Watch" label, matching the stored pipeline value exactly.
+
+**Verdict: no implementation bugs found. Both audits (Promotion Audit, Golden Dataset Audit) are now complete** -- BC v2 is cleared for production per critic's final gate, pending the actual code change (updating `base_filters_pass()` with the real trend condition, removing RSI/Liquidity, adding Volume Quality + Fragility as live gate conditions).
+
+## CANONICAL REAL-EXIT-ENGINE RECONSTRUCTION — Priority 1 result: BC v2 SURVIVES (2026-09-25)
+
+Per critic's Exit Engine Integrity Rule and Step 0 architecture (entry generation and outcome generation as one artifact, built from `primed_engine.py`'s real functions, never reimplemented): built a canonical BC Primed dataset by monkeypatching `primed_engine.base_filters_pass` to always pass (capturing every raw trigger, not just pre-qualified ones) while reusing `_new_state`/`check_primed_exit`/`current_primed_stop_level`/`find_zigzag_target` UNCHANGED -- guarantees exact fidelity to the real exit mechanics (ATR0 stop, ZigZag+R_FLOOR target, K=2 confirmed-swing-low trail, MAX_HOLD_DAYS=15). Verified the bypass works correctly before the full run (RELIANCE spot-check: 101 raw triggers captured vs 36 that would pass the real filter). n=21,446 raw triggers, full 500-ticker universe, 2021-2026.
+
+**Priority 1 — BC current vs BC v2, same canonical real-exit dataset:**
+
+| | n | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|
+| BC current (old recipe: trend+RSI+EMA34+Momentum+Liquidity) | 3,847 | 53.0% | +0.560% | 0.0821 | 70.04 | -16.57 |
+| BC v2 (new recipe: trend+Volume+EMA34+Momentum+Fragility) | 6,005 | 53.7% | +0.701% | **0.1198** | **130.74** | **-10.13** |
+
+**Capacity sweep, BC v2 wins outright at every slot count**: cumR@5 59.89 vs 36.89; cumR@10 130.74 vs 70.04; cumR@15 165.94 vs 98.93; cumR@20 225.00 vs 111.03; cumR@30 267.47 vs 151.97.
+
+**Annual breakdown**:
+
+| Year | BC current meanR | BC v2 meanR | BC current cumR@10 | BC v2 cumR@10 |
+|---|---|---|---|---|
+| 2022 | -0.0026 | 0.0637 | 3.72 | 14.25 |
+| 2023 | 0.3058 | 0.3027 (tied) | 36.21 | 39.01 |
+| 2024 | 0.0682 | 0.1132 | 18.87 | 23.93 |
+| 2025 | 0.0490 | 0.0832 | -3.51 (negative) | 4.13 (positive) |
+| 2026 (partial) | 0.0001 | -0.0234 | 4.31 | 1.93 |
+
+**BC v2 wins clearly in 2022/2024/2025, ties 2023, underperforms only in the partial 2026** (both weak/flat there, smallest and least conclusive sample). Not the severe monotonic decay Cell C Incremental showed under the WRONG engine -- a genuinely different, healthier shape confirmed under the CORRECT one.
+
+**Verdict per critic's own decision gate: BC v2 survives the real exit engine. Proceed to filter-level verification (Priority 2-5), do not stop here.**
+
+**One honest concern, flagged not hidden**: the incremental ladder (Baseline=trend_bullish only, n=12,842, meanR=0.0986, cumR@10=107.62) shows Volume Quality's OWN step (+Volume) actually WORSENS meanR (->0.0818) and cumR@10 (->53.55) -- a real reversal from what the wrong-engine research showed. The full combined stack still wins clearly (Momentum and Fragility's additions recover past baseline), but Volume Quality's standalone contribution needs its own dedicated marginal audit (queued next, critic's Priority 3), not assumed.
+
+## Priority 2-5 marginal filter audits (real exit engine) — Volume Quality FAILS, drop it (2026-09-25)
+
+Per-filter KEPT vs REMOVED, conditioned on the rest of the BC v2 stack already applied, same canonical real-exit-engine dataset:
+
+| Filter | Baseline meanR/cumR@10 | KEPT meanR/cumR@10 | REMOVED meanR/cumR@10 | Verdict |
+|---|---|---|---|---|
+| Volume Quality | 0.1381 / 138.51 | 0.1198 / 130.74 | **0.2243 / 152.21** | **FAILS -- removed cohort beats kept on every metric** |
+| EMA34 | 0.1206 / 88.07 | 0.1198 / 130.74 | 0.6589 / 5.93 (n=9) | Inert in this population -- too thin a removed sample (0.1%) to judge either way |
+| Momentum | 0.0860 / 66.92 | **0.1198 / 130.74** | **-0.0370 / -66.62** (DD -78.66) | **Strongest survivor -- removed cohort genuinely toxic** |
+| Fragility | 0.1100 / 101.89 | **0.1198 / 130.74** | 0.0430 / 1.45 | **Survives cleanly** |
+
+**Volume Quality reverses under the real exit engine -- confirmed, not a fluke.** It was one of the two explicit reasons for replacing RSI/Liquidity in the original BC v2 design; that reasoning does not survive contact with the real Primed exit mechanics.
+
+**Checked directly: does dropping Volume Quality entirely improve BC v2?**
+
+| | n | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|
+| BC current | 3,847 | 53.0% | +0.560% | 0.0821 | 70.04 | -16.57 |
+| BC v2 WITH Volume (original design) | 6,005 | 53.7% | +0.701% | 0.1198 | 130.74 | -10.13 |
+| **BC v2 WITHOUT Volume (corrected)** | **7,281** | **54.5%** | **+0.886%** | **0.1381** | **138.51** | -14.52 |
+
+**Yes, unambiguously better** -- more trades (+21% over the 5-piece version), better win/median/meanR/cumR@10, only tradeoff is a somewhat deeper DD@10. **Critically, this fixes 2026** (the one weak year for the 5-piece version): meanR flips -0.0234 -> +0.0156, cumR@10 1.93 -> 9.30. Capacity sweep (5/10/15/20/30 slots) confirms the corrected 4-piece stack scales cleanly: cumR@30=353.55 (vs the 5-piece version's implied lower scaling).
+
+**PRODUCTION CODE CORRECTED, same day**: `signals.py`'s `base_filters_pass()` updated to drop the Volume Quality (`ad_fraction`) check entirely -- BC v2 is now a 4-piece stack: trend_bullish (Close>ema34 and ema8>ema34) + EMA34 persistence + Momentum + Fragility (excluding "Precise" only). `ad_fraction` stays computed in `build_indicators()` (harmless, kept for telemetry/future research) but is no longer gated on. Test suite updated to match (the Volume Quality gate test removed, matching the corrected behavior) -- 71/71 passing.
+
+**Revised final BC v2 recipe: trend_bullish + EMA34>=2 + Momentum>=1.05x + Fragility(exclude Precise). No Volume Quality, no RSI, no Liquidity.**
+
+## SECOND BUG FOUND AND FIXED — canonical dataset's own position-blocking bias, corrected with fully unbiased re-verification (2026-09-25)
+
+Caught before trusting the Promotion Audit's Priority 2-5 results: the canonical dataset was built by monkeypatching `primed_engine.base_filters_pass` to always pass, capturing every raw trigger for post-hoc filtering. But the simulation enforces ONE position at a time per ticker -- with the filter bypassed, the FIRST raw trigger on a ticker consumes that ticker's position slot regardless of whether it would have actually qualified, blocking out LATER triggers that would have qualified under the real gate. This systematically UNDERCOUNTS what a correctly-filtered simulation produces. Evidence: canonical-derived "BC v2 without Volume" gave n=7,281 (restricted date range); the real, unmodified `run_primed()` gives n=10,952 on the same range -- a 50% gap, not noise.
+
+**Fix, and the distinction that matters**: a population built by LOOSENING the gate for capture purposes is unsafe for that population; a population built as a genuinely, correctly-gated real simulation (or split within one, using the SAME gate that generated it) is fine. Priority 1's WITH-vs-WITHOUT-Volume comparison was already safe (both came from genuine, non-bypassed `run_primed()` calls). Priority 2-5's marginal audits were NOT safe as originally reported -- redone properly below, each with its own correctly-gated real simulation (baseline = the other filters actually enforced as the entry gate, target filter captured as a side observation, not used to block positions).
+
+**Volume Quality re-verified, unbiased -- reversal CONFIRMED, even stronger**: BASELINE (real 4-piece gate, n=10,952) meanR=0.1850, cumR@10=84.31. Volume KEPT (n=8,001) meanR=0.1574, cumR@10=90.48. Volume REMOVED (n=2,951) meanR=**0.2598**, cumR@10=**172.17**. Removed cohort clearly, decisively better -- confirms the drop decision.
+
+**Momentum re-verified, unbiased -- clean survivor, confirmed**: BASELINE (n=14,000) meanR=0.1269. Momentum KEPT (n=8,294) meanR=0.1773, cumR@10=129.51. Momentum REMOVED (n=5,706) meanR=0.0535, cumR@10=23.21, DD@10=-52.10. Real, substantial, unbiased confirmation.
+
+**Fragility re-verified, unbiased -- clean survivor, confirmed**: BASELINE (n=11,288) meanR=0.1769. Fragility KEPT (n=10,379) meanR=0.1876, cumR@10=120.24. Fragility REMOVED (n=909) meanR=0.0546, cumR@10=37.70. Real, meaningful, unbiased confirmation.
+
+**EMA34 re-verified, unbiased -- still too thin to judge, matches critic's own read, not chased further**: BASELINE (n=10,972) meanR=0.1866. EMA34 KEPT (n=10,938) meanR=0.1849, cumR@10=122.90. EMA34 REMOVED (n=34, up from the biased version's n=9 but still thin) meanR=0.7404 (huge, but n=34 is not a trustworthy sample either way). Per critic's explicit guidance, not spending a dedicated RQ on this -- EMA34 stays in the stack, its marginal contribution in this specific population remains genuinely unresolved.
+
+**Final head-to-head, BC current vs BC v2, BOTH sides now correctly-gated real simulations (no bias either direction)**:
+
+Capacity sweep:
+| Slots | BC current cumR/DD | BC v2 cumR/DD |
+|---|---|---|
+| 5 | 45.00/-10.42 | 35.72/-16.13 |
+| 10 | 102.43/-11.59 | 84.31/-31.81 |
+| 15 | 134.93/-21.52 | 175.32/-30.05 |
+| 20 | 200.01/-25.39 | 243.88/-30.93 |
+| 30 | 282.38/-38.44 | 376.53/-47.09 |
+
+Annual:
+| Year | BC current meanR/cumR@10/DD@10 | BC v2 meanR/cumR@10/DD@10 |
+|---|---|---|
+| 2022 | 0.0413/3.72/-16.41 | 0.0984/10.74/-9.34 |
+| 2023 | 0.3279/44.54/-5.98 | 0.3823/67.97/-5.25 |
+| 2024 | 0.0945/18.28/-6.34 | 0.1481/32.73/-6.09 |
+| 2025 | 0.0657/4.88/-14.24 | 0.0663/4.41/-14.19 (tied) |
+| 2026 | 0.0650/16.66/-7.08 | 0.0680/8.97/-11.20 |
+
+**BC current wins at tight capacity (5-10 slots); BC v2 overtakes cleanly from 15 slots up -- the same capacity-dependent crossover found earlier in the wrong-engine research is CONFIRMED as a real, reproducible property, not an artifact of that bug.** BC v2 wins clearly in meanR/median nearly every year (2022/2023/2024 also on cumR/DD), ties 2025, mixed in 2026 (better meanR, worse cumR/DD -- same capacity-competition effect). Real practical question stands: BC v2's edge requires roughly 15+ concurrent positions to show cleanly in a capacity-constrained portfolio.
+
+**Test suite reconfirmed 71/71 passing. No further code changes needed from this audit -- the earlier correction (drop Volume Quality) stands, doubly verified now.**
+
+## RQ-Tail-1 completed — large-loss anatomy + day+1/day+3 early-warning overlay quantified (2026-09-25)
+
+Per critic's weekend objective #1, on the final, correctly-gated BC v2 population (real exit engine, no bypass).
+
+**Loss-tail anatomy**: worst-10% (n=1,095) clusters tightly near -1R (min R=-1.1226) -- 96.1% are clean `stop` exits, no gap-through-stop blowups. Ordinary losers (95.5% `max_hold_cap`) are small, slow-drift losses, not catastrophic. Ticker concentration is broad (max 8 of 1,095 trades from any single ticker) -- no event/bad-apple clustering. Year distribution modestly overweights 2024-26 and underweights 2023, matching the already-known regime pattern, not a new problem.
+
+**Pre-entry discrimination (Bucket A) -- weak, matches critic's own instinct not to force an entry filter**: risk_pct, RSI, EMA34-persistence, ATR%, dist_40d_preentry, and entry-day gap_pct are all nearly identical between the worst-10% and the rest. Only momentum_20d shows a real but modest gap (8.77% vs 12.11%) -- not clean enough to build a hard pre-entry filter without cutting a large amount of good BC v2 opportunity too.
+
+**Post-entry discrimination (Bucket B) -- strong and immediate**: by day+1, eventual big losers are already visibly underwater (mean -0.834%, median -0.663%) while the rest of the population is already showing a gain (mean +1.273%, median +0.713%). MAE for the tail averages -13.13% vs the rest's -4.18%. The damage shows up almost immediately, not gradually over the ~13-day average hold to stop-out.
+
+**Quantified a day+1/day+3 early-warning exit overlay** (whichever fires first: the real check_primed_exit(), or the early-warning rule; normal exit takes priority on a same-day tie):
+
+| Rule | win% | median | meanR | cumR@10 | DD@10 | streak@10 |
+|---|---|---|---|---|---|---|
+| BASELINE (no overlay) | 57.4% | +1.475% | 0.1849 | 116.17 | -15.67 | -9.06 |
+| d1<=0% (fires 4,471x) | 39.6% | -0.588% | 0.1533 | 101.95 | -6.77 | -4.82 |
+| d1<=-2% (fires 1,698x) | 51.9% | +0.410% | 0.1715 | 103.25 | -12.91 | -8.89 |
+| d3<=-2% (fires 2,542x) | 50.7% | +0.161% | 0.1706 | 111.21 | -12.78 | -6.42 |
+| d3<=-3% (fires 1,767x) | 53.3% | +0.703% | 0.1757 | 114.65 | -12.07 | -7.27 |
+
+**Every threshold tested, at every combination, shows the same shape**: win%/median/cumR@10 all worsen, DD/worst-streak both improve. No variant clears this project's own standing promotion bar (must improve BOTH R and drawdown, not trade one for the other). Same mechanism behind this project's prior rejections of EMA34-break exit overlay, 3-day-stall, and fixed 2R/3R targets -- some early-red trades recover into real winners, and a hard early-exit permanently forfeits those recoveries at a cost exceeding the drawdown saved.
+
+**Verdict**: the day+1/day+3 signal is real (confirmed, not noise) but NOT actionable as a hard exit rule without accepting a genuine risk/return trade-off (smoother drawdown, materially less total profit) -- not a free improvement, not promoted. RQ-Tail-1 closed: pre-entry filtering doesn't work here, post-entry early-exit doesn't pass the promotion bar, the tail is best understood as the normal, well-behaved cost of the stop-loss mechanism (Bucket D-adjacent: identifiable post-entry but not cheaply actionable, not truly random).
+
+## Reverse-engineered shape profile, worst-10% vs best-10% (real BC v2 population) — a strong, coherent, new signal (2026-09-25)
+
+Per user's explicit instruction: instead of hypothesis-testing pre-picked filter thresholds, build a rich descriptive profile of the ACTUAL shape of winners vs losers (pattern/strength/volume/consistency dimensions) and let differences emerge. Worst-10% (n=1,069) vs Best-10% (n=1,068) of the real, correctly-gated BC v2 population, 12 features extracted fresh from daily bars.
+
+**No discrimination at all** (essentially identical medians both cohorts): trend consistency (up_days_10/20), base tightness (base_range_pct), number of prior 60-day breakout attempts (prior_attempts_60d, literally 8.0 median both) -- rules out "smoothness of the prior trend," "how tight the base was," and "how many times it already tried to break out" as discriminators, consistent with this project's repeated null findings on quiet/tight-base theories (VCP, Supply Exhaustion, Base Structure).
+
+**Real, coherent signal -- distance from longer-term highs/MAs**:
+| Feature | Worst-10% median | Best-10% median |
+|---|---|---|
+| dist_52w_high (% below 52-week high) | 9.2% | 6.4% |
+| dist_ema8 | 3.3% | 4.8% |
+| dist_sma50 | 7.2% | 9.1% |
+| dist_sma150 | 12.4% | 13.8% |
+
+**Winners are systematically MORE extended and closer to genuine new (52-week) highs; losers are relatively further from theirs.** Randomization check on dist_52w_high: observed gap sits at the **0.08th percentile** of 5,000 permutations -- among the strongest signals this entire project has found, and the direction is consistent across all four related measures (52-week high, EMA8, SMA50, SMA150), not a single-test fluke from testing many features.
+
+**Direction is the opposite of this project's earlier "avoid extension" filter attempts** -- a stock genuinely pushing into new-high territory continues BETTER, not worse, than one that's merely clearing its own recent 10-day trigger from well below its longer-term highs. This is directly consistent with (and a longer-timeframe confirmation of) the earlier dist_40d_preentry finding (distance from the 40-day high predicts worse drawdown) -- same underlying mechanism, now shown to extend to the 52-week timeframe with even stronger significance.
+
+**Status: strong exploratory finding, not yet a validated filter candidate.** Needs the standing verification protocol (regime split 2023 vs 2024-26, capacity/stacking check on top of the existing BC v2 stack) before being treated as production-ready -- flagging the discovery now, not yet promoting it.
+
+## dist_52w_high, corrected and run on the FULL population — a peaked shape, not monotonic (2026-09-25)
+
+Caught before running the full sweep: the original tail-only `dist_52w_high` used the entry day's own EOD close -- the same same-day-close lookahead that caused the earlier `dist_40d` retraction (the 252-day-high itself was correctly lagged, but comparing it to the entry day's own close isn't knowable at the moment of an intraday trigger). Corrected to `dist_52w_high_preentry` = prior day's close vs the 252-day-high as of prior day, matching the already-established `dist_40d_preentry` convention. Run on the FULL population (n=9,833, not just the worst/best-10% tails), per user's explicit request -- the tail-only comparison risks reflecting idiosyncratic/news-driven outlier trades rather than a genuine, broadly-applicable pattern.
+
+Decile sweep:
+
+| Decile | Range (% below 52w high) | n | win% | median | meanR | cumR@10 | DD@10 |
+|---|---|---|---|---|---|---|---|
+| D1 | 0.0-1.5% | 984 | 59.3% | +1.544% | 0.1417 | 61.96 | -9.77 |
+| D2 | 1.5-2.9% | 983 | 55.6% | +1.103% | 0.1233 | 41.94 | -12.42 |
+| D3 | 2.9-4.6% | 983 | 57.2% | +1.455% | 0.1670 | 57.47 | -18.28 |
+| D4 | 4.6-7.2% | 983 | 60.5% | +1.955% | 0.2327 | 121.46 | -10.08 |
+| D5 | 7.3-10.7% | 984 | 59.5% | +2.365% | 0.2848 | 108.67 | -9.47 |
+| D6 | 10.7-15.2% | 983 | 58.1% | +1.661% | 0.2297 | 134.30 | -9.75 |
+| D7 | 15.2-21.8% | 983 | 56.0% | +1.118% | 0.1666 | 85.69 | -15.26 |
+| D8 | 21.8-30.4% | 983 | 53.9% | +0.727% | 0.1370 | 63.37 | -16.05 |
+| D9 | 30.4-45.9% | 983 | 54.3% | +0.699% | 0.0996 | 35.21 | -13.39 |
+| D10 | 45.9-520.9% | 984 | 52.5% | +0.575% | 0.1519 | 52.65 | -20.70 |
+
+**The full-population shape is peaked (inverted-U), not monotonic.** The sweet spot is D4-D6 (roughly 5-15% below the 52-week high) -- win%/median/meanR all peak there. Being literally AT the 52-week high (D1) is decent but clearly below the peak (plausibly real resistance/profit-taking at that level). Being far below it (D9-D10) is clearly the worst zone (lowest win%, lowest median). This refines, rather than contradicts, the earlier tail-only finding -- the direction (closer beats farther, on average) was correct, but the tail comparison flattened a genuine peaked shape into an apparent monotonic one.
+
+**Not yet validated further** -- needs a regime split (2023 vs 2024-26) and a stacking/necessity check against the existing BC v2 filters before being treated as a production candidate. Flagged as the strongest lead from the reverse-engineering exercise so far, not yet promoted.
+
+## dist_52w_high dissection (2026-09-25) — the "peaked" shape is a mixture artifact of age-of-high and volatility; the real underlying relationship is monotonic and weak-but-real
+
+Per critic's explicit dissection plan (rank-correlation/latent-axis check, 2D age-of-high decomposition, volatility decomposition, residualization), executed on the full real BC v2 population (n=9,833), no gate/threshold introduced anywhere in this analysis.
+
+**Stage B — the four extension measures are NOT one latent axis.** Spearman correlations: dist_52w_high vs dist_sma150 = -0.731 (strong), vs dist_sma50 = -0.478 (moderate), vs dist_ema8 = -0.015 (essentially zero). dist_52w_high tracks long-term structure (SMA150/SMA50), not short-term extension (EMA8). The tail comparison that first surfaced this (worst-10% vs best-10%) was picking up a long-term-structure signal, not a generic "extension" signal.
+
+**Stage C — age-of-high (`days_since_52w_high`) is a real confound.** Within the pooled population, dist_52w_high decile composition by age bucket is almost mechanical: decile 0 (closest to the high) is 93% "high set in the last 20 days"; decile 9 (furthest below) is 90% "high set 121+ days ago." Conditioning on age bucket changes the shape:
+- Fresh highs (0-20d old): flat/no clean pattern.
+- 21-60d and 61-120d old: a real pattern, but not peaked — best in the middle-near band, worst at the far tail within that age band.
+- Stale highs (121d+): **monotonic** — closer to a stale high is better, farther below is worse (win% 58.5% → 52.0% across the five within-band deciles, med return +1.73% → +0.53%).
+
+**Stage C continued — volatility (`atr_pct` quartile) reshapes it further, in one case reversing it.** Low-vol quartile: still somewhat peaked (best in the middle). High-vol quartile: **inverted** — closest-to-high is the *worst* band (54.9% win) and furthest-below is the *best* (59.4% win, +2.94% median). For high-volatility names, "far below the 52-week high" does not mean stale/weak; it can just mean normal wide swings, and it correlates with the best outcomes in this population.
+
+**Stage D — residualization.** Regressed `dist_52w_high` on `dist_ema8 + dist_sma50 + dist_sma150 + atr_pct + days_since_52w_high` (R²=0.47 — a meaningful but partial fit). Took the residual (the part of dist_52w_high NOT explained by age/vol/extension-family) and re-ran the outcome sweep:
+- Raw dist_52w_high decile sweep: peaked, non-monotonic (Spearman vs r_multiple = -0.025).
+- Residual decile sweep: no longer peaked — **cleaner top-quintile-vs-rest pattern.** Top quintile (stronger than age/vol/extension alone would predict) n=1,967: win 59.5%, med +2.071%, meanR 0.210. Middle 60% n=5,899: win 56.8%, med +1.312%, meanR 0.166. Bottom quintile (weaker than predicted) n=1,967: win 53.5%, med +0.629%, meanR 0.158.
+
+**Conclusion:** the raw peaked shape was substantially a mixture artifact of the population's age-of-high and volatility composition. The real signal, once those are conditioned out, is a real-but-weak (Spearman -0.0275 on the residual, p=0.006 — significant only because n is large, not because the relationship is strong) tilt: stocks trading unusually close to their 52-week high relative to what their age-of-high/volatility/short-term-extension profile alone would predict do modestly better than stocks trading unusually far below. Effect size is a top-quintile-vs-bottom-quintile gap of ~6 win% points and ~0.05 meanR, concentrated at the tails, with a flat/noisy middle 60%. This is NOT strong enough, on its own, to justify a gate or threshold. Per critic's "room vs extension" hypothesis: the data does not cleanly support "sweet spot in the middle" — it supports "closer-to-relative-strength is mildly better," most cleanly visible for stale highs, and REVERSED for high-volatility names. Not promoted to any filter. Logged as a completed dissection, not an open thread.
+
+## Loser Autopsy + MAE/MFE Shape Audit (2026-09-25, weekend Priority 1, critic-specified) — entry mechanics show real but insufficient signal; success criterion not met
+
+Per critic's explicit RQ: population = worst 5% R-multiple trades (n=544, all stop exits by construction) vs middle 50% of WINNERS only (r_multiple in [0.225, 0.944], n=3,126) — deliberately not top winners, to avoid outlier/news bias. Real, correctly-gated engine (Exit Engine Integrity Rule + Gate Integrity Rule respected — reused `primed_engine.detect_primed_entry`/`check_primed_exit` unchanged, no bypass). Full population n=10,883 (2022-07-04 onward, matching the established canonical cutoff).
+
+**Entry mechanics (breach-day candle geometry, volume, market context) — Cohen's d, worst-5% vs mid-50%-winners:**
+
+| Feature | d | worst5 mean | mid50 mean |
+|---|---|---|---|
+| body_pct (breakout candle body size) | -0.270 | 2.12% | 2.92% |
+| dist_from_trigger_close_pct (follow-through above trigger) | -0.242 | 0.51% | 1.08% |
+| close_location (close within day's range) | -0.159 | 0.662 | 0.699 |
+| nifty_ret_pct (market context on entry day) | -0.143 | +0.20% | +0.31% |
+| wick_top_pct | +0.145 | 29.1% | 26.4% |
+| gap_pct | -0.113 | 0.52% | 0.66% |
+| wick_bottom_pct | +0.084 | 17.4% | 16.1% |
+| volume_ratio | -0.052 | 2.86x | 3.20x |
+
+All individually weak (d < 0.3). Direction is coherent (losers show smaller breakout candles, less follow-through above trigger, weaker closes, weaker market days) but none is a strong discriminator alone.
+
+**8-feature composite vs critic's stated success criterion ("remove 30-40% of worst losers while sacrificing <10-15% of winner R"):**
+
+| K% removed (weakest composite) | worst-5% tail removed | winner R sacrificed | random-removal baseline (same K) |
+|---|---|---|---|
+| 20% | 23.7% | 12.7% | 20.0% / 20.0% |
+| 25% | 28.1% | 16.3% | 25.0% / 24.9% |
+| 30% | 34.0% | 20.2% | 30.1% / 29.9% |
+| 35% | 40.6% | 24.3% | -- |
+
+The composite beats random removal by a real margin (e.g. at K=30%, removes 34% of the worst tail for 20.2% winner cost vs random's 30%/30%) but never satisfies both halves of the criterion simultaneously — the closest point (K=25%, 28.1% loser removal / 16.3% winner cost) is just outside the target band on both axes. **Success criterion not met.** Individual features (body_pct, dist_from_trigger_close_pct) tested the same way, same result, slightly worse than the composite.
+
+**MAE/MFE trajectory (descriptive, not gateable pre-entry):** worst-5% trades' maximum drawdown is deeper (median -9.8% vs mid-50%-winners' -2.0%) and occurs later in the hold (median day 9 vs day 3); 96.7% of worst-5% trades never reach +1R at any point before being stopped out, vs winners reaching +1R 32.2% of the time. This describes the tail as "slow bleeds that never turn," not fast whipsaws — consistent with, and a further characterization of, the RQ-Tail-1 finding (2026-09-25, earlier this session) that the tail is the normal stop mechanism operating correctly, not a hidden pathology. Not a new actionable lever — MAE/day-of-MAE for a stop-exit trade is close to tautological with the trade's own final loss.
+
+**Disposition:** entry-mechanics and MAE/MFE features characterize the tail honestly but do not clear critic's own success bar for a production gate. Consistent with this weekend's broader pattern (Volume Quality reversal, dist_52w_high dissection, day+1/day+3 overlay): individually-coherent, statistically-real signals in this population repeatedly fail to translate into a gate that improves both loss-avoidance and winner-preservation simultaneously. Not promoted. Telemetry only (composite8 formula logged here, not added to signals.py).
+
+## RQ-OX3 — Option Exit Matrix, 09:20/09:30/09:45/10:00/11:30 x Gap-Up/Flat/Gap-Down (2026-09-25, weekend Priority 2, critic-specified)
+
+Measure only, no policy optimization. Stock entry/exit engine (BC v2) untouched — this is options-execution-only research. Reused OX1 reconstruction infrastructure (`ox1_reconstruction.reconstruct_option_value`, frozen BETA_ATM_CURRENT=0.492, PROMOTED Research Infrastructure) and the exact same population/entry anchors (O0, S0) as RQ-OX1-E (n=367 real breakout events, freshness<=0.40, F&O-eligible, day+1 inside the intraday_cache coverage window). 09:30/10:00/11:30 reused directly from `rq_ox1e_exit_checkpoints.csv`; 09:20 and 09:45 newly computed through the SAME full reconstruction call for methodological consistency (OX2's original 09:20 used a simplified linear shortcut — this version replaces it). Gap buckets reused EXACTLY from RQ-OX2 (±0.5% on the 09:15 checkpoint's stock move vs S0) — reproduced the documented 139/60/168 split exactly, confirming no drift.
+
+**Decision table — median / p10 / p25 / worst(min) / std, reconstructed option pnl%:**
+
+Gap-Up (n=139):
+| Checkpoint | median | p10 | p25 | worst | std |
+|---|---|---|---|---|---|
+| 09:20 | +16.34% | +7.39% | +10.97% | -0.40% | 21.19 |
+| 09:30 | +18.63% | +2.80% | +8.56% | -19.46% | 23.88 |
+| 09:45 | +17.51% | +0.33% | +5.97% | -26.42% | 25.12 |
+| 10:00 | +19.24% | +0.13% | +7.84% | -14.32% | 25.21 |
+| 11:30 | +20.40% | -3.85% | +6.75% | -16.65% | 30.86 |
+
+Flat (n=168):
+| Checkpoint | median | p10 | p25 | worst | std |
+|---|---|---|---|---|---|
+| 09:20 | +1.95% | -8.15% | -4.36% | -25.83% | 8.20 |
+| 09:30 | +0.71% | -13.74% | -6.54% | -46.04% | 11.31 |
+| 09:45 | -0.37% | -14.96% | -8.62% | -43.42% | 14.98 |
+| 10:00 | -1.70% | -16.54% | -9.57% | -36.42% | 16.03 |
+| 11:30 | -0.74% | -23.47% | -12.29% | -50.03% | 22.15 |
+
+Gap-Down (n=60):
+| Checkpoint | median | p10 | p25 | worst | std |
+|---|---|---|---|---|---|
+| 09:20 | -16.96% | -33.58% | -25.13% | -92.10% | 16.50 |
+| 09:30 | -17.44% | -39.83% | -26.13% | -107.77% | 19.11 |
+| 09:45 | -19.06% | -36.13% | -26.36% | -99.62% | 18.33 |
+| 10:00 | -19.30% | -39.59% | -27.45% | -109.94% | 19.97 |
+| 11:30 | -18.01% | -45.91% | -34.87% | -128.54% | 24.46 |
+
+Confidence flags (new 09:20/09:45 rows, n=734): BASELINE 73.2%, CAUTION 22.2%, LOW_CONFIDENCE 4.6% — consistent with prior OX1/OX2 quality.
+
+**Reading, extends OX2's finding down to 09:20 rather than changing it:** Gap-Up is "almost always profitable" only at 09:20 itself (p10=+7.4%, worst=-0.4%, no real loser yet) — by 09:30, just 10 minutes later, the tail has already opened up materially (worst=-19.5%, p10 down to +2.8%). Medians keep drifting up through 11:30 across all three buckets' own trend, but downside risk (p10/worst/std) grows monotonically with time in Gap-Up and Flat, same risk/reward decoupling OX2 already established — now confirmed to start within the first 15 minutes, not just "sometime before 11:30." Flat is breakeven-to-slightly-negative on the median at every checkpoint tested, with a downside tail nearly as bad as Gap-Down's by 11:30 (worst -50.0% vs -128.5%) — Flat opens are not a "safe, do-nothing" bucket. Gap-Down shows no real recovery window inside 09:20-11:30 on the median (stays -17% to -19% throughout); the "occasional recovery" OX2 flagged appears to be individual-trade variance, not a bucket-level pattern within this checkpoint range.
+
+**Disposition: descriptive decision table only, no exit-timing policy promoted or recommended.** Per critic's explicit instruction, this deliberately does NOT conclude "the best checkpoint is X" — the table is the deliverable; a policy choice (if any) is a separate, later decision that should weigh the user's own execution constraints (how fast they can realistically act on a signal) against this risk/reward tradeoff, not just pick the highest median.
+
+## Two standing additions adopted from critic's weekend-close review (2026-09-25)
+
+**Research Integrity Rule #17 (Negative Findings Are First-Class)**: a negative result — real, statistically legible signal that fails to clear the promotion/actionability bar — is a completed research outcome, not an open thread or a failure to find something. A signal is "closed" when it has been shown to be real but insufficient for production, not only when it becomes a filter. This weekend alone: Freshness (real, not actionable), Volume Quality (real, reversed under the real engine), dist_52w_high (real, proxy for age/vol confounds), Loser Autopsy entry-mechanics (real, below the promotion bar). Purpose: prevent re-litigating the same closed idea months later under a new name.
+
+**Type-A taxonomy split (A1 vs A2)** — critic's reframe of the Loser Autopsy result: "catastrophic loser" was being treated as one category, but the MAE/MFE trajectory data (96.7% of worst-5% trades never reach +1R before being stopped, median MAE arrives day 9) shows it's actually two different mechanisms:
+- **A1 — momentum-absence losers**: never develop real follow-through after the breakout; visible early (within ~1-3 trading days) via post-entry price action, not pre-entry candle mechanics. This is the mechanism behind the live options pain (MAXHEALTH is an A1 case) — options decay while the stock never confirms.
+- **A2 — eventual-stop losers**: the trade develops some initial follow-through, then reverses later and gets stopped over a longer hold (matches the "slow bleed that never turns" MAE/day-9 pattern the autopsy actually measured).
+The Loser Autopsy (single pre-entry EOD candle) mostly characterized A2. Critic's proposed next BC-side RQ, **RQ-TA2 (Momentum Absence Audit)** — bucket by "never reaches +0.5R before stop" (A1) vs "reaches +1R within first 3 trading days" (Healthy), compare day+1 close/high, intraday follow-through, RVOL at trigger, opening gap (all available within 24 hours, unlike day-9 MAE) — is QUEUED, not started, since the weekend's remaining time went to RQ-OX3 per critic's own explicit recommendation to freeze the BC branch and focus on options.
+
+**Weekend BC-branch freeze, per critic's explicit recommendation**: BC v2 promotion package treated as essentially complete; Loser Autopsy closed without promotion; reverse-engineering thread (52-week highs, candle anatomy) paused, not abandoned. Queued, not started: RQ-TA2 (Momentum Absence Audit), trajectory-shape clustering (Lens 1, critic's highest-priority next BC angle — "what shape did the first two days take", e.g. breach->hold->expand vs breach->stall->drift vs breach->reject->recover vs breach->reject->never-recover), sector/regime clustering of worst losers (Lens 2 — one RQ, success criterion = sector concentration greater than expected by trade count, else close it), Nifty-regime conditioning (Lens 3 — above/below SMA50, high/low ATR regime), Cell C real-engine rebuild, capacity/concurrency audit.
+
+## RQ-OX3 pairwise checkpoint dominance (2026-09-25) — closes OX3; medians were hiding a coin-flip reality
+
+Critic's one remaining pre-freeze check: for every trade, does a later checkpoint actually beat the immediately preceding one (trade-by-trade), not just in the pooled median.
+
+| Bucket | 09:30>09:20 | 09:45>09:30 | 10:00>09:45 | 11:30>10:00 |
+|---|---|---|---|---|
+| Gap-Up (n=139) | 49.6% | 43.2% | 53.2% | 48.2% |
+| Flat (n=168) | 42.3% | 45.8% | 45.8% | 50.0% |
+| Gap-Down (n=60) | 48.3% | 45.0% | 41.7% | 46.7% |
+
+Every single transition, every bucket: 42-53%, indistinguishable from a coin flip. **Waiting does not reliably improve any individual trade** — the rising medians reported in the main OX3 table are being pulled up by a minority of trades with large gains while the majority is a wash or worse. This is exactly the gap critic flagged: median-based reporting was hiding that "later is better" is not true trade-by-trade, only in aggregate distribution shape (which is itself just the tail-widening finding restated).
+
+**OX3 formally closed.** VALIDATED measurement layer (decision table + dominance matrix), same promotion tier as OX1 itself — infrastructure/observation, not a trading rule. No exit-timing policy exists or is implied by this result. Weekend Priority 2 closed.
+
+## RQ-Trail-1 — Progress-Based Early Exit Audit, Stage 1 + Stage 2 (2026-09-25, Sunday priority, per user's direct request on drawdowns)
+
+Real, correctly-gated BC v2 simulation (Exit Engine Integrity Rule + Gate Integrity Rule respected — reused `primed_engine.detect_primed_entry`/`check_primed_exit` unchanged; no new stop, no changed entry/position-sizing logic anywhere). Day-by-day trajectory captured for every trade's first 15 sessions (n=10,952 full canonical population, 2022-07-04 onward): close-vs-trigger progress, running MFE/MAE, current stop cushion, EMA8 relationship, first-higher-high/first-lower-low day.
+
+**Stage 1 — when do eventual winners (n=5,599) and eventual stop-losers (n=1,859) separate?** Real separation building from day 1, widening steadily (median close_vs_trigger_pct: day1 winner 1.06% vs stop-loser 0.94%, small; day7 winner 2.97% vs 1.68%, clearly apart; day5 % holding above EMA8: winner 83.7% vs stop-loser 59.7%, already a large real gap). **Caveat, explicitly flagged, not swept under the rug**: the day-10-15 numbers for stop-losers are increasingly survivorship-conditioned — most stop-losers exit well before day 15 (median MAE day ~9, from the earlier Loser Autopsy), so only the toughest survivors remain in the "stop_loser" group's later-day statistics, which is why stop-losers' median MFE-so-far actually reads HIGHER than winners' at every day (an artifact of conditioning on survival to that day, not a real "losers show more upside" finding — do not report that comparison literally). The early-day (1-9) separation, where attrition is still modest for both groups, is the trustworthy part of this table.
+
+**Stage 2 — candidate behavioral rules, quantified against critic's exact ask (drawdown removed vs winner R sacrificed), against the real BASELINE (n=10,952, meanR=0.1850, maxDD=-151.55R, worst losing streak=-20.95R):**
+
+| Rule | Best D | n flagged | meanR | maxDD (R) | worst streak (R) | losers "fixed" | winner R sacrificed |
+|---|---|---|---|---|---|---|---|
+| Rule2: never closed above trigger through day D | D=8 | 1,770 | 0.1850→0.1790 | -151.5→-139.4 (-8.0%) | -20.9→-18.5 (-11.7%) | 30.1% | 4.9% |
+| Rule4: made a lower low before any higher high, by day D | D=9 | 2,679 | 0.1850→0.1785 | -151.5→-137.4 (-9.3%) | -20.9→-13.6 (-35.0%) | 34.7% | 7.1% |
+| **Rule2 OR Rule4 (combined), by day D** | **D=9** | **3,131** | **0.1850→0.1759** | **-151.5→-130.7 (-13.7%)** | **-20.9→-13.6 (-35.0%)** | **42.2%** | **8.5%** |
+
+("hyp_r" for a flagged trade = close_vs_trigger_pct at day D / the trade's own real risk_pct — a hypothetical exit at that day's close, replacing the eventual outcome; the stop/entry/sizing logic itself is never touched, only whether the position is still held.)
+
+Rule1 (single-day no-progress snapshot) and Rule3 (single-day below-EMA8 snapshot) were also tested and are dominated by Rule2/Rule4 at every day cutoff (higher winner-R cost for similar or worse loser-removal) — not carried forward.
+
+**The combined rule (Rule2 OR Rule4, D=9) is the strongest candidate found**: cuts max drawdown by 13.7% and the worst losing streak by 35%, for an 8.5% winner-R cost and a 4.9% relative expectancy reduction (meanR 0.1850→0.1759). This is a materially better DD-to-cost ratio than every other candidate rejected this weekend (day+1/day+3 overlay, entry-mechanics composite) — the difference is using richer, later (day 9) post-entry structural information (never regained the trigger + made a new low before a new high) rather than a single early-day price snapshot or pre-entry candle.
+
+**Not yet promoted — explicit gaps before this can be treated as validated**: (1) DD/streak computed on the simple chronological cumulative-R curve, NOT the capacity-constrained FCFS methodology (`risk_of_ruin.capacity_constrained_backtest`) used for every other BC v2 promotion decision this weekend — needs redoing with real exit_date scheduling before treating the DD numbers as final; (2) no out-of-sample/regime split yet (Research Integrity Rule #16 — never pool years); (3) no check of whether this interacts with the options side (a stock-side early exit at day 7-9 changes the options-decay window too — a natural bridge to the OX3/RQ-TA2 connection critic already flagged). Sending to critic before any further work, per the project's own standing pattern.
+
+## RQ-Trail-2 — Early Cut Risk/Reward Frontier (2026-09-25, critic-specified, no a-priori winner-R cap)
+
+Per critic's explicit reframe: the earlier bar ("<10-15% winner R lost") may be too strict — the real question is how much winner R the user is willing to trade for a materially smaller deep-loss tail and drawdown, mapped as a full frontier rather than a single point, using a magnitude signal (how far below trigger, not just a binary "never got back above it") evaluated at D=2/3/4/5 only (must be available within the user's own stated patience window). Deep loss defined as r_multiple<=-0.8 (n=1,172, 10.7% of population, total_R=-1200.7 — near-full-stop trades). Same real, correctly-gated engine as RQ-Trail-1; DD/streak still on simple chronological cumulative-R (capacity-constrained re-check still outstanding).
+
+**BASELINE: n=10,952, meanR=0.1850, totalR=2,025.9, maxDD=-151.5R, worst streak=-20.9R, median holding=22.0 calendar days.**
+
+Frontier at D=2 (theta = close_vs_trigger_pct threshold, i.e. "still this far below/above the trigger after D days"):
+| theta | %flagged | meanR | totalR | DD | deep loser removal | deep R saved | winner R lost |
+|---|---|---|---|---|---|---|---|
+| 0 | 42.6% | 0.1511 | 1654.7 | -78.0 (-48.5%) | 66.9% | 566.1 | 28.8% |
+| -2 | 21.1% | 0.1707 | 1869.6 | -112.3 (-25.9%) | 43.2% | 311.1 | 12.8% |
+| -4 | 8.2% | 0.1793 | 1964.0 | -132.5 (-12.6%) | 21.2% | 119.6 | 4.3% |
+
+Frontier at D=5:
+| theta | %flagged | meanR | totalR | DD | deep loser removal | deep R saved | winner R lost |
+|---|---|---|---|---|---|---|---|
+| 0 | 43.0% | 0.1629 | 1784.5 | -101.5 (-33.0%) | 73.2% | 499.0 | 22.0% |
+| -1 | 34.7% | 0.1690 | 1850.5 | -117.2 (-22.6%) | 66.1% | 419.2 | 16.5% |
+| -2 | 26.7% | 0.1739 | 1904.4 | -131.6 (-13.2%) | 57.8% | 334.6 | 11.5% |
+| -4 | 14.7% | 0.1798 | 1969.0 | -138.7 (-8.5%) | 41.1% | 196.7 | 5.2% |
+
+(D=3, D=4 rows follow the same shape, interpolating between D=2 and D=5 — full 9-theta-point tables for all four D values in the raw analysis output, not reproduced here in full.)
+
+**The frontier's real shape, and the trap critic explicitly warned against**: at the aggressive end (theta near 0, D=2), DD improves dramatically (-48.5%) and deep-loser removal is high (66.9%) — but **total R is NET WORSE, not just relatively diluted** (2025.9 -> 1654.7, an absolute loss of 371.2R) — the winners cut short cost more in aggregate than the deep-loss pain saved. This is real "stop optimization" territory, exactly what critic said not to chase blindly. Moving toward the conservative end (theta=-4, D=5) keeps total R roughly flat (1969.0 vs 2025.9, -2.8%) while still capturing a real, useful DD improvement (-8.5%) and removing 41% of deep losers for only 5.2% winner R lost — closer to a genuine "free" improvement, but the DD relief is far more modest than the dramatic-looking aggressive end.
+
+**No point on this frontier is a pure win on every axis simultaneously** — every meaningful DD reduction requires giving up real total-R, in a roughly monotonic tradeoff (not the "frontier bend" critic hoped might exist, where a large DD gain could be had for a disproportionately small R cost). The honest reading, per critic's own stated stopping rule ("if every meaningful DD reduction requires giving up roughly equivalent or greater R, the information isn't available early enough, stop digging"): there IS a real, usable middle zone (roughly theta=-1 to -2 at D=4-5: 12-17% winner R cost for 13-23% DD relief and 55-66% deep-loser removal) that is not disqualifying, but there is no free lunch anywhere on this frontier — the choice is a genuine risk-tolerance tradeoff, not a discovered inefficiency.
+
+**Not yet promoted.** Sent to critic and the user together for the actual policy decision — this is now a preference question (how much total expectancy is worth trading for a shallower, shorter drawdown experience), not a further research question.
+
+## Real-trade spot check — entry-mechanics composite8 does NOT confirm on the user's actual 2026-09 trades (n=7 usable, anecdotal only)
+
+Per user's direct request ("find some trends in the real trades too") and their stated willingness to accept the Loser Autopsy composite8 filter's tradeoff (~24% loser removal / ~13% winner cost, K=20%) as a practical screen ("we can take those shots"). Matched each real trade_journal.csv entry to its actual real BC v2 breach-day trigger (via `primed_engine.detect_primed_entry`, not the user's own later discretionary/pullback entry day — most real trades this month are "pulled_back" tier, entered days after the actual model trigger), computed the same 7 entry-mechanics features + composite score, and located each on the SAME population percentile scale as the backtest (n=10,883).
+
+| Ticker | Real outcome | Composite percentile (population) | Would K=20-25% have flagged it? |
+|---|---|---|---|
+| OIL | WIN (+41.5%) | 4.8th percentile (very weak-looking) | YES — would have cut a real winner |
+| GLAND | WIN (+2.53%) | 14.9th percentile (weak-looking) | YES — would have cut a real winner |
+| LAURUSLABS | loss | 28.5th percentile | borderline, close to the cutoff |
+| MOTILALOFS | loss | 46.2nd percentile (near median) | NO |
+| MAXHEALTH | WIN (+3.95%) | 47.2nd percentile (near median) | NO |
+| DIVISLAB | loss | 56.3rd percentile (above median) | NO |
+| IFCI | loss | 97.8th percentile (very strong-looking) | NO — missed a real loser entirely |
+| VIJAYA | loss | no matching real breach trigger found near the noted date — likely not a canonical BC v2 signal at all (real entry was a later discretionary/pullback trade); excluded |
+
+**Honest read, not spun positive:** in this tiny (n=7), heavily loss-skewed, anecdotal sample, the composite does NOT show the hoped-for pattern. Two of the three real winners (OIL, GLAND) score in the weakest 5-15% of the population and would have been cut by the exact filter the user is willing to accept; the single strongest-looking real loser (IFCI, 97.8th percentile, huge volume expansion and follow-through) would have sailed through untouched. Only LAURUSLABS lands roughly where expected. This is consistent with — not a contradiction of — the backtest's own finding that this composite's effect size is weak (Cohen's d~0.27): at n=7, a weak true effect is expected to look like noise, and this sample does.
+
+**Disposition: do NOT yet treat composite8 as a practical live screening decision, despite the user's stated willingness to accept its backtest-measured cost.** The backtest signal is real but weak, and the one real-world spot check available does not corroborate it — recommend continuing to refine (per the user's own "keep trying to find out how to cut only losers" instruction) rather than deploying this specific composite now. n=7 is far too small to be decisive either way; this is a caution flag, not a retraction of the backtest finding.
+
+## R2_TIGHT_AND_MOM_WEAK revival on BC v2 (2026-09-26) — does NOT replicate; clean negative, with a clear mechanism
+
+Per user's direct real-world observation (RBLBANK touching R2, MAXHEALTH touching R1, both rejected intraday, 2026-09-23/25 live sessions) — the original RQ-P1 arc's final surviving candidate (R2-tight proximity AND weak momentum together = catastrophic, n=100/7,793 in the now-retired Cell C population) was tested for the first time on the CURRENT production population, BC v2 (n=10,883). Explicit safeguards, all confirmed before running: reused the existing canonical dataset (no rebuild, no position-blocking risk); distance-to-pivot anchored to the TRIGGER PRICE (prior-day-known), never the entry day's Close (the exact bug that caused the original arc's big retraction); R1/R2 kept strictly separate; outcome = the real, already-validated r_multiple (never a proxy); "weak momentum" defined as the bottom decile of momentum_20d WITHIN the already-gated BC v2 population (not the old freshness_score composite that caused Rule #14's retraction).
+
+**Overlap check (run first, per plan) — no redundancy with existing filters.** Momentum-weak-decile trades are NOT concentrated in Fragility's "Watch" label (43.3% Robust vs population's 33.3% Robust — if anything a mild inverse relationship); R2-tight trades match the population's Fragility mix almost exactly (34.6%/65.4% vs 33.3%/66.7%). Both candidate conditions are independent of what BC v2 already filters on.
+
+**The 2x2 decomposition, capacity-constrained R/trade + drawdown at slots=5/10/20/50:**
+
+| Cell | n | win% | median | slots=5 R/trade | slots=10 R/trade | slots=20 R/trade | slots=50 R/trade |
+|---|---|---|---|---|---|---|---|
+| NEITHER | 9,001 | 57.7% | +1.561% | 0.1300 | 0.1575 | 0.1808 | 0.1923 |
+| R2_TIGHT_ONLY | 793 | 57.6% | +1.118% | 0.1946 | 0.1607 | 0.1501 | 0.1549 |
+| MOM_WEAK_ONLY | 978 | 55.0% | +1.111% | 0.0810 | 0.1125 | 0.1347 | 0.1429 |
+| **BOTH** | **111** | **60.4%** | **+1.552%** | **0.1499** | **0.1693** | **0.1693** | **0.1693** |
+
+**Does NOT replicate — cleanly, not marginally.** In Cell C, BOTH was catastrophic (R/trade -0.0702, negative cumR). In BC v2, BOTH is the HIGHEST win-rate cell of the four (60.4%) and has positive, healthy R/trade at every slot count (0.15-0.17) — no drawdown blowup either (maxDD -4.26R at every slot count, the smallest of any cell, though n=111 means capacity rarely binds). R2-tight-alone and momentum-weak-alone are each mild, unremarkable cells, same as the original Cell C read (friction, not poison) — consistent with that part of the earlier finding.
+
+**Mechanism, not just "the data says no"**: BC v2's own entry gate already requires `momentum_20d >= MOMENTUM_20D_MIN` (1.05x) and excludes Fragility's "Precise" label entirely — two screens that did not exist in Cell C's looser O'Neil-entry population. The R2_TIGHT_AND_MOM_WEAK mechanism needed a population that still contained genuinely weak setups for the resistance-overhead condition to interact with; BC v2's Momentum gate has already removed most of that toxic subset before this analysis even starts. The "bottom decile of momentum within an already-momentum-filtered population" is a qualitatively different, much less fragile group than Cell C's bottom decile drawn from an unfiltered population.
+
+**Real-world connection**: MAXHEALTH itself (the user's own live example, touched R1 and rejected intraday 2026-09-23) went on to close as a real +3.95% win (trade_journal.csv, exited 2026-09-25) — a small, concrete, real-world data point consistent with this session's finding that touching-and-rejecting-at-resistance intraday does not doom a BC v2 trade the way it did in the retired Cell C population.
+
+**Disposition: CLOSED, negative, for BC v2 specifically.** The underlying live observation (resistance causes a real, visible touch-and-reject) is real and worth continued situational awareness, but the R2_TIGHT_AND_MOM_WEAK filter mechanism from the Cell C research does not transfer to the current production entry population — do not re-test this exact composite on BC v2 again without a materially different formulation (e.g., a fresh momentum-weak definition not conditioned on "within the gated population," or testing against BC v2's Fragility dimension instead of Momentum, since Fragility is closer in spirit to "how precise/fragile is this setup").
+
+## R2_TIGHT x Extension_days on BC v2 (2026-09-26) — user's corrected hypothesis also does not replicate; extension_days validated against real outcomes for the first time ever
+
+Per user's direct correction of the MAXHEALTH example (entered 2 days before the real R1 touch-and-reject; exited discretionarily AT the rejection; the win came from 2 days of prior cushion, not from the resistance being harmless) — retested R2-tight proximity interacting with `extension_days` (reused EXACTLY from `live_checkpoint.py`'s own existing definition: `already_extended = Close > high10_prior`, consecutive prior days counted backward from entry, 0 = fresh day-1 — this feature has been computed live since 2026-09-07 but, per that code's own comment, "there is NO validated evidence either way on entering day 2/3/4+ of an already-running move" — never tested against real outcomes until now).
+
+**extension_days distribution on the full BC v2 population (n=10,883)**: 0 (fresh day-1) = 81.1% (8,829), 1 = 14.1% (1,533), 2 = 3.5% (381), 3 = 0.9% (98), 4+ = 0.4% (42). Extension beyond day-1 is real and not rare (~18.9% extension_days>=1), broadly consistent with the project's prior general finding elsewhere (79-84% fresh-day-1).
+
+**2x2 (R2-tight x Extended), capacity-constrained R/trade at slots=5/10/20/50:**
+
+| Cell | n | win% | median | R/trade @5 | @10 | @20 | @50 |
+|---|---|---|---|---|---|---|---|
+| NEITHER | 7,982 | 57.1% | +1.459% | 0.2498 | 0.1729 | 0.1713 | 0.1780 |
+| R2_TIGHT_FRESH | 847 | 57.3% | +1.100% | 0.1987 | 0.1623 | 0.1486 | 0.1507 |
+| EXTENDED_ONLY | 1,997 | 58.9% | +1.806% | 0.1930 | 0.1754 | 0.1877 | 0.1917 |
+| **R2_TIGHT_EXTENDED** | **57** | **68.4%** | **+2.100%** | **0.2445 (all slot counts, thin)** | | | |
+
+Within R2_TIGHT_EXTENDED, the extension_days>=2 sub-slice (n=23, matching the user's own account "extended by one or two days") is even stronger: win 73.9%, median +2.10%, meanR 0.2714.
+
+**Direction is the OPPOSITE of the feared hypothesis, not neutral.** R2_TIGHT_EXTENDED is the best-performing cell of the four, not the worst. Honest caveats before over-reading this: n=57 is thin, top-3-trades concentration is 39.9% of total R (real but plausible individual outcomes — e.g. EICHERMOT +18.2%, KFINTECH +22.0% — not data errors; 47 of 57 trades are distinct tickers, no single-name dominance), and exits are overwhelmingly `max_hold_cap` (48/57) rather than stops (6/57) — these are NOT trades getting crushed at resistance, they're mostly running the full holding period profitably.
+
+**Reconciling with the user's real MAXHEALTH experience, not dismissing it**: this project already established (Entry Confirmation/Breach Acceptance Audit, 2026-09-24) that same-day intraday resistance touch-and-reject dynamics are essentially unpredictable from any prior-day-known feature — the confirmed/rejected split "appears driven by same-day, intraday dynamics that don't show up in the prior day's state at all." `extension_days` and `dist_pct` are both prior-day/entry-day EOD features; they cannot see the SAME kind of live, intraday touch-and-reject moment the user watched happen in real time. The population-level result here says: entries that are already a couple of days into an extended move, sitting close to R2, do not on average go on to develop into bad multi-day trades — but this doesn't contradict a real, live, same-day whipsaw being uncomfortable to sit through in the moment (an already-known, separately-documented phenomenon: same-day rejection is real and visible but doesn't predict the eventual multi-day outcome).
+
+**Disposition: CLOSED, negative (does not support the extension-makes-resistance-dangerous hypothesis), with an honest small-n caveat.** `extension_days` is now, for the first time, validated (not just flagged) against real BC v2 outcomes — and shows no evidence of danger, if anything a positive tilt, though n=57 for the specific intersection is too thin to promote as a standalone positive filter either. Not chasing this further without a much larger sample (more history, or relaxing to a broader "any overhead pivot" definition) — logged as closed per Research Integrity Rule #17 (negative findings are first-class).
+
+## R2-tight on the RAW (ungated) trigger population (2026-09-26) — modest, noisy confirmation, not dramatic unmasking
+
+Per user's direct theoretical challenge ("I don't think this will survive [on BC v2's gated population specifically because] there is already something else filtering it out... a resistance has to push back unless it breaches, then it becomes support itself... if it's very near 0.25 it fails but if it's between 0.5 to 1 it actually runs good") — rebuilt the population WITHOUT the `base_filters_pass` gate (raw trigger = any real `High >= high10_prior*TRIGGER_CLEARANCE` touch, regardless of trend/EMA34/Momentum/Fragility), explicitly labeled a **trigger-price counterfactual** (per this project's own 2026-09-24 Phase 2 guardrail — hypothetical single-position-per-ticker trades using the real exit mechanics, not a claim about executable real trades). Full universe/history, n=21,279 raw triggers (vs BC v2's gated 10,883 — confirms `base_filters_pass` roughly halves the population, and only 34% of raw triggers would have passed it at all). Distance-to-pivot still trigger-anchored (not Close-anchored). R1/R2 kept separate.
+
+**R2-nearest, RAW population (no gate), by distance bucket:**
+
+| Bucket | n | win% | median | meanR |
+|---|---|---|---|---|
+| 0-0.25% | 1,783 | 50.1% | +0.010% | 0.054 |
+| 0.25-0.5% | 1,818 | 51.9% | +0.382% | 0.077 |
+| 0.5-1% | 2,842 | 51.8% | +0.329% | 0.084 |
+| 1-2% | 1,651 | 50.6% | +0.119% | 0.053 |
+| 2-3% | 227 | 44.5% | -1.500% | 0.031 |
+| 3%+ | 60 | 53.3% | +1.853% | 0.131 |
+| NoPivot | 9,342 | 48.6% | -0.343% | 0.039 |
+
+**Split by whether base_filters_pass would have passed (does R2 bite harder in the subset the gate correctly excludes?):**
+
+| Bucket | FAILS gate: win / median / meanR | PASSES gate: win / median / meanR |
+|---|---|---|
+| 0-0.25% | 48.0% / -0.351% / 0.019 | 54.8% / +0.700% / 0.134 |
+| 0.25-0.5% | 48.4% / -0.369% / 0.034 | 58.3% / +1.621% / 0.158 |
+| 0.5-1% | 50.0% / -0.033% / 0.048 | 55.1% / +0.864% / 0.152 |
+| 1-2% | 49.0% / -0.332% / 0.016 | 53.2% / +0.732% / 0.117 |
+| 2-3% | 47.5% / -0.796% / 0.070 | 39.5% / -1.518% / -0.033 (n=86, thin) |
+
+**Reading, honest, not oversold:** the raw population does show a real, directionally-consistent, but MODEST and noisy version of the user's hypothesized shape — the tightest bucket (0-0.25%) is the weakest of the main range (flat/breakeven median, not negative), 0.25-1% is the local strength zone, and there's a hint of a second weak spot at 2-3% (echoing the earlier, since-retracted "two danger zones" finding, but this time on trigger-anchored — not Close-anchored — data, so not subject to that exact bug; still, n=227/141/86 in that bucket is thin enough to flag rather than trust). **This is NOT a dramatic unmasking** — removing the gate does not resurrect a strong, clean "tight R2 = doomed" signal; it resurfaces a mild tilt that was already faintly visible in the gated population's own R2_TIGHT_FRESH cell (win 57.3%/median +1.100% there vs the raw-population-passing-subset's 54.8%/+0.700% here — broadly consistent, not a different story). The user's specific claim that "it fails" at the tightest bucket is directionally right (weakest bucket) but the magnitude is milder than implied (flat/breakeven, not a real loss) at both the raw-population and gate-passing-subset level.
+
+**Disposition: the theoretical objection was reasonable and worth checking, but does not change the standing conclusion.** `base_filters_pass` is not hiding a strong R2 effect — it's mostly just generally filtering out weaker setups everywhere (FAILS-gate rows are worse across every distance bucket, not specifically worse near R2), consistent with (not contradicting) the earlier finding that R2-proximity is real telemetry/friction, not a standalone poison, in the current production entry mechanism. CLOSED, same disposition as the two prior tests this session (real, modest, not a production gate).
+
+## RQ-P1 revival arc, formally closed (2026-09-26)
+
+Three independent re-tests run this session, each addressing a distinct, reasonable objection before closing: (1) R2-tight x momentum-weak on BC v2 (does the Cell C-era finding replicate on current production? No — clean, opposite-direction result). (2) R2-tight x extension_days on BC v2 (is it specifically dangerous for entries already a few days into a move, per the user's own corrected MAXHEALTH account? No — best-performing cell, though thin at n=57). (3) R2-tight on the raw, ungated trigger population (is BC v2's own gate hiding a real effect? No — the raw population shows the same modest, noisy tilt as the gated one; the gate isn't selectively masking anything near resistance, it's just filtering weak setups everywhere). A fourth check (day-3 vs day-15 progression by distance bucket) confirmed no hidden short-horizon damage being averaged away — whatever tilt exists shows up immediately and stays constant in size through the full hold.
+
+**User's own closing call: close it.** Standing disposition, per Research Integrity Rule #17 (negative findings are first-class): R2/R1 overhead-resistance proximity is real, theoretically well-motivated (external research confirms floor-trader pivots are a live phenomenon traders watch, and same-day rejection is a real, observable event — your own MAXHEALTH/RBLBANK live experience is genuine), but across every formulation tested on the current BC v2 production population (momentum-weak interaction, extension interaction, ungated population, short-vs-long horizon), it never rises above a modest, noisy tilt — never catastrophic, never a clean production gate. Telemetry-worthy (dist_pct/nearest_rung are cheap to keep computing and displaying), not action-worthy. Do not reopen this exact question on BC v2 without either a materially larger population (more history) or a fundamentally different data source (real intraday bars, not daily-bar proxies) — daily OHLC has now been asked this question four separate ways and given the same answer each time.
+
+## Research Integrity Rule #18 (Live-Representative Gate Timing) — adopted 2026-09-26
+
+**The gap, confirmed by direct code read**: `signals.py`'s own comment on `body_atr` states outright that RSI, EMA34-persistence, and Momentum "already use today's own EOD values in base_filters_pass()" — i.e. every field in the current production gate (Trend, EMA34, Momentum, Fragility) is evaluated, in every research/backtest reconstruction this project has ever run, using the TRIGGER DAY's own completed candle. This is not knowable at the real, live intraday IOC-touch moment. Live has two genuinely different paths — `shortlist_primed()` (yesterday's frozen row, zero lookahead) and `shortlist_primed_live()` (today's partial, session-fraction-extrapolated row) — neither of which matches what the backtest measures (the full, final EOD row). This is the same family as the already-known "~7.6% mismatch" from prior project history, but had not been re-flagged before this weekend's BC v2 promotion work was built on top of it.
+
+**Rule #18**: any population built to validate a Primed-Gate / live-IOC production filter must evaluate that filter's gate conditions (trend/momentum/fragility/any future addition) against the PRIOR day's row, not the trigger day's own row — matching `shortlist_primed()`'s real live convention exactly. The intraday trigger-touch condition itself (`High >= high10_prior*TRIGGER_CLEARANCE`) stays checked against the trigger day's real, live-updating High, since that genuinely is observable in real time. Do not conflate "the touch is real-time" with "the gate can also use real-time-completed values" — they are different questions with different honest answers.
+
+**Status**: caught 2026-09-26, not yet re-validated. BC v2's entire promotion package (Momentum, Fragility, Trend) and every research result built on it this weekend (Loser Autopsy, R2/resistance arc, RQ-Trail-1/2) were built on the OLD (trigger-day-row) construction. Queued, highest priority: rebuild the canonical population with the gate evaluated on the prior day's row and re-check whether BC v2's core filters survive.
+
+## Rule #18 re-validation result — BC v2's edge is real but substantially weaker under the honest, live-matching gate (2026-09-26)
+
+Rebuilt the canonical BC v2 population with the entry gate (base_filters_pass) checked on the PRIOR day's row (matching `shortlist_primed()`'s real live convention exactly), touch condition kept on the trigger day's real High. Same 2022-07-04 cutoff applied to both for a fair comparison. Exit mechanics fully unchanged and reused (Exit Engine Integrity Rule respected).
+
+| | OLD (today-row gate, this weekend's validated numbers) | NEW (yesterday-row gate, Rule #18-honest) |
+|---|---|---|
+| n | 10,952 | 9,430 |
+| win% | 57.4% | 53.8% |
+| median | +1.475% | +0.728% |
+| meanR | 0.1850 | **0.0982 (-47%)** |
+| R/trade @slots=5 | 0.0945 | **0.0504 (-47%)** |
+| R/trade @slots=10 | 0.1129 | **0.0383 (-66%)** |
+| R/trade @slots=20 | 0.1649 | **0.0618 (-63%)** |
+| R/trade @slots=50 | 0.1779 | **0.0838 (-53%)** |
+
+**Year-by-year (Rule #16, never pool):**
+
+| Year | OLD meanR | NEW meanR |
+|---|---|---|
+| 2022 | 0.205 | 0.104 |
+| 2023 | 0.382 | 0.268 |
+| 2024 | 0.148 | 0.062 |
+| 2025 | 0.066 | 0.009 |
+| 2026 | 0.068 | **-0.015 (negative)** |
+
+**Reading**: BC v2's edge does not disappear, but it is roughly half of what this weekend reported at every capacity level, and the most recent regime (2025-2026 — the one that matters most for a live-deployment decision) goes from "modestly positive" to "flat-to-negative." Only 30.5% of the new population's trades share the exact same entry_date as the old population's — the gate change substantially reshuffles WHICH candidates get admitted, not just how many.
+
+**Not yet fully resolved — before treating this as final**: (1) has NOT yet been checked for its own new bugs (this is a fresh script, needs the same scrutiny every canonical population got this weekend); (2) capacity-constrained numbers here use the standard FCFS methodology but haven't been cross-checked against a second independent construction; (3) every downstream result built on the OLD population this weekend (Loser Autopsy, RQ-Trail-1/2, the full R2/resistance arc) is now under a cloud for its ABSOLUTE numbers — their RELATIVE comparisons (cohort A vs cohort B within the same population) may still hold directionally, but this needs to be said explicitly, not assumed.
+
+**Disposition: URGENT, not yet closed.** This is the most consequential result of the session — it downgrades confidence in BC v2's promotion package itself, not just a downstream research thread. Reported to the user immediately per this project's own standing practice (major findings go to critic/user before further action, not after building more on top of an unverified number).
+
+## Rule #18 re-validation, BC current vs BC v2 both yesterday-gated (2026-09-26) — the capacity-crossover finding does not survive cleanly
+
+Per direct user correction: "BC current" in this weekend's comparisons is itself a Primed Gate population (pre-BC-v2 recipe: trend + EMA34>=2 + Momentum + RSI[55,90] + liquidity>=100cr), sharing the exact same `detect_primed_entry` architecture as BC v2 — so Rule #18's bug affects BOTH sides of every comparison made this weekend, not just BC v2 standalone. Rebuilt BC current the same way (gate on yesterday's row, touch on today's real High, same exit mechanics), same 2022-07-04 cutoff.
+
+| | BC current (yesterday-gated) | BC v2 (yesterday-gated) |
+|---|---|---|
+| n | 4,821 | 9,430 |
+| win% | 53.1% | 53.8% |
+| meanR (raw) | 0.0599 | 0.0982 |
+| R/trade @slots=5 | 0.0343 | **0.0504 (v2 wins)** |
+| R/trade @slots=10 | **0.0632 (current wins)** | 0.0383 |
+| R/trade @slots=20 | **0.0658 (current wins)** | 0.0618 |
+| R/trade @slots=50 | 0.0692 | **0.0838 (v2 wins)** |
+
+**Year-by-year:**
+
+| Year | BC current meanR | BC v2 meanR |
+|---|---|---|
+| 2022 | 0.041 | **0.104 (v2 wins)** |
+| 2023 | 0.218 | **0.268 (v2 wins)** |
+| 2024 | 0.034 | **0.062 (v2 wins)** |
+| 2025 | **0.012 (current wins)** | 0.009 |
+| 2026 | **-0.005 (current wins, less negative)** | -0.015 |
+
+**Reading, honest**: BC v2 still generates roughly 2x the raw candidate volume (9,430 vs 4,821) and wins in raw aggregate meanR and in every OLDER year (2022-2024). But the clean "BC v2 needs 15+ slots to beat BC current, then wins outright" story from this weekend does NOT survive — the crossover is now non-monotonic (v2 wins at slots=5, loses at 10 and 20, wins again at 50), and in the two most recent years — 2025 and 2026, the regime that actually matters for a live decision right now — BC current is flat-to-marginally-better, both effectively near breakeven-to-negative. BC v2's advantage over BC current, once honestly gated, is concentrated in the older regime, not the current one.
+
+**Disposition: BC v2's promotion over BC current no longer has clean, unambiguous support.** Both populations still show a real, if much smaller, positive edge in aggregate — this is not "the strategy doesn't work" — but the SPECIFIC claim "BC v2 is a strict improvement over BC current" is not supportable at every capacity level or in the current regime. This needs a fresh critic review before any further downstream work treats BC v2 as settled. Not yet resolved.
+
+## Architecture fix adopted: "Production Is The Only Source Of Truth" — `population_builder.py` created (2026-09-26)
+
+Per the user's direct instinct ("I don't think fixing the populations makes sense ever... instead of treating symptoms, let's treat the disease") and critic's agreement/extension: all three of this weekend's integrity bugs (wrong exit engine, position-blocking bias from monkeypatching, same-day EOD gate leakage) share one root cause — research code was allowed to construct populations independently of production logic, via hand-copied simulation loops in scratch scripts. The fix is architectural, not another saved CSV.
+
+**`population_builder.py` created** — the single, canonical `build_population(tickers, load_fn, filter_recipe, breakout_lookback=10, gate_clock="T-1", start_date=None, structural_lookback=None)` function, structurally closing all three bugs rather than just documenting against them:
+- Exit mechanics are unconditionally `primed_engine.py`'s real `_new_state`/`check_primed_exit`/`current_primed_stop_level` — no alternative path exists in this module.
+- `filter_recipe` is a required argument and is always the real position gate inside the simulation loop — no bypass mode. An intentionally ungated population is built by passing `ungated_recipe` through this SAME function (labeled a trigger-price counterfactual), never a monkeypatched copy.
+- `gate_clock` ("T-1" default, or "same-day" for genuine EOD-confirmed-entry recipes) makes Rule #18's fix a required, explicit parameter rather than a silent, easy-to-forget convention.
+- `breakout_lookback` is computed fresh from the raw High series (not the fixed `high10_prior` column), making it genuinely parameterizable — the same function serves BC (10-day) and Cell C (40-day) instead of two independently-evolving code paths.
+
+**Caught its own bug before being trusted**: an initial version defaulted `structural_lookback` to `breakout_lookback` (10) instead of the real, independent production constant `STRUCTURAL_LOOKBACK_BC` (20) — found via a correctness check against the already-established BC v2/BC current numbers (n=9,598/meanR=0.1079 vs the trusted n=9,430/meanR=0.0982 — a real, non-trivial gap). Fixed, re-verified: n=9,444/meanR=0.0982/win%=53.8% (exact match) for BC v2, n=4,825/meanR=0.0600/win%=53.1% (exact match) for BC current. 71/71 tests still pass (no existing file touched, only additive).
+
+**Named recipes provided, reused verbatim from production, not re-derived**: `bc_v2_recipe` (current `base_filters_pass`), `bc_current_recipe` (the retired RSI/liquidity recipe, constants still live in `signals.py`), `ungated_recipe` (explicit always-pass, for counterfactual studies only).
+
+**Standing discipline going forward**: no new hand-rolled simulation loop for Primed-Gate-style research — call `build_population()`. Full checklist added to `CLAUDE.md` (auto-loaded every session) as a mandatory pre-flight per RQ, per critic's specification.
+
+## BC v2 production status — DOWNGRADED (critic + user, 2026-09-26)
+
+**Was**: Promoted to Production.
+**Now**: **Candidate — Revalidated Architecture.** The recipe survives (EMA34, Momentum, Fragility, Volume Quality correctly dropped) — that part of the promotion logic is still coherent. The EVIDENCE PACKAGE does not survive: "strict improvement over BC current," "15-slot capacity crossover," and "production upgrade" were all evidence claims built on the Rule #18-contaminated population, and none of them hold cleanly under the corrected (yesterday-gated) rebuild — see "Rule #18 re-validation, BC current vs BC v2 both yesterday-gated" above. Re-promotion requires a fresh audit built entirely through `population_builder.py`, not a continuation of this weekend's numbers.
+
+**Non-monotonic capacity result (BC v2 wins at slots=5/50, loses at 10/20) — NOT yet interpreted economically.** Per critic's explicit caution: suspect portfolio composition (burst clustering) before strategy quality; treat as requiring a Population Composition Audit (Rule #12) before drawing any strategic conclusion from that specific shape.
+
+**Triage order adopted for the remaining downstream work** (critic-specified): (1) this architecture fix — done; (2) re-audit Momentum/Fragility/EMA34/Volume Quality on the corrected, builder-generated population — not yet done, next priority; (3) only if the recipe changes as a result, rerun RQ-Trail-1/2 and the Loser Autopsy; (4) leave Cell C untouched until BC is re-frozen. The R2/resistance revival arc's conclusions are directionally likely to survive (they were relative, cohort-vs-cohort comparisons within one population) but this has not been verified, only assumed as a risk — stated explicitly, not silently relied on.
+
+## Marginal filter re-audit under Rule #18 (2026-09-26) — Momentum and Fragility lose their validation; Volume Quality's reversal reconfirmed
+
+First run of the EMA34/Momentum/Fragility/Volume-Quality marginal audits through the canonical `population_builder.py` (gate_clock="T-1", filter_recipe = the other 3 conditions actually enforced as the real position gate, tested condition captured as pure telemetry — Gate Integrity Rule respected). Same methodology this weekend already established (real gate, no bypass), now for the first time run honestly gate-timed.
+
+| Filter | n kept / removed | KEPT meanR | REMOVED meanR | Verdict |
+|---|---|---|---|---|
+| EMA34 | 9,431 / 19 | 0.0984 | 0.0513 | Still too thin to trust either way (unchanged from before) |
+| **Momentum** | 6,424 / 6,382 | 0.1047 | 0.0971 | **No real discrimination — nearly identical, removed even wins at slots=10/20** |
+| **Fragility** | 8,601 / 1,261 | 0.0986 | **0.1075** | **REVERSES — removed cohort does BETTER, not worse** |
+| Volume Quality | 6,997 / 2,447 | 0.0961 | 0.1042 | Reversal reconfirmed (already known from the pre-Rule-18 audit) |
+
+Capacity-constrained detail — Momentum: slots=10 KEPT R/trade=0.0390 vs REMOVED=0.0498 (removed wins); slots=20 KEPT=0.0801 vs REMOVED=0.0993 (removed wins). Fragility: slots=10 KEPT=0.0614 vs REMOVED=0.0562 (close); slots=20 KEPT=0.0840 vs REMOVED=0.0869 (removed wins).
+
+**Reading, stated plainly**: under the same-day-gated (pre-Rule-18) construction this weekend, Momentum was found to be "the strongest survivor" (removed cohort "genuinely toxic") and Fragility "cleared every promotion bar." Under the honest T-1-gated construction, NEITHER holds up — Momentum shows no real discrimination, and Fragility actively reverses. Combined with Volume Quality's already-known reversal, **three of BC v2's four filter conditions show no benefit or a reversal once the same-day lookahead is removed.** Only trend (untested here, foundational) and EMA34 (too thin to call) remain unexamined or unresolved. This strongly suggests the apparent validity of Momentum and Fragility this weekend was substantially an artifact of the same-day EOD information the old construction was secretly using — a stock whose day ends with strong momentum/low fragility is mechanically likely to be a stock that also did well later that same session, which is a different, weaker, and largely spurious relationship once the gate is moved to genuinely prior-day-known information.
+
+**Population-size note, not a new bug**: each audit's "gated population" size differs (9,450 / 12,806 / 9,862 / 9,444) because loosening the gate to 3-of-4 conditions changes which triggers get admitted and which ticker-position slots they consume — a real, expected interaction of single-position-per-ticker blocking with a genuinely different (looser) gate, not the position-blocking BUG from earlier this weekend (that bug was comparing a bypassed population's count against a properly-gated one; this is the same real-gate/side-telemetry methodology already established and approved this weekend, just correctly gate-timed now).
+
+**BC v2 status, further downgraded**: from "Candidate — Revalidated Architecture" to **"Recipe Under Serious Doubt."** It is no longer just the evidence package that's in question — two of the four filter conditions themselves (Momentum, Fragility) do not currently have any real, honestly-gated evidence supporting them, and a third (Volume Quality) was already known to reverse. Sending this to critic before any further work — this may mean BC v2's actual production recipe needs to shrink back toward just Trend + EMA34 (both still unresolved either way, not yet re-confirmed positively either) until a real, honestly-gated positive filter is found.
+
+## BC current's own filters (RSI, Liquidity) re-audited under Rule #18 (2026-09-26) — same pattern, not isolated to BC v2
+
+Per user's direct follow-up question: if BC v2's filters were inflated by the same-day lookahead, was BC current's own original RSI-band/liquidity-floor validation (from earlier in this project's history) affected the same way? Same methodology, same builder, gate = trend+EMA34+Momentum (BC current's other conditions), tested condition as pure telemetry.
+
+| Filter | n kept / removed | KEPT meanR | REMOVED meanR | slots=10 KEPT/REMOVED | slots=20 KEPT/REMOVED |
+|---|---|---|---|---|---|
+| RSI band | 9,495 / 367 | 0.1001 | 0.0896 | 0.0634 / **0.0855 (removed wins)** | 0.0730 / **0.0896 (removed wins)** |
+| Liquidity floor | 4,421 / 5,441 | 0.0652 | **0.1278** | 0.0721 / **0.0791 (removed wins)** | 0.0596 / **0.1009 (removed wins)** |
+
+Liquidity's reversal here is not a new surprise — it reconfirms (from a completely different angle: gate-clock honesty rather than the original real-exit-engine audit) the already-known, already-documented reason it was retired from `base_filters_pass()` ("liquidity's removed cohort consistently performs as well or better than its kept cohort, never a real quality signal"). RSI is a new confirmation from this specific angle — raw meanR barely favors keeping it, but at every capacity-constrained level tested, the removed cohort wins, consistent with (not new relative to) its already-documented regime-instability ("RSI is regime-conditional, reverses direction between 2023 and 2024-26").
+
+**Full picture across every marginal condition this project has tested, now re-run (or reconfirmed) honestly gate-timed:**
+
+| Condition | Recipe | Honest-gate verdict |
+|---|---|---|
+| Trend (Close>ema34, ema8>ema34) | both | Untested standalone — foundational, never marginally audited |
+| EMA34 persistence | both | Too thin (n=19 removed) — unresolved |
+| Momentum | BC v2 | No real discrimination, reverses at slots=10/20 |
+| Fragility | BC v2 | Reverses |
+| Volume Quality | BC v2 | Reverses (already known) |
+| RSI band | BC current | Reverses at slots=10/20 despite a slight raw meanR edge |
+| Liquidity floor | BC current | Reverses clearly (already known) |
+
+**Reading, the single biggest finding of the weekend**: essentially every condition this project has ever added on top of Trend + EMA34 — across both the original BC-current recipe and this weekend's BC v2 recipe — shows no real benefit or actively reverses once evaluated with an honest, T-1-gated entry decision. This suggests Trend + EMA34 alone may represent close to the actual, real edge this strategy has ever had, and every subsequent "improvement" filter (RSI, Liquidity, Momentum, Fragility, Volume Quality) was substantially chasing same-day-lookahead noise, not a real signal — a single root cause (Rule #18) explaining a pattern that spanned months of separate research threads.
+
+**Next, obvious step, not yet run**: re-test Trend + EMA34 ALONE (no additional filter at all) under the honest T-1 gate, to establish what the real, unembellished baseline edge actually is before deciding what (if anything) to add back.
+
+## Trend + EMA34 alone, the real baseline, honest T-1 gate (2026-09-26)
+
+No RSI, no liquidity, no Momentum, no Fragility, no Volume Quality — just `Close>ema34 and ema8>ema34` plus `ema34_rising10>=2`, via `population_builder.build_population()`, gate_clock="T-1", same 2022-07-04 cutoff.
+
+**n=13,182 (more candidates than either recipe with extra filters — consistent with the extra filters mostly cutting volume, not adding quality).**
+
+| Metric | Trend+EMA34 alone | BC v2 (4-filter, T-1) | BC current (5-filter, T-1) |
+|---|---|---|---|
+| n | 13,182 | 9,430 | 4,821 |
+| win% | 53.3% | 53.8% | 53.1% |
+| meanR | **0.1021** | 0.0982 | 0.0599 |
+| R/trade @slots=5 | 0.0319 | 0.0504 | 0.0343 |
+| R/trade @slots=10 | 0.0543 | 0.0383 | 0.0632 |
+| R/trade @slots=20 | 0.0705 | 0.0618 | 0.0658 |
+| R/trade @slots=50 | 0.0886 | 0.0838 | 0.0692 |
+
+**Year-by-year:**
+
+| Year | Trend+EMA34 alone | BC v2 | BC current |
+|---|---|---|---|
+| 2022 | 0.109 | 0.104 | 0.041 |
+| 2023 | 0.298 | 0.268 | 0.218 |
+| 2024 | 0.046 | 0.062 | 0.034 |
+| 2025 | -0.009 | 0.009 | 0.012 |
+| 2026 | 0.010 | -0.015 | -0.005 |
+
+**Reading**: the bare two-condition recipe (trend + EMA34 persistence) captures essentially the SAME aggregate edge as BC v2's four-condition recipe — meanR is actually marginally HIGHER (0.1021 vs 0.0982) with a larger candidate pool, at the cost of noisier capacity-constrained numbers (no consistent winner across slots 5/10/20/50 for any of the three recipes — this itself needs the Population Composition Audit critic already flagged, not yet done). In the current regime (2025-2026), all three recipes are effectively flat, hovering within a point or two of zero either side — none of this project's "improvement" filters, including this weekend's BC v2 recipe, currently shows a real, honestly-gated edge over the bare trend/EMA34 baseline.
+
+**Disposition, current honest state of the whole project**: no filter added on top of Trend + EMA34 across this project's entire history currently has honestly-gated, positive evidence behind it. The strategy's real core (Trend + EMA34, an intraday touch of a 10-day high) still shows a real, positive aggregate edge (meanR ~0.10, roughly matching what BC v2 showed) but that edge is thin and close to flat in the current regime, and every attempt to sharpen it with an additional filter has, so far, either added nothing or actively hurt once evaluated without the same-day lookahead. Sent to critic for review before any further promotion decision.
+
+## RQ-94 — Primed vs Confirmed Entry Cost, complete (2026-09-26, critic-specified)
+
+Same trigger, same T-1-gated filters (BC v2 recipe), same real exit mechanics (`primed_engine`'s `_new_state`/`check_primed_exit`, unchanged) — only entry timing/price varies. Reused the already-built, verified T-1-gated BC v2 population (n=9,430) as the base event set; for each, classified Confirmed (Close held above trigger at EOD) vs Rejected, and for Confirmed events built a parallel hypothetical trade entered at the next day's open instead, same exit engine, re-anchored to that entry.
+
+**Population split**: Confirmed 4,197 (44.5%), Rejected 5,233 (55.5%) — a majority of real, gated intraday triggers never hold into the close at all.
+
+**Family B (Rejected, n=5,233) — the "fake breakout" population Confirmed structurally avoids**: Primed win%=46.6%, meanR=**-0.0111** (a real, if modest, net drag — Primed is worse than breakeven here, exactly the population Confirmed is designed to sidestep).
+
+**Family A (Confirmed subset, n=4,194) — same events, Primed-entry vs Confirmed-entry, paired**:
+| | win% | meanR |
+|---|---|---|
+| Primed (entered at touch) | 62.7% | **0.2347** |
+| Confirmed (entered next-day open) | 52.9% | 0.0774 |
+| Paired difference (Primed − Confirmed) | — | **+0.1573** |
+
+Primed beats Confirmed on the identical underlying event 74.3% of the time. This is the "price of confirmation," now measured directly rather than assumed: on trades that do go on to confirm, waiting for that confirmation costs roughly 0.157R per trade on average.
+
+**Gap-cost distribution (Confirmed subset), all vs eventual PRIMED winners specifically**:
+| Gap bucket | All confirmed | Primed winners only |
+|---|---|---|
+| <0% | 5.6% | 4.2% |
+| 0-1% | 26.8% | 23.7% |
+| 1-2% | 26.1% | 24.4% |
+| 2-3% | 15.4% | 16.7% |
+| >3% | 26.1% | **31.0%** |
+
+**Nearly half (47.7%) of eventual Primed winners gap 2%+ before a Confirmed entry could even act, and 31% gap more than 3%.** This is the direct, quantified answer to the "you miss the gap" cost the user flagged — it is enormous, not marginal, confirming the intuition rather than just assuming it.
+
+**Net aggregate (unpaired, each on its own full population)**: Primed on ALL gated triggers (n=9,430, includes the Rejected drag): meanR=0.0982. Confirmed on its own Confirmed-only subset (n=4,194): meanR=0.0774. Primed still wins in aggregate — Family A's large advantage (+0.1573 paired) more than compensates for Family B's modest drag (-0.0111 on 55.5% of the raw population).
+
+**Regime split (Rule #16):**
+| Regime | Primed meanR (all) | Confirmed meanR (Confirmed-only) | Rejected rate |
+|---|---|---|---|
+| 2022-2024 | **0.1530** | 0.1181 | 55.6% |
+| 2025-2026 | -0.0017 | **0.0035** | 55.4% |
+
+**Historically, Primed clearly wins** (0.1530 vs 0.1181), driven by Family A's large gap-avoidance advantage. **In the current regime (2025-2026), the edge has compressed to near-zero for both, and Confirmed is marginally ahead** (though the gap is negligible — both are effectively flat). Rejected rate is stable across regimes (~55.5% either way) — the shift is in what happens to the Confirmed subset's magnitude, not in confirmation odds themselves.
+
+**Disposition: this is the cleanest, most decisive result of the weekend.** Per critic's own framing: this does NOT disprove Primed Gate as an architecture — it quantifies, for the first time with real numbers rather than intuition, exactly why it was built (Family A's gap-avoidance advantage is real, large, and historically dominant) and exactly its cost (Family B's modest drag from unconfirmed fakeouts). The current-regime compression (2025-2026 near-zero for both) is a separate, still-open question from the entry-timing question RQ-94 was designed to isolate — it affects both architectures roughly equally, so it is not an argument for switching to Confirmed, but it does mean neither currently has a strong edge to lean on.
+
+## New standing reporting convention adopted: Meaningful Win Rate (>=0.25R), Payoff Ratio, and win-rate demoted from promotion metric (2026-09-26)
+
+Per the user's explicit concern (don't want a ₹500-on-₹2000-risk trade to look like a ₹1-on-₹2000-risk trade in the win-rate number) and critic's response: do NOT replace the canonical `r_multiple>0` win rate -- report a stack of thresholds instead, so nothing gets hidden.
+
+**Frozen definitions, going forward, for every future report in this project**:
+- **Gross win rate**: `r_multiple > 0` -- canonical, statistical, kept for comparability with all prior research.
+- **Meaningful Win Rate**: `r_multiple >= 0.25` -- the user's own stated bar (₹500 profit against ₹2,000 risk = 0.25R), now the **headline practical win-rate number** for judging whether a strategy is actually working, not just "not losing."
+- **Quality win**: `r_multiple >= 0.5` -- roughly "paid for one average losing trade" (average realized loser across every cohort tested today sits consistently around -0.45R to -0.55R).
+- **Full-R win**: `r_multiple >= 1.0`.
+- **Payoff Ratio** = average winner R / |average loser R| -- a single number describing the win/loss size asymmetry, reported alongside every win-rate stack.
+
+**Explicit rejection, per critic, of a fixed reward:risk framing (e.g. "1:2" or "1:3")** for this project: BC's exit engine is a trailing, evolving-target, distribution-following mechanism (some exits at 0.4R, some at 5R), not a fixed-target setup -- a fixed R:R ratio concept from discretionary trading doesn't map onto it. Evaluate the realized R distribution directly instead.
+
+**Promotion metric demoted, win rate now context-only**: expectancy (meanR / Payoff Ratio) first, portfolio pain (capacity-constrained drawdown/worst streak) second, win rate reported for interpretability only, never as the primary decision metric — consistent with (not a new departure from) how every real promotion decision this project has made was already reasoned about.
+
+**First application of the new convention -- the three current honest-gated (T-1) recipes, full stack:**
+
+| Population | Regime | n | >0R | >=0.25R | >=0.5R | >=1.0R | avgWin | avgLoss | Payoff |
+|---|---|---|---|---|---|---|---|---|---|
+| BC v2 | ALL | 9,430 | 53.8% | 36.9% | 23.4% | 9.1% | 0.585 | -0.468 | 1.25 |
+| BC v2 | 2022-24 | 6,086 | 56.7% | 39.5% | 26.0% | 10.3% | 0.620 | -0.460 | 1.35 |
+| BC v2 | 2025-26 | 3,344 | 48.4% | 32.2% | 18.6% | 6.8% | 0.509 | -0.481 | 1.06 |
+| BC current | ALL | 4,821 | 53.1% | 34.7% | 20.0% | 6.8% | 0.513 | -0.453 | 1.13 |
+| BC current | 2022-24 | 2,840 | 55.5% | 37.1% | 22.1% | 7.6% | 0.541 | -0.453 | 1.19 |
+| BC current | 2025-26 | 1,981 | 49.6% | 31.3% | 16.9% | 5.6% | 0.467 | -0.452 | 1.03 |
+| Trend+EMA34 alone | ALL | 13,182 | 53.3% | 38.5% | 26.5% | 12.2% | 0.680 | -0.557 | 1.22 |
+| Trend+EMA34 alone | 2022-24 | 8,420 | 56.1% | 41.2% | 29.0% | 13.8% | 0.717 | -0.551 | 1.30 |
+| Trend+EMA34 alone | 2025-26 | 4,762 | 48.2% | 33.6% | 22.1% | 9.4% | 0.605 | -0.566 | 1.07 |
+
+**Reading, sobering but not hidden, per the user's own explicit instruction**: the Payoff Ratio is remarkably stable across all three recipes (1.1-1.35) — this genuinely is a "many medium winners" strategy, not a big-winner-carries-it story, confirming critic's read. Meaningful Win Rate (>=0.25R) runs roughly 15-19 points below the gross win rate everywhere. In the current regime (2025-2026), Meaningful Win Rate compresses further (18.6-22.1% across recipes, down from 26-29% in 2022-2024) and Payoff Ratio also compresses toward ~1.0-1.07 (smaller wins relative to losses, not just fewer of them) — the current-regime weakness shows up on both axes, not just win frequency.
+
+## New standing rule: "winner sacrificed" cost accounting must use Meaningful Win (>=0.25R), not gross win (2026-09-26)
+
+Per direct user instruction, a real reframe of how every future filter/trail-cut audit measures cost: **"winner R sacrificed" by a candidate filter must be counted against Meaningful Winners (r_multiple>=0.25R) only, never against the loose r_multiple>0 definition.** Rationale, in the user's own words: a filter that "cuts win rate" may only be cutting trivial, near-zero winners that were never going to survive real STT/brokerage/slippage anyway -- that isn't a real cost, it's noise being correctly removed. The actual question that matters is whether a filter sacrifices trades that would have made the portfolio genuinely greener over time (>=0.25R, the user's own ₹500-on-₹2,000-risk bar), not whether it lowers a gross win-rate number partly built from economically-meaningless outcomes.
+
+**Practical effect on every past filter/trail-cut audit this project has run**: every "winner R sacrificed" percentage reported so far (the Loser Autopsy composite8 sweep, the RQ-Trail-1/2 early-cut frontier, the marginal filter audits) used the loose r_multiple>0 definition for what counts as a winner being cut. None of them have yet been re-evaluated against the Meaningful Win bar. Given those same analyses also sit on the pre-Rule-18 population, correcting both at once (honest T-1 gate + Meaningful Win cost accounting) is the right combined next step before trusting any specific filter's economics -- not a redo of the old numbers with one fix in isolation.
+
+**Adopted going forward**: any future report of "X% of winners sacrificed" or "winner R sacrificed" must specify which win definition it used, and default to Meaningful Win (>=0.25R) unless there's a stated reason to use the gross definition instead.
+
+## Trail-cut combination search, targeting ~60% loser removal (2026-09-26, honest T-1 population + Meaningful-Win cost accounting)
+
+Per direct user instruction ("finding filters which cut 60% is probably much better than tuning for 30%") — systematic search across all four candidate signals (Rule1: single-day no-progress, Rule2: never closed above trigger, Rule3: below EMA8, Rule4: lower-low-before-higher-high) and their OR-combinations, at D=2 through 7, on the honest T-1-gated population, cost measured against Meaningful Winners (>=0.25R) only.
+
+**Key finding: R2|R3 (never-above-trigger OR below-EMA8) is a materially more efficient way to reach ~60% loser removal than the original R2|R4 combo:**
+
+| D | Combo | loser removed | Meaningful winner R lost | DD change | meanR change |
+|---|---|---|---|---|---|
+| 3 | R2\|R3 | 58.8% | **25.6%** | -20.9% (real improvement) | -30.7% |
+| 3 | R2\|R4 (original) | 59.4% | 29.4% | -23.5% | -35.7% |
+| 4 | R2\|R3 | 61.1% | **23.1%** | -11.6% | -30.8% |
+| 6 | R2\|R3 | 67.3% | 20.2% | -11.1% | -29.2% |
+
+At a matched ~59-61% loser-removal rate, R2|R3 costs 4-6 percentage points less Meaningful Winner R than R2|R4, and at D=4 specifically reaches 61.1% removal for only 23.1% cost — the best point found on this search.
+
+**The bigger, more important finding — there is no cheap way to reach 60%.** Across the full sweep, **drawdown only genuinely improves at D=2-3** (real, positive DD relief every combo tested); from D=4 onward, drawdown stops improving and in several cases gets slightly WORSE even while removing MORE losers and costing MORE winner R — cutting later doesn't buy anything extra once you're already past the ~D=3-4 window, it just keeps taxing winners for no additional portfolio-pain benefit. Adding Rule1 or all four signals together pushes loser removal above 70-80%, but at a cost (35-41% of meaningful winner R, -42 to -44% expectancy) that is clearly not worth it on any reasonable reading.
+
+**Disposition**: R2|R3 at D=3-4 is the best-found combination for a ~60% loser-removal target, replacing R2|R4 as the standing candidate (roughly 5pp cheaper at matched removal). Still not free — 23-26% of meaningful winner R given up, -30% expectancy — this remains a genuine risk-tolerance tradeoff, not a discovered inefficiency, exactly as the earlier (pre-search) frontier already established. The floor on "cost per unit of loser removal" does not go away with a smarter combination; it just moves modestly in the user's favor.
+
+## Sector Relative Strength on BC v2/Primed Gate (2026-09-26) — real, consistent reversal of the established VCP finding
+
+First genuinely new pre-entry (T-1, prior-day-known) angle tried this session. Reused the already-built production infrastructure (`sectors.py`/`sector_strength.py`, adopted 2026-09-01 for VCP as a ranking signal only, never tested as a filter, never tested on Primed Gate). `sector_rs(ticker, date)` uses `date`'s own 126-day trailing return internally (confirmed: `relative_strength.py`'s `_universe_returns_for` is same-day-inclusive) — called here with **yesterday's date** (i-1), not the trigger day's own date, to keep this genuinely prior-day-known per Rule #18. Tested on both the T-1-gated BC v2 population (n=9,411 matched) and Trend+EMA34-alone (n=13,154 matched), using the existing Minervini-style `RS_RATING_MIN=70` threshold already in production code (not a newly-mined cutoff).
+
+**Aggregate (RS>=70 = "sector also leading" vs RS<70 = "sector lagging/average"):**
+
+| Population | Group | n | win% | Meaningful Win | meanR | Payoff |
+|---|---|---|---|---|---|---|
+| BC v2 | RS>=70 | 3,260 | 52.9% | 35.3% | 0.0781 | 1.21 |
+| BC v2 | RS<70 | 6,151 | 54.2% | 37.8% | **0.1089** | 1.27 |
+| Trend+EMA34 | RS>=70 | 4,424 | 52.6% | 37.5% | 0.0824 | 1.19 |
+| Trend+EMA34 | RS<70 | 8,730 | 53.6% | 38.9% | **0.1119** | 1.24 |
+
+**Direction is the OPPOSITE of the established VCP finding** (leading-sector VCP trades win 68.1% vs 55-61% in lagging sectors). Here, the stock being strong enough to break out even while its own SECTOR lags actually outperforms the stock breaking out with sector tailwind, in raw aggregate terms, on both populations.
+
+**Year-by-year (Rule #16) — not a single-year artifact, holds consistently:**
+
+| Year | BC v2 HIGH_RS meanR | BC v2 LOW_RS meanR |
+|---|---|---|
+| 2022 | 0.035 | **0.136** |
+| 2023 | 0.251 | **0.279** |
+| 2024 | 0.035 | **0.071** |
+| 2025 | 0.024 | -0.004 |
+| 2026 | -0.052 | **0.006** |
+
+LOW_RS beats HIGH_RS in 4 of 5 years (2025 is the lone, narrow exception, both near-zero). Same pattern holds for Trend+EMA34.
+
+**Capacity-constrained result is inconsistent between the two populations** — BC v2 favors LOW_RS at both slots=10 and slots=20 (matching the aggregate direction), but Trend+EMA34-alone FLIPS at capacity-constrained levels (HIGH_RS wins at slots=10/20: 0.1125/0.1238 vs LOW_RS's 0.0650/0.0647) despite LOW_RS winning in raw aggregate. This divergence is not yet understood — flagged, not resolved (possible burst-clustering/scheduling interaction, matching the exact caution critic raised about the earlier non-monotonic capacity result — needs a proper Population Composition Audit, Rule #12, before reading anything into it).
+
+**Plausible mechanism, stated as a hypothesis not a proven fact**: a stock strong enough to make new highs despite its own sector lagging may reflect genuine idiosyncratic strength/leadership within a weak group, rather than a more "beta"-driven, crowded move riding an already-strong sector-wide rally. This is a different setup than VCP's multi-week base-building pattern, where sector tailwind may matter more for a slower-forming pattern than for a fast, single-day-trigger breakout.
+
+**Disposition: real, consistent, genuinely new finding — NOT a proven proxy result, needs the same confound/decomposition scrutiny as dist_52w_high got before being trusted as anything actionable.** Not promoted. Flagged for critic review, with the explicit open question of the capacity-constrained inconsistency between the two populations.
+
+## Sector-RS Independence Test, complete (2026-09-26, critic-specified decomposition) — the reversal does NOT survive across lookback horizons
+
+Critic's two pre-declared checks, no threshold optimization: (A) does LOW_RS>HIGH_RS hold across alternative sector-RS lookback horizons (21d, 63d, 126d), or only 126d; (B) does sector RS add independent information conditional on the stock's own RS (Minervini `rs_rating`, 126d, already in production).
+
+**(A) — FAILS. The reversal is specific to the 126-day construction, not a general "sector laggard leadership" effect:**
+
+| Lookback | BC v2 HIGH meanR | BC v2 LOW meanR | Trend+EMA34 HIGH meanR | Trend+EMA34 LOW meanR |
+|---|---|---|---|---|
+| 21d | **0.1066** | 0.0936 | **0.1101** | 0.0981 |
+| 63d | **0.1044** | 0.0950 | 0.0987 | **0.1035** |
+| 126d | 0.0781 | **0.1089** | 0.0824 | **0.1119** |
+
+At 21d, HIGH_RS actually WINS (opposite of the original 126d finding, matching VCP's own established direction). At 63d it's essentially a wash, direction inconsistent between the two populations. Only at 126d does the clear, consistent LOW_RS>HIGH_RS reversal appear. Exactly the failure mode critic flagged in advance: "if only 126d reverses and 21/63d don't, that is very different evidence from a robust effect."
+
+**(B) — conditional on stock's own RS (126d), the effect survives WITHIN the stock-leader stratum, but is concentrated there, not general:**
+
+| Stock RS | Sector RS | BC v2 n | BC v2 meanR | Trend+EMA34 n | Trend+EMA34 meanR |
+|---|---|---|---|---|---|
+| stock_HIGH | sector_HIGH | 1,801 | 0.052 | 2,307 | 0.069 |
+| stock_HIGH | sector_LOW | 2,011 | **0.116** | 2,612 | **0.120** |
+| stock_LOW | sector_HIGH | 1,402 | 0.108 | 2,023 | 0.095 |
+| stock_LOW | sector_LOW | 4,015 | 0.106 | 5,933 | 0.109 |
+
+Among stocks that are themselves strong 126-day RS leaders, a lagging sector is a real, roughly 2x advantage over a leading sector (0.116 vs 0.052; 0.120 vs 0.069). Among stocks that are NOT themselves RS leaders, sector RS makes almost no difference (0.108 vs 0.106; 0.095 vs 0.109). Correlation between stock RS and sector RS is modest (0.30-0.30) — not a pure confound, this is a genuine interaction, not sector RS simply proxying for stock RS.
+
+**Combined verdict, per critic's own stopping rule**: the interaction in (B) is real but built entirely on the 126d construction that (A) just showed is NOT robust across lookback horizons. The honest conclusion is not "sector RS adds independent information" (that would require the underlying reversal to survive (A) first) — it is **"there is a real, specific, 126-day-window interaction between stock leadership and sector laggard status, but the 126-day sector-RS reversal itself is fragile and does not generalize across nearby lookback windows."** Most likely explanation, matching critic's own hypothesis: a 126-day (6-month) sector return is probably capturing "is this whole sector already exhausted from a long rally" rather than genuine current sector support for a fresh breakout — a different, staler signal than what a 21-63 day window measures.
+
+**Disposition: descriptive/telemetry only, per critic's own explicit instruction not to gate on this.** Not promoted, not rejected as a curiosity — logged as a specific, narrow, lookback-fragile finding. Do not build a LOW_RS filter. If revisited, the 126d-specific interaction with stock leadership (the strongest, cleanest cell found: stock_HIGH + sector_LOW) is the more interesting thread to pull on, but only after understanding WHY 21d/63d don't show it.
+
+## Sector-RS thread formally closed (critic disposition, 2026-09-26)
+
+Critic's final verdict, adopted as-is: successful falsification, not a failed research thread. Sector RS = telemetry/descriptive finding; the 126d stock-leader x sector-laggard interaction logged as an interesting conditional pattern (not rescued, not chased further — doing so "would risk turning a clean falsification into an increasingly elaborate rescue mission"). No filter, no promotion, no follow-up RQ. Thread closed.
+
+## Research Integrity Rule #19 (Robustness Before Finding) — adopted 2026-09-26
+
+Per critic, prompted directly by the sector-RS reversal collapsing under its own pre-declared robustness check: **a newly introduced candidate feature may be reported as an exploratory observation after its first test, but may not be called a finding, promoted, or used to motivate a production candidate until its observed effect has survived a pre-declared robustness check across materially related, non-optimized variants where such variants naturally exist.**
+
+**Parameterized Feature corollary**: if a candidate has a natural lookback/window/measurement horizon, pre-declare at least 2-3 materially distinct nearby horizons BEFORE evaluating the result. Do not select the horizon after seeing results. This is exactly what caught the sector-RS reversal being 126d-specific (21d flips it entirely, 63d is a wash) before it could be mistaken for a robust "sector laggard leadership" effect and built into a filter.
+
+**Explicit non-goal, per critic**: this is not "test every feature across 2-3 parameters no matter what" (unnecessarily expensive, encourages arbitrary variants) — it applies specifically where a natural parameter/horizon choice exists and could plausibly have been fit to the data rather than chosen for a principled reason.
+
+## RQ-SWING-1 + Exit-Horizon Audit, complete (2026-09-26) — MAX_HOLD_DAYS shortening is NOT supported by the data; a real but modest give-back rescue signal found
+
+Pre-mortem safeguards applied throughout (logged in CLAUDE.md before this was built): honest T-1-gated BC v2 population reused as-is (n=9,430, verified at load time), day-index convention matches `rq_trail1_trajectory_honest.py` exactly, corp_action_day breaks every walk, no confirmed-swing label computed from future information, no candidate rule decision executed same-day (all hypothetical exits use the NEXT day's open), outcome labels never leaked into predictor construction.
+
+**Finding 1 — 83.3% of ALL trades exit via `max_hold_cap`, not the mechanical stop/target/trail logic.** Only 15.7% exit via stop, 0.6%/0.4% via target/climax. The exit engine's responsive mechanics (stop, target, trail) determine the outcome for a small minority of trades; for the overwhelming majority, the only thing that ends the trade is the calendar cap itself.
+
+**Finding 2 — contribution by real holding-horizon bucket (trading days, not calendar days):**
+
+| Bucket | n | % of population | total R | meanR | Meaningful Win |
+|---|---|---|---|---|---|
+| D0-3 | 86 | 0.9% | -64.1 | -0.75 | 14.0% |
+| D4-5 | 105 | 1.1% | -81.2 | -0.77 | 12.4% |
+| D6-10 | 552 | 5.9% | -328.7 | -0.60 | 14.7% |
+| D11-15 | 8,687 | 92.1% | +1,399.6 | +0.16 | 38.9% |
+
+D0-10 (all early exits) are 86-95% stop-outs (near-tautologically negative — this is what a stop-out is). D11-15 contributes 151% of total portfolio R; D0-10 combined is a net -49% drag. **This is largely a restatement of "stopped-out trades are losses," not new information about whether the hold period itself is too long.**
+
+**Finding 3 — MAX_HOLD_DAYS re-audit, exact production entries/exits, only the cap varied:**
+
+| Cap | % of trades forcibly capped early | meanR | DD | worst streak | Meaningful Win |
+|---|---|---|---|---|---|
+| 5 | 98.0% | 0.0291 (-70%) | -121.0 | -15.3 | 24.3% |
+| 7 | 96.3% | 0.0393 (-60%) | -131.3 | -16.5 | 28.2% |
+| 10 | 92.1% | 0.0651 (-34%) | -187.3 | -26.8 | 32.4% |
+| 12 | 88.6% | 0.0750 (-24%) | -210.1 (WORSE than 15-day real) | -34.6 | 34.3% |
+| **15 (real)** | — | **0.0982** | **-188.6** | **-36.3** | **36.9%** |
+
+Shortening the cap monotonically hurts meanR and Meaningful Win Rate at every level tested, and drawdown does NOT monotonically improve — cap=12 has WORSE drawdown than the real 15-day cap (-210.1 vs -188.6), because forcing an exit at day 12 can lock in a temporary dip that would have recovered by day 15. **There is no cap shorter than 15 in this sweep that improves both return and risk simultaneously.**
+
+**Finding 4 — for `max_hold_cap` trades specifically (n=7,855), the trajectory is continuous, real growth throughout the ENTIRE 15-day window, not a plateau after an early pop:**
+
+| Day | 1 | 3 | 5 | 7 | 9 | 11 | 13 | 15 |
+|---|---|---|---|---|---|---|---|---|
+| mean R | 0.010 | 0.022 | 0.039 | 0.065 | 0.096 | 0.132 | 0.160 | 0.192 |
+| median R | -0.012 | -0.005 | -0.003 | +0.006 | +0.029 | +0.048 | +0.069 | +0.091 |
+
+Median R is actually NEGATIVE through day 6 — the *typical* max_hold_cap trade is underwater or flat for the first week, and only becomes a real winner in the second half of the hold. Growth is monotonic and roughly steady throughout, with no sign of flattening by day 10-12. **This directly contradicts the "beyond 3-5 days you're catching a stall, not a breakout" hypothesis for this population.**
+
+**Finding 5 — time-to-first-meaningful-continuation, among eventual winners, by threshold:**
+
+| Threshold | median day | % reached by D3 | % by D5 | % by D7 | % by D10 |
+|---|---|---|---|---|---|
+| ≥0.25R | 3 | 58.7% | 71.6% | 80.2% | 90.1% |
+| ≥0.5R | 5 | 37.7% | 53.1% | 65.2% | 81.3% |
+| **≥1.0R** | **8** | **18.5%** | **33.9%** | **47.7%** | **71.2%** |
+
+Modest wins do show up early, consistent with a "quick swing" character. But **the biggest, most valuable winners (≥1R) are systematically the slowest to develop** — median day 8, and 28.8% don't cross +1R until after day 10. A shorter product horizon would disproportionately amputate exactly the trades that make the strategy profitable, not the trades that are dragging on it. This explains Finding 3 directly: the reason shortening the cap hurts so much is that the right tail specifically needs the extra runway.
+
+**Finding 6 — give-back from peak, `max_hold_cap` trades reaching a real peak (peak R≥0.5, n=2,764, 35.2% of `max_hold_cap`):** median give-back is 15.0% of the peak (0.136R), 87.6% still end up as meaningful winners (≥0.25R) despite the give-back, and only 5.3% give back enough to end in an outright loss (the Aegis-Logistics-style pattern). This is a real but narrow failure mode, not the dominant behavior of the population.
+
+**Finding 7 — candidate HH give-back rule tested causally (decide at close, execute at next day's open; requires a REAL prior peak ≥0.5R before considering any give-back, per the pre-mortem's anti-noise safeguard):**
+
+| Give-back trigger | n flagged | meanR | DD | worst streak | Meaningful winner R lost | Rescued from real loss | Meaningful winners cut short |
+|---|---|---|---|---|---|---|---|
+| ≥30% of peak given back | 2,015 (21.4%) | 0.0822 (-16%) | -175.2 (-7.1%) | -30.4 (-16.3%) | 13.7% | 262 (235 to positive) | 1,004 |
+| ≥50% of peak given back | 1,285 (13.6%) | 0.0878 (-11%) | -170.1 (-9.8%) | -30.4 | 9.6% | 256 (218 to positive) | 604 |
+| **≥70% of peak given back** | **828 (8.8%)** | **0.0893 (-9%)** | **-178.6 (-5.3%)** | **-30.4** | **6.5%** | **248 (175 to positive)** | **317** |
+
+The strictest version (require giving back 70% of a real ≥0.5R peak) is the most efficient: it rescues almost the same NUMBER of genuine loss-turnarounds as the looser versions (175-235 range across all three, roughly stable) while cutting far fewer otherwise-fine meaningful winners (317 vs 1,004 at the loosest setting). **This is a real, defensible, low-cost signal — but a modest one, not a dramatic fix for the drawdown problem.** DD improves only 5.3-9.8% across the sweep — this mechanism narrows a specific failure mode (severe reversal after a real advance) without being a broad drawdown solution.
+
+**Overall disposition**: the swing-horizon question is answered clearly — **do not shorten MAX_HOLD_DAYS below 15; the data argues for the current cap or longer, not shorter, and the user's "beyond 3-5 days is a stall" hypothesis is not supported for this population.** The give-back/HH-completion research produced one real, narrow, defensible candidate (giveback≥70% of a ≥0.5R peak) worth a second look, but it is not the "scary drawdown" fix on its own — DD improvement is modest (5-10%), not dramatic. Not promoted yet — needs the same capacity-constrained re-verification and year-by-year (Rule #16) check every other candidate this weekend has gone through before being trusted further.
+
+**Year-by-year check on the giveback≥70%-of-≥0.5R-peak rule (Rule #16):** cost is small and consistent in direction 2022-2024 (meanR drag of -0.010 to -0.019 in absolute terms each year, never reverses to a benefit), but in 2025 the rule is essentially neutral (0.0088→0.0088, unchanged) and in 2026 it's very slightly negative (-0.0154→-0.0159) — not a reversal, but a real, honest sign that this rule's modest historical benefit is not currently showing up in the flat/thin current regime (consistent with everything else found this weekend about 2025-2026). Logged, not disqualifying, but tempers how much to expect from this specific candidate right now.
+
+## HH/LH structural confirmation, complete (2026-09-26) — real, modest candidate found; caught and fixed a lookahead bug in the process
+
+Per direct user follow-up ("were you able to run HH and LHs" — the earlier give-back analysis only used a simplified running-peak proxy, not the actual structural confirmation critic and the user discussed). Built the proper version: confirmed swing highs mirroring `primed_engine.py`'s own `K_SWING=2` symmetric confirmation convention exactly (a high at position idx2 confirms once K bars on both sides are not higher) — applied to Highs instead of Lows, same mechanism, not a new invented rule.
+
+**Structure found, full BC v2 T-1-gated population (n=9,430)**: 93.1% of trades develop at least one confirmed swing high (median day 6, median magnitude 0.293R). 28.3% (n=2,485) go on to form a genuine confirmed LOWER high before the real exit — a structurally confirmed HH-then-LH pattern (the Aegis Logistics shape). Among those: median LH confirmation day is 11, median final outcome is **-0.105R (a loss)**, 59.0% end in an outright loss despite having made a real high, only 23.9% still end up as meaningful winners (≥0.25R) anyway.
+
+**Bug caught and fixed before trusting the result — worth recording as a concrete example of Rule #18-family lookahead, not just the original discovery**: the first version of this test used the LH's own peak day as the decision point (`exec_day = lh_day + 1`), but a "confirmed" swing high is only KNOWN as confirmed K=2 days after its own peak day — the confirmation itself requires seeing that the next 2 days didn't exceed it. Using the peak day directly let the rule see 2 days into the future before firing. This is exactly the kind of lag critic warned about in advance ("don't use the existing ZigZag definition blindly... importing future information into the research definition") and the pre-mortem's own item #1, and it still slipped through on the first pass — a good reminder that writing the safeguard down doesn't automatically prevent the mistake, only catching it via a sanity check does.
+
+**Buggy vs corrected result, same rule, only the execution timing fixed:**
+
+| | Buggy (lookahead, exec at lh_day+1) | Corrected (exec at lh_day+K+1) |
+|---|---|---|
+| n flagged | 2,485 (26.4%) | 1,995 (21.2%) |
+| meanR | 0.1287 | **0.0988** (vs baseline 0.0982 — essentially flat) |
+| DD | -134.2 (looked 28.8% better) | **-174.2** (real, 7.6% better) |
+| worst streak | -28.8 (looked 20.7% better) | **-36.3** (unchanged — entirely a lookahead artifact) |
+| Meaningful winner R lost | (not computed, invalid) | 3.5% |
+| Rescued from real loss | 1,215 | 753 |
+
+**The corrected result is a real, if modest, candidate — the first this weekend that doesn't trade return away for drawdown relief.** meanR holds flat (does not cost expectancy, unlike every other candidate tested this weekend), DD improves a real 7.6%, cost is low (3.5% of meaningful winner R), and it rescues 753 trades from an outright loss. Not dramatic, but a cleaner cost profile than the earlier simplified give-back-from-peak rule.
+
+**Cross-population check**: the "83%+ ride to cap" behavior (Finding 1 of the Exit-Horizon Audit) is confirmed NOT specific to BC v2's filter stack — BC current shows 84.5% max_hold_cap, bare Trend+EMA34 shows 78.0% — this is a property of the shared Primed Gate exit architecture itself (the trail/target mechanics), present across every recipe tested, not an artifact of any one filter combination.
+
+**Disposition**: HH/LH structural finding is real and logged. Corrected exit candidate not promoted — still needs the year-by-year (Rule #16) and capacity-constrained checks every other candidate this weekend has gone through. Flagged for the user's explicit reframe: the "83% ride to cap, continuous slow development, biggest winners take longest" pattern is a genuine product-definition question (is this a swing strategy or has it become positional) that a modest exit tweak does not resolve on its own.
+
+## Rule #20 adopted (2026-09-27) — Risk Unit Integrity
+
+Infrastructure note, not a research finding: Rule #20 (Risk Unit Integrity) added to
+`CLAUDE.md`'s checklist, alongside a new "Research Preflight" section. Full context —
+the swing_qs Quick Swing line silently inheriting BC v2's stop for a weekend of R-based
+work before it was caught — lives in `swing_qs/FINDINGS.md`'s Stop Definition Audit, not
+here; this project stays BC/Cell C's own research log.
