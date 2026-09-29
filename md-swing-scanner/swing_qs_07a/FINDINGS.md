@@ -338,3 +338,104 @@ no A-vs-B classifier, no A-only/B-only study yet (the 73.4% overlap is evidence
 worth having, not a reason to collapse the two questions). Once a candidate
 precursor is found, it will be checked against A, B, and A∩B/A\B/B\A as
 evaluation, not built around one of them chosen in advance.
+
+## RQ-QS-07A-3 — Broad Pre-Event State Search, first read (2026-09-29, critic+user corrected sequencing)
+
+**Method, per the corrected architecture**: FULL Cohort A (102,837 events, no
+F&O/liquidity restriction) + matched controls, reconstructed identically (same
+seed=42, same method) from `event_matrix.csv` — not re-drawn. 19 pre-declared
+features across 3 families (price structure/trend, volume, volatility), every
+one reused directly from `signals.py`'s existing, already-validated production
+indicator columns — none re-derived from scratch. F&O/NIFTY/circuit/liquidity
+recorded as annotation on the working set, NOT used to filter the population and
+NOT included as candidate features themselves. Information cutoff: every feature
+is Close-of-day-T or earlier, matching the same day whose forward D1-D3 window
+defines cohort membership.
+
+**Spot-checked one row (A2ZINFRA 2025-06-03) against raw indicators** — exact
+match. Full hand-verification (multiple examples) deferred: every feature here
+is a direct lookup of an already-hand-verified, already-production-trusted
+column (`ema34`, `rsi14`, etc.) via a plain date lookup, not a new formula — a
+materially lower-risk operation than the custom return/path-shape computations
+hand-checked earlier in this line, so one spot-check was judged sufficient for
+this first read; a fuller check should still happen before anything here is
+promoted past "candidate."
+
+### Result — trend/momentum distance is the clearest signal; volume/volatility/candle-shape are weak
+
+| Feature | Cohort A median | Control median | Gap |
+|---|---|---|---|
+| dist_ema8_pct | +0.48% | -0.17% | +0.65 |
+| dist_ema21_pct | +0.88% | -0.44% | +1.32 |
+| dist_ema34_pct | +1.11% | -0.61% | +1.72 |
+| dist_sma50_pct | +1.59% | -0.80% | +2.40 |
+| dist_sma150_pct | +1.66% | -1.13% | +2.79 |
+| dist_sma200_pct | +2.63% | -0.69% | +3.32 |
+| ret_5d | +0.70% | -0.27% | +0.98 |
+| ret_10d | +1.01% | -0.55% | +1.56 |
+| ret_20d | +1.68% | -0.71% | +2.38 |
+| dist_low252_pct | +47.40% | +35.69% | +11.72 |
+| rsi14 | 51.86 | 48.82 | +3.04 |
+| dist_high252_pct | -27.44% | -26.18% | -1.25 |
+| range5_width_over_atr | 2.20x | 2.08x | +0.12 |
+| vol_zscore | -0.19 | -0.34 | +0.15 |
+| vol_ratio_10d | 0.89x | 0.77x | +0.12 |
+| atr_expansion | 1.06x | 0.99x | +0.07 |
+| body_atr | 0.37 | 0.34 | +0.03 |
+| ad_fraction | 0.56 | 0.53 | +0.03 |
+| vol_declining5 | 0.7% | 0.7% | 0 |
+
+**A real, directionally consistent pattern across the whole trend/momentum
+family, and it GROWS with longer lookback windows** — distance-above-EMA gap
+climbs from +0.65 (8-day) to +1.72 (34-day); trailing return gap climbs from
++0.98% (5-day) to +2.38% (20-day); distance above the 52-week low is the
+single largest gap (+11.72pp). Stocks that go on to produce an extreme 3-day
+move are, on average, ALREADY in a moderately stronger position beforehand —
+not extreme (median RSI 51.86 is still roughly neutral, not overbought), but
+consistently, measurably stronger across every trend-distance and return
+horizon tested.
+
+**By contrast, volume, volatility, and candle-shape features show weak-to-
+negligible gaps** — vol_zscore, vol_ratio_10d, atr_expansion, body_atr, and
+ad_fraction all sit close to their control values, none showing the kind of
+consistent, growing separation the trend family does. `vol_declining5` shows
+literally zero difference (0.7% both). This matches the pattern this project
+has now found repeatedly, tonight and before: volume/volatility state rarely
+carries discriminating information on its own, while trend/momentum measures
+do show something real.
+
+**One genuinely counter-intuitive result worth flagging, not smoothing over**:
+`range5_width_over_atr` gap is small and in the WRONG direction for a
+compression-precedes-breakout (VCP-style) story — Cohort A shows slightly
+WIDER recent 5-day ranges than the control (2.20x ATR vs 2.08x), not tighter.
+And `dist_high252_pct`'s gap is small and also slightly negative — Cohort A
+sits marginally FURTHER below its own 52-week high than the control, not
+closer to it. Extreme 3-day movers in this population are not obviously
+"stocks quietly compressing near their highs" — they can be moderately-strong
+stocks recovering from further down too. Neither of these small, backwards-
+direction gaps should be over-read given their size, but they're reported
+honestly rather than only reporting the results that fit a tidy story.
+
+**Disposition — a real candidate signal, not yet a finding.** Per this
+project's own standing discipline (Rule #19, Robustness Before Finding; Rule
+#21, Signal ≠ Intervention), a directionally consistent, cross-feature pattern
+is exactly the kind of result that must survive robustness checks — year-by-
+year stability, stratification across F&O/non-F&O/circuit-involved (Phase 2 of
+the corrected architecture), and an honest test of whether the gap is large
+enough to build anything on, not just statistically present — before being
+called a finding. **None of that has been done yet.** No threshold has been
+chosen on any feature, no combination has been tested, no model has been
+built. This is the first, purely descriptive read of the 19 pre-declared
+features, exactly as scoped.
+
+**Not yet done**: robustness/year-by-year check on the trend/momentum gap;
+Phase 2 stratification (does the gap survive in F&O vs non-F&O, circuit-
+involved vs not, across liquidity deciles); relative-strength/sector features
+(deferred, same known infra limitation as RQ-QS-07U); any feature combination
+or composite score; Cohort B run through the same feature search (not started
+— Cohort A was the priority per the corrected sequencing, Cohort B's own
+precursor search is a natural next step, not yet begun).
+
+**Files**: `05_precursor_discovery.py`, `precursor_features.csv` (205,674
+rows, committed — feature values only, no returns/outcomes duplicated in this
+file, cross-referenced to `cohort_a_events.csv` by ticker+date).
