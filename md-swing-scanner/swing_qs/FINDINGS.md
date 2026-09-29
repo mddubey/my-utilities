@@ -2747,3 +2747,60 @@ useful as an early signal.
 **Files**: `trajectory_replay/rq_qs_06c_real_time_separability.py`,
 `trajectory_replay/rq_qs_06c_separability.csv` (111,199 landmark-observations
 across 19,864 trades that reached at least one landmark).
+
+## RQ-QS-06D — Contemporaneous-State Diagnostic (2026-09-29, critic-specified, one-pass by design)
+
+**Pre-registered as a bounded, one-pass diagnostic**, per critic's explicit
+instruction: "not 'keep adding information until something separates.'" Three
+feature families only — volume state, volatility state, market context — chosen
+for staying close to the mechanism already observed (is the move being accepted
+with participation and volatility, or exhausting), not the most exhaustive set
+possible. Deliberately excludes relative-strength/sector infrastructure and
+intraday data this pass, per critic's own explicit scoping. **Decision rule,
+pre-declared before running**: meaningful, directionally consistent, reasonably
+early separation -> justifies a narrow predictive/harvesting experiment; no
+separation -> "prediction is closed for this branch," no model, no feature
+stacking, no threshold search regardless.
+
+**Method**: same landmarks, same archetype join (entry_definition included in the
+join key from the start this time, not rediscovered), same `walk_full()` reuse as
+06C. Five predictors, all computed strictly at the landmark day (or the 3 days
+ending there): `volume_ratio_landmark` (Volume / production's own `vol_avg10_prior`
+baseline), `volume_trend_3d` (correlation of day-index vs Volume over the trailing
+window, same convention as 04A/04B), `atr_expansion` (atr14 / production's own
+`atr14_60ago`), `day_range_over_atr`, `nifty_return_3d` (index-level 3-session
+return ending on the landmark date, from `data_cache/_NIFTY.csv`).
+
+**Result — clean, unambiguous negative. Every predictor overlaps at every
+landmark, no exceptions**:
+
+| Landmark | volume_ratio | volume_trend_3d | atr_expansion | day_range/ATR | nifty_return_3d |
+|---|---|---|---|---|---|
+| +0.5R | overlap | overlap | overlap | overlap | overlap |
+| +0.75R | overlap | overlap | overlap | overlap | overlap |
+| +1.0R | overlap | overlap | overlap | overlap | overlap |
+| +1.5R | overlap | overlap | overlap | overlap | overlap |
+| +2.0R | overlap | overlap | overlap | overlap | overlap |
+
+25 of 25 cells overlap. Gaps are all small relative to spread (e.g.
+volume_ratio_landmark medians 1.80x burst vs 1.96x persistent at +0.5R, against a
+P25-P75 spread of roughly 1x-4x for both groups — the gap is real but tiny next to
+the noise). `volume_trend_3d` is essentially identical between groups at every
+landmark (gaps of 0.001-0.026 on a -1..+1 scale). `nifty_return_3d` converges to
+near-zero gap by +2.0R (0.010) — market context carries no separating information
+at any point tested.
+
+**Per the pre-declared decision rule, this closes prediction for this branch — not
+a partial or ambiguous result.** Neither the simple trajectory information (06C)
+nor volume/volatility/market state (06D) separates burst_then_exhaustion from
+persistent_continuation early. Combined with 06C, this is now two independent,
+disciplined negative passes over the two most natural information sources
+available from the existing QS-A trade itself. Per critic's own pre-declared
+sequencing: no further feature-hunting on this specific question (no relative
+strength, no sector, no intraday data added to chase separation) — the path
+forward is RQ-QS-06E (reactive deterioration anatomy: don't predict the turn, wait
+for it to become observable and ask whether responding still has value) rather
+than continued prediction attempts.
+
+**Files**: `trajectory_replay/rq_qs_06d_contemporaneous_state.py`,
+`trajectory_replay/rq_qs_06d_contemporaneous.csv` (111,199 rows).
