@@ -852,32 +852,167 @@ oscillating pattern as trend breadth (Finding 1).
 
 **Answer to the critic's exact question — "reduced breadth, reduced
 dispersion, liquidity/size composition change, weaker fast-mover base rate, or
-some combination?"**: **a combination of reduced trend breadth (Finding 1) and
-a genuinely weaker fast-mover base rate (Finding 4), concentrated specifically
-in 2025Q3-2025Q4** — NOT a liquidity/size composition shift (Finding 3 rules
-this out — the decline is broad-based across all terciles), and NOT a clean
-permanent 2025-26 regime break (both breadth and base rate are already
-recovering unevenly by 2026Q2, most sharply). The dominant character of the
-2025-26 period isn't "worse," it's **choppier** — wider swings between
-strong-breadth and weak-breadth quarters than 2023-24 ever showed. A
-trend-persistence precursor is mechanically more fragile in a choppy regime
-even without the underlying rate of extreme moves falling, which is exactly
-why 07A-3R found a real but weaker signal rather than a dead one.
+some combination?"**: reduced trend breadth (Finding 1) and a genuinely
+weaker fast-mover base rate (Finding 4), concentrated specifically in
+2025Q3-2025Q4, **coincide with and characterize** the weakening — NOT a
+liquidity/size composition shift (Finding 3 rules this out — the decline is
+broad-based across all terciles), and NOT a clean permanent 2025-26 regime
+break (both breadth and base rate are already recovering unevenly by 2026Q2).
+The dominant character of the 2025-26 period isn't "worse," it's **choppier**
+— wider swings between strong-breadth and weak-breadth quarters than 2023-24
+ever showed.
+
+**CORRECTION (2026-09-29, critic's explicit catch, adopted)**: the original
+version of this disposition said breadth choppiness and the base-rate dip
+"explain most of the weakening." That overstates what was shown. Breadth and
+dispersion are themselves correlated market-state measurements — we have
+NOT decomposed causality, only shown these measures coincide with and
+characterize the same weakening window. **07R closes as: regime
+characterization established; causal attribution remains open.** This is the
+appropriately conservative conclusion, and this correction is itself the
+finding to carry forward, not a footnote.
 
 **Sector dispersion (D)**: explicitly not attempted, per critic's instruction
 — no historical sector mapping exists yet; not faked with a current-snapshot
-proxy.
+proxy. Critic's status, adopted: **sector-relative strength is DEFERRED, not
+rejected** — real sector rotation existed in 2025 per NSE's own published
+review (Financials gaining Nifty 50 weight while IT/Consumer Staples lost
+it), so sector remains a legitimate untested hypothesis, just not the
+highest-value next build given three higher-value open threads already in
+hand (trend-strength relationship exists, strongest in liquid/F&O names, and
+the fast-mover environment itself got choppier/temporarily weaker).
 
-**Per critic's stated decision framework**: this result argues AGAINST an
-immediate full historical-sector-RS infrastructure build — the regime
-diagnostic already explains most of the 2025-26 weakening via breadth
-choppiness + a real-but-temporary base-rate dip, both liquidity-broad, neither
-of which sector-relative strength would obviously fix. Critic's own next-step
-call needed on whether that's sufficient to keep 07A-5 (historical sector-RS)
-deferred, or whether the still-real 2025Q3-Q4 base-rate dip specifically
-warrants investigating a sector-concentration explanation before moving on.
+**Next RQ, critic-specified**: not sector concentration — RQ-QS-07A-5,
+Trend-State -> Fast-Mover Anatomy (see its own section below).
 
 **Files**: `09_market_regime_diagnostic.py`, `regime_daily_panel.csv`
 (gitignored, 2,063,163 rows), `regime_daily_panel_sample_200k.csv` (seed=42),
 `regime_breadth_by_quarter.csv`, `regime_breadth_by_liq_tercile_year.csv`,
 `regime_fastmover_baserate_by_quarter.csv`.
+
+## RQ-QS-07A-5 — Trend-State → Fast-Mover Anatomy, complete (2026-09-29, critic-specified)
+
+**Objective (critic's exact framing)**: "What does the trend-strength state
+actually represent immediately before the fast move?" — the SHAPE of the
+relationship between prior trend strength and subsequent fast-mover outcome.
+NOT another predictor search, NOT a threshold optimization.
+
+**Method**: full neutral `event_matrix.csv` population (2,056,725 stock-days,
+not the matched-control subsample used in 05_/07_/08_ — a dose-response/shape
+question needs the full distribution). Computed the 5 primary trend/momentum
+variables from 07A-3R (`dist_sma200_pct`, `ret_20d`, `dist_low252_pct`,
+`dist_ema34_pct`, `rsi14`) for every eligible row using the exact formulas
+from `05_precursor_discovery.py`. Built a composite trend-strength score (my
+design choice, not critic-specified, flagged for critic review): mean of each
+variable's percentile rank (0-100) across the full population — all 5 share
+the same "higher = stronger trend" sign convention, verified, no flips
+needed. Composite used ONLY as the single binning axis, never tested
+alongside its own components (would violate Rule #7). Pre-declared bins:
+deciles of the composite (chosen before looking at any outcome — deciles are
+of the predictor itself, not the result). 1,668,305 of 2,056,725 rows had all
+5 features populated (the rest lack sufficient history, mostly early-cache
+tickers).
+
+**Hand-verification (Rule #22)**: the headline result below was surprising
+enough to require checking before trusting. (a) Pulled 5 real decile-0
+Cohort A events (seed=42) — AIRAN, LAGNAM, ZEEMEDIA, MOKSH, VIRINCHI, 2025-26
+dates — every one shows a coherent, real pattern: 20-40% below SMA200, near
+or slightly above the 52-week low, RSI 15-42, negative 20D return, followed
+by genuine 15-43% 3-day max moves. Not noise. (b) Aggregate math check:
+regime-split n's sum to the total (786,730+782,154+99,421=1,668,305) and
+pathway-split n's sum to the total (1,631,608+36,697=1,668,305) exactly —
+both stratifications are mathematically clean partitions, no leakage/overlap
+bug.
+
+### The headline result: the relationship is NOT monotonic — it's an asymmetric U-shape
+
+| Decile (0=weakest trend, 9=strongest) | %Cohort A | %Cohort B | p90 MFE |
+|---|---|---|---|
+| 0 | 6.61 | 6.75 | 10.66 |
+| 1 | 3.67 | 3.74 | 8.52 |
+| 2 (minimum) | 3.35 | 3.49 | 8.17 |
+| 3 | 3.41 | 3.50 | 8.12 |
+| 4 | 3.50 | 3.59 | 8.21 |
+| 5 | 3.74 | 3.76 | 8.37 |
+| 6 | 3.92 | 4.03 | 8.60 |
+| 7 | 4.66 | 4.63 | 9.14 |
+| 8 | 5.43 | 5.49 | 9.84 |
+| 9 (maximum) | 8.47 | 8.22 | 11.82 |
+
+**Two distinct archetypes, not one**: the dominant, larger tail effect is at
+decile 9 (strongest trend state — the trend-CONTINUATION archetype 07A-3/
+07A-3R already found), rising steadily and only really separating from
+deciles 7-9 (shape-check table: decile-over-decile delta is near-zero from
+1→6, then +0.74/+0.77/+3.03 for 7/8/9 — concentrated in the top tail, not
+gradual across the whole range). But decile 0 (the WEAKEST trend state —
+deeply oversold, near 52-week lows, low RSI) shows a real, separate local
+elevation: roughly DOUBLE the flat ~3.3-3.9% baseline sitting in deciles
+1-6. This is a second, distinct **oversold-reversal/capitulation** fast-mover
+archetype, invisible in every prior 07A study because none of them binned the
+full population by trend state before — 05_/07_/08_ all compared Cohort A
+against a matched, same-liquidity control without asking where the control's
+own trend state sits.
+
+**Confirmed NOT a circuit-lock or liquidity-composition artifact**: the U-shape
+survives in the "structural" pathway alone (circuit_days_in_window==0,
+1,631,608 of 1,668,305 rows) — decile 0 = 6.36% vs decile 2's minimum of
+3.24%, still ~2x — so it isn't just circuit-driven violent reversals. It also
+survives within every liquidity tercile individually: decile-0 vs decile-2
+Cohort A rate is 9.25%-vs-4.93% (low liquidity), 5.54%-vs-2.89% (mid),
+3.62%-vs-1.65% (high) — consistently ~1.9-2.2x at every liquidity level, so
+it isn't explained by decile 0 simply containing more illiquid names. (The
+circuit/wake-up pathway, only 36,697 rows / 2.2% of the population, does show
+much higher absolute rates everywhere — 8-25% — consistent with circuit
+events being inherently volatile, but that's a separate, already-expected
+effect layered on top, not the source of the structural-pathway U-shape.)
+
+### Regime dependence — critic's ask #3, answered with a real asymmetry
+
+| Decile | Stable (2023-24) %Cohort A | Choppy (2025-26) %Cohort A | Change |
+|---|---|---|---|
+| 0 (oversold) | 6.65 | 6.67 | **~unchanged** |
+| 9 (trend continuation) | 8.97 | 6.70 | **-25% relative** |
+
+**The trend-CONTINUATION tail (decile 9) is the one that weakened in the
+choppier 2025-26 regime** — consistent with everything 07A-3R/07R already
+found. **The oversold-reversal tail (decile 0) is regime-INVARIANT** — its
+rate is essentially identical in both windows. This is a materially different
+answer than "the whole trend-strength dimension got weaker": only HALF of
+the U-shape is regime-sensitive. The oversold-reversal archetype looks like a
+more structurally robust phenomenon, not an artifact of 2022-24 having been a
+friendlier environment — though it has NOT been robustness-tested the way
+07A-3R tested the continuation side (Rule #19 applies: this is a candidate
+observation from one pass, not yet a promoted finding).
+
+### Cohort A vs Cohort B — critic's ask #4
+
+No meaningful divergence at either tail: decile 0's Cohort-A/Cohort-B overlap
+fraction is 4.86/6.61=73.5%, decile 9's is 6.43/8.47=75.9% — both essentially
+match the population-wide 73.4% overlap (07A-2B). Neither archetype
+preferentially produces "big spike only" (Cohort A-only) or "sustained close
+only" (Cohort B-only) outcomes — the MFE/sustained-close split is not
+differentiated by which tail of the trend-state distribution produced the
+event.
+
+### Disposition
+
+**Real, hand-verified, non-obvious structural finding, per Rule #19 status: a
+candidate observation, not yet a promoted finding** — the trend-strength
+dimension's relationship to fast-mover outcomes is a two-tailed, not
+one-tailed, phenomenon, and the two tails behave differently across regimes.
+This reframes the whole 07A-3/07A-3R "trend precursor" result: it was only
+ever describing HALF of the real relationship (the continuation half), and
+that's specifically the half that weakened in 2025-26 — while an entirely
+separate, apparently regime-stable oversold-reversal signal has been present
+in the data the whole time, unexamined until this pass.
+
+**Not promotable as a filter/gate yet** (Rule #21, Signal ≠ Intervention):
+this is shape characterization only, no threshold chosen, no robustness sweep
+run on the oversold-reversal side specifically, and average decile-9/decile-0
+Cohort A rates (6.6-8.5%) are population base rates, not gap-to-control
+comparisons — don't compare these percentages directly against 05_/07_'s
+median-gap numbers, they're measuring a different thing (absolute rate in an
+unmatched population vs. gap between matched cohort/control pairs).
+
+**Files**: `10_trend_state_anatomy.py`, `trend_state_anatomy.csv`
+(1,668,305 rows), `trend_state_anatomy_overall_by_decile.csv`.
