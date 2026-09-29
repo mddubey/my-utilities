@@ -36,7 +36,7 @@ def test_fetch_all_brand_new_ticker_fetches_full_period(tmp_path, monkeypatch):
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["NEWCO"])
-    assert result == {"new": ["NEWCO"], "updated": [], "current": [], "empty": []}
+    assert result == {"new": ["NEWCO"], "updated": [], "current": [], "empty": [], "stale": []}
     written = pd.read_csv(tmp_path / "NEWCO.csv", index_col="Date", parse_dates=True)
     assert len(written) == 5
 
@@ -54,7 +54,7 @@ def test_fetch_all_existing_ticker_appends_only_new_rows(tmp_path, monkeypatch):
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["EXISTS"])
-    assert result == {"new": [], "updated": ["EXISTS"], "current": [], "empty": []}
+    assert result == {"new": [], "updated": ["EXISTS"], "current": [], "empty": [], "stale": []}
     written = pd.read_csv(tmp_path / "EXISTS.csv", index_col="Date", parse_dates=True)
     assert len(written) == 6  # 5 old + only the 1 genuinely new day (01-06)
     assert not written.index.duplicated().any()
@@ -92,7 +92,7 @@ def test_fetch_all_recovers_nan_close_on_last_day_of_wide_range(tmp_path, monkey
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["A"])
-    assert result == {"new": [], "updated": ["A"], "current": [], "empty": []}
+    assert result == {"new": [], "updated": ["A"], "current": [], "empty": [], "stale": []}
     written = pd.read_csv(tmp_path / "A.csv", index_col="Date", parse_dates=True)
     assert pd.Timestamp("2026-09-01") in written.index
     assert not pd.isna(written.loc["2026-09-01", "Close"])
@@ -110,7 +110,7 @@ def test_fetch_all_existing_ticker_already_current_is_a_no_op(tmp_path, monkeypa
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["CURRENT"])
-    assert result == {"new": [], "updated": [], "current": ["CURRENT"], "empty": []}
+    assert result == {"new": [], "updated": [], "current": ["CURRENT"], "empty": [], "stale": []}
     written = pd.read_csv(tmp_path / "CURRENT.csv", index_col="Date", parse_dates=True)
     assert len(written) == 5  # unchanged
 
@@ -123,7 +123,7 @@ def test_fetch_all_marks_empty_when_new_ticker_has_no_data(tmp_path, monkeypatch
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["DELISTED"])
-    assert result == {"new": [], "updated": [], "current": [], "empty": ["DELISTED"]}
+    assert result == {"new": [], "updated": [], "current": [], "empty": ["DELISTED"], "stale": []}
     assert not (tmp_path / "DELISTED.csv").exists()
 
 
@@ -142,7 +142,7 @@ def test_fetch_all_weekend_run_reports_current_not_fetched(tmp_path, monkeypatch
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["A", "B"])
-    assert result == {"new": [], "updated": [], "current": ["A", "B"], "empty": []}
+    assert result == {"new": [], "updated": [], "current": ["A", "B"], "empty": [], "stale": []}
 
 
 def test_fetch_all_same_day_rerun_skips_the_network_call_entirely(tmp_path, monkeypatch):
@@ -158,7 +158,7 @@ def test_fetch_all_same_day_rerun_skips_the_network_call_entirely(tmp_path, monk
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["A"])
-    assert result == {"new": [], "updated": [], "current": ["A"], "empty": []}
+    assert result == {"new": [], "updated": [], "current": ["A"], "empty": [], "stale": []}
 
 
 def test_fetch_all_before_safe_hour_does_not_cache_todays_row(tmp_path, monkeypatch):
@@ -179,7 +179,7 @@ def test_fetch_all_before_safe_hour_does_not_cache_todays_row(tmp_path, monkeypa
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["A"])
-    assert result == {"new": [], "updated": [], "current": ["A"], "empty": []}
+    assert result == {"new": [], "updated": [], "current": ["A"], "empty": [], "stale": []}
     written = pd.read_csv(tmp_path / "A.csv", index_col="Date", parse_dates=True)
     assert written.index.max() == pd.Timestamp("2026-08-28")  # today NOT appended
 
@@ -197,9 +197,38 @@ def test_fetch_all_at_safe_hour_caches_todays_row(tmp_path, monkeypatch):
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["A"])
-    assert result == {"new": [], "updated": ["A"], "current": [], "empty": []}
+    assert result == {"new": [], "updated": ["A"], "current": [], "empty": [], "stale": []}
     written = pd.read_csv(tmp_path / "A.csv", index_col="Date", parse_dates=True)
     assert written.index.max() == pd.Timestamp("2026-08-31")
+
+
+def test_fetch_all_mixed_batch_marks_only_the_silent_failures_stale(tmp_path, monkeypatch):
+    """The actual incident (2026-09-29, PARKING_LOT #10): a full-universe refresh left
+    198 of ~700 tickers silently stuck days behind, folded into 'current' with no error
+    signal, because a single large yf.download() call can drop a subset under Yahoo
+    throttling. Real signature: MOST tickers in the batch get genuine new data, a
+    SUBSET comes back empty even after a retry — distinguishable from a real weekend/
+    holiday, where NOBODY in the batch gets anything (see the test above)."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(fetch_prices, "_now_ist", lambda: datetime(2026, 9, 2, 16, 0, tzinfo=IST))
+    old_dates = pd.date_range(end="2026-08-28", periods=4, freq="D")  # last cached: 08-28
+    for t in ("GOOD", "STUCK"):
+        _multi_index_df([f"{t}.NS"], old_dates)[f"{t}.NS"].to_csv(tmp_path / f"{t}.csv")
+
+    def fake_download(yf_tickers, **kwargs):
+        # GOOD genuinely has new data through safe_today; STUCK silently gets nothing,
+        # on the main pass AND the retry — the exact "some succeed, some don't" shape
+        new_dates = pd.date_range("2026-08-29", periods=5, freq="D")  # 08-29..09-02
+        df = _multi_index_df(yf_tickers, new_dates)
+        for d in new_dates:
+            df.loc[d, ("STUCK.NS", "Close")] = float("nan")
+        return df
+
+    monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
+    result = fetch_prices.fetch_all(["GOOD", "STUCK"])
+    assert result == {"new": [], "updated": ["GOOD"], "current": [], "empty": [], "stale": ["STUCK"]}
+    written = pd.read_csv(tmp_path / "STUCK.csv", index_col="Date", parse_dates=True)
+    assert written.index.max() == pd.Timestamp("2026-08-28")  # untouched, not silently marked current
 
 
 def test_fetch_all_new_ticker_before_safe_hour_drops_todays_row(tmp_path, monkeypatch):
@@ -214,7 +243,7 @@ def test_fetch_all_new_ticker_before_safe_hour_drops_todays_row(tmp_path, monkey
 
     monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
     result = fetch_prices.fetch_all(["NEWCO"])
-    assert result == {"new": ["NEWCO"], "updated": [], "current": [], "empty": []}
+    assert result == {"new": ["NEWCO"], "updated": [], "current": [], "empty": [], "stale": []}
     written = pd.read_csv(tmp_path / "NEWCO.csv", index_col="Date", parse_dates=True)
     assert len(written) == 4  # 5 fetched, today (08-31) dropped as unsafe
     assert written.index.max() == pd.Timestamp("2026-08-30")
