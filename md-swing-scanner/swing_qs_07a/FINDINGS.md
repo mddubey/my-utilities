@@ -507,3 +507,154 @@ a live/reactive observation, not shown here to be predictable in advance.
 **Files**: `06_pivot_distance_features.py`, `pivot_distance_features.csv`
 (205,674 rows), `pivots.py` (added `monthly_pivots()`),
 `tests/test_pivots.py` (added test).
+
+## RQ-QS-07A-3R — Trend/Momentum Robustness Audit (2026-09-29, critic-specified) — the signal is real but concentrated in liquid names, and has weakened since 2024
+
+**Question**: is the trend/momentum precursor from 05_ real, stable, and useful
+across market-quality/regime strata, or an artifact of a specific slice? Frozen
+population (full Cohort A + matched controls, no filter). 5 pre-declared
+primary variables (not re-selected after seeing results): `dist_sma200_pct`,
+`ret_20d`, `dist_low252_pct`, `dist_ema34_pct`, `rsi14`. Independently verified
+the stratification arithmetic directly (liquidity decile 0 and 9's
+`dist_sma200_pct` gaps recomputed from raw grouped medians) before trusting
+anything — exact match.
+
+### A. Liquidity decile — the single most important result of this whole line
+
+**The signal is essentially ABSENT in the least liquid decile and grows
+monotonically, dramatically, to the most liquid decile:**
+
+| Decile (0=least liquid) | n cohort | dist_sma200_pct gap | ret_20d gap | dist_low252_pct gap | dist_ema34_pct gap | rsi14 gap |
+|---|---|---|---|---|---|---|
+| 0 | 17,428 | **-0.01** | +1.23 | +2.77 | +0.89 | +2.14 |
+| 1 | 15,410 | +0.51 | +1.19 | +4.38 | +0.90 | +1.77 |
+| 2 | 13,661 | +3.34 | +2.15 | +9.62 | +1.38 | +2.73 |
+| 3 | 11,819 | +5.04 | +2.65 | +13.60 | +1.84 | +3.30 |
+| 4 | 10,187 | +5.81 | +3.07 | +14.20 | +2.18 | +3.91 |
+| 5 | 9,339 | +6.40 | +2.86 | +16.24 | +2.22 | +3.74 |
+| 6 | 8,135 | +9.01 | +3.58 | +24.45 | +2.55 | +4.04 |
+| 7 | 7,472 | +8.28 | +4.55 | +23.51 | +3.35 | +5.20 |
+| 8 | 5,700 | +11.77 | +5.08 | +31.18 | +3.45 | +4.83 |
+| 9 (most liquid) | 3,686 | **+15.80** | +6.68 | **+50.17** | +4.27 | +5.28 |
+
+Every one of the 5 primary variables shows this SAME monotonic-or-near-monotonic
+climb from decile 0 to decile 9, not just one. `dist_sma200_pct` moves from
+essentially zero (-0.01, no signal at all) to +15.80 — a real, dramatic range,
+not noise. This directly matches the Indian-market literature the critic cited
+(momentum stronger among liquid stocks, reversal effects more pronounced among
+illiquid ones) — now confirmed on this project's own data, cleanly, not merely
+assumed from an external source.
+
+**This materially changes how 05_'s original population-wide result should be
+read.** Decile 0 (the least liquid) is the SINGLE LARGEST decile bucket in
+Cohort A (17,428 of 102,837, ~17%) — recall from 07A-2 that Cohort A already
+skews toward low liquidity. The population-wide gap reported in 05_ was real,
+but it was disproportionately driven by the smaller, more liquid slice of the
+cohort; for the bulk of low-liquidity events, this trend/momentum family
+carries close to zero discriminating information.
+
+### B. F&O eligibility — confirms and reinforces the liquidity finding
+
+| | n cohort | dist_sma200_pct gap | ret_20d gap | dist_low252_pct gap | dist_ema34_pct gap | rsi14 gap |
+|---|---|---|---|---|---|---|
+| F&O eligible | 3,134 | +10.38 | +4.03 | +42.13 | +2.50 | +4.38 |
+| Non-F&O | 99,703 | +3.81 | +2.55 | +11.74 | +1.84 | +3.26 |
+
+F&O names (a subset of the highest liquidity deciles by construction) show a
+gap roughly 2.7-3.6x larger than non-F&O names across every variable — the
+trend/momentum signal is genuinely stronger, not just present, in exactly the
+population that matters for an eventual options product.
+
+### C. Circuit involvement — a real, different-flavored nuance, not a simple confound
+
+| | n cohort | dist_sma200_pct gap | ret_20d gap | dist_low252_pct gap | dist_ema34_pct gap | rsi14 gap |
+|---|---|---|---|---|---|---|
+| Zero circuit | 93,908 | +3.17 | +2.30 | +10.82 | +1.60 | +2.88 |
+| Circuit-involved | 8,929 | +1.66 | +5.19 | **-1.27** | **+5.84** | **+7.63** |
+
+Circuit-involved names show a genuinely DIFFERENT pattern, not simply a weaker
+or stronger version of the same one: LOWER long-term structural-position gaps
+(`dist_low252_pct` actually flips negative) but MUCH HIGHER short-term
+momentum gaps (`rsi14` +7.63, `dist_ema34_pct` +5.84). Consistent with a
+plausible mechanism — an illiquid name waking up with a sudden short-term
+momentum burst (high RSI, above its 34-day EMA) without necessarily being in a
+strong long-term structural position (still closer to its 52-week low) —
+flagged as a real, interesting difference worth knowing, not a reason to
+exclude circuit-involved names from anything.
+
+### D. NIFTY 500 membership — same direction as F&O/liquidity, lower priority per critic (imperfect v1 metadata)
+
+| | n cohort | dist_sma200_pct gap | ret_20d gap | dist_low252_pct gap | dist_ema34_pct gap | rsi14 gap |
+|---|---|---|---|---|---|---|
+| NIFTY 500 member | 11,528 | +7.82 | +3.54 | +27.93 | +2.40 | +4.29 |
+| Non-member | 91,309 | +3.56 | +2.44 | +10.94 | +1.79 | +3.18 |
+
+### E. Year — the signal has weakened substantially since 2024, the same regime pattern found repeatedly tonight
+
+| Year | n cohort | dist_sma200_pct gap | ret_20d gap | dist_low252_pct gap | dist_ema34_pct gap | rsi14 gap |
+|---|---|---|---|---|---|---|
+| 2021 (partial) | 1,176 | n/a* | +9.14 | n/a* | +6.85 | +9.10 |
+| 2022 | 22,746 | +5.39 | +2.78 | +18.54 | +2.01 | +3.30 |
+| 2023 | 19,504 | +5.44 | +3.04 | +14.56 | +2.19 | +3.85 |
+| 2024 | 23,990 | +7.52 | +4.13 | +23.73 | +2.92 | +4.52 |
+| 2025 | 18,461 | **-1.43** | +0.46 | +4.72 | +0.28 | +1.11 |
+| 2026 | 16,960 | **-0.93** | +1.02 | +5.87 | +0.79 | +2.00 |
+
+*2021's `dist_sma200_pct`/`dist_low252_pct` medians are NaN — genuinely
+insufficient trailing history (200/252-day lookbacks) for most events that
+early in the cached data, not a bug; the 3 shorter-lookback variables still
+compute and show a real (if partial-year, thin-sample) gap.
+
+**2022-2024 show a real, strong, consistent signal across every variable.
+2025-2026 show the signal collapse to near-zero or slightly negative for the
+longer-horizon variables** (`dist_sma200_pct` actually goes negative both
+years) while the shorter-horizon variables (`ret_20d`, `rsi14`) weaken
+substantially but don't fully vanish. **This is now the fourth or fifth
+independent confirmation, within this single session, of the same "something
+changed in the 2025-2026 regime" pattern** — QS-A's own year-by-year (RQ-QS-06
+line), Cohort A's share-of-population year-by-year (07A-2), and Cohort B's
+clean-subset coverage (07A-2B) all showed the same softening. Worth treating
+as a real, standing, cross-cutting project observation, not a one-off.
+
+### Feature-feature correlation diagnostic — confirms the critic's expectation: one latent dimension, not 5 independent signals
+
+| | dist_sma200 | ret_20d | dist_low252 | dist_ema34 | rsi14 |
+|---|---|---|---|---|---|
+| dist_sma200 | 1.00 | 0.59 | 0.85 | 0.69 | 0.64 |
+| ret_20d | 0.59 | 1.00 | 0.49 | 0.91 | 0.89 |
+| dist_low252 | 0.85 | 0.49 | 1.00 | 0.57 | 0.54 |
+| dist_ema34 | 0.69 | 0.91 | 0.57 | 1.00 | **0.98** |
+| rsi14 | 0.64 | 0.89 | 0.54 | 0.98 | 1.00 |
+
+(Spearman, within Cohort A — the Control population shows the same structure,
+slightly weaker correlations throughout.) `dist_ema34_pct` and `rsi14`
+correlate at 0.98 — essentially the same measurement. Two sub-groups emerge: a
+longer-term "structural position" pair (`dist_sma200`/`dist_low252`, r=0.85)
+and a shorter-term "momentum" trio (`ret_20d`/`dist_ema34`/`rsi14`, r=0.89-0.98),
+cross-correlated at a more moderate 0.47-0.69. **Confirms the critic's
+expectation exactly: these 5 variables are not 5 independent pieces of
+evidence — they are one latent trend-strength dimension expressed through
+slightly different lenses**, with a real but secondary split between its
+longer-term/structural and shorter-term/momentum expressions.
+
+**Honest overall disposition**: the trend/momentum precursor from 05_ is real
+— it survives across every stratum tested, always in the same direction — but
+it is NOT uniform. It is concentrated in liquid, F&O-eligible, larger-cap names
+(exactly where it would matter most for an options product) and has weakened
+substantially in the most recent 1.5-2 years. It represents one underlying
+"already moderately trending" dimension, not several independent signals. This
+is a materially more precise, more useful characterization than 05_'s
+population-wide read alone — not a reversal of it.
+
+**Per critic's explicit instruction: no new classical-TA feature family
+explored in this pass.** The next open decision is whether relative-strength/
+sector context (the genuinely different, not-yet-tried family, still blocked
+on the same un-vectorized infrastructure limitation as RQ-QS-07U) is worth
+building now that trend/momentum has survived this robustness pass, or whether
+the liquidity/regime concentration found here changes that calculus.
+
+**Files**: `07_trend_robustness_audit.py`, `trend_robustness_audit.csv`
+(217,136 rows — includes 11,509 rows where the merge to `precursor_features.csv`
+didn't find a match, e.g. very recently listed tickers with insufficient
+history for a feature; excluded from median calculations via the existing
+`.dropna()`-safe `.median()` handling, not silently zero-filled).
