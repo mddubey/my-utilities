@@ -658,3 +658,82 @@ the liquidity/regime concentration found here changes that calculus.
 didn't find a match, e.g. very recently listed tickers with insufficient
 history for a feature; excluded from median calculations via the existing
 `.dropna()`-safe `.median()` handling, not silently zero-filled).
+
+## RQ-QS-07A-4 — Relative-Strength Proxy Audit (2026-09-29, critic-specified, cheap interim test)
+
+**Question**: does stock-minus-market momentum add information beyond the
+absolute trend-strength family already found, or is a stock's strength
+predominantly just broad-market participation? Deliberately narrow scope per
+critic: 5D/20D stock return, 5D/20D NIFTY (market) return, stock-minus-market
+at both horizons. **Market-relative only, NOT sector-relative** — this
+project's only sector mapping (`_sectors.csv`) is a single current snapshot
+applied across 5 years, the same disclosed point-in-time limitation as
+`nifty500_universe.csv` (RQ-QS-07U) — not "already safely available," so
+correctly out of scope for this cheap pass, per critic's own explicit
+guardrail against calling stock-minus-Nifty "relative strength" and pretending
+it answers the sector question.
+
+**A real join bug caught by Rule #22 before trusting anything**: the first
+version merged pre-computed `ret_5d`/`ret_20d` back in from
+`precursor_features.csv` on (ticker, date, group) — an unexpected row-count
+jump (control n: 102,837 -> 114,299) exposed that this key is NOT unique: the
+same control stock-day can legitimately be drawn as a match for multiple
+different cohort A events (random sampling with replacement from a same-date/
+same-decile pool), and BOTH sides of the merge carried that same duplicate
+structure — a classic many-to-many join multiplying rows, the same class of
+bug RQ-QS-06C hit earlier tonight for a different reason. Fixed by
+recomputing the stock returns directly, per-ticker, instead of merging on a
+key that doesn't naturally exist as unique — verified control n returned to
+exactly 102,837 after the fix, hand-verified one row (AAREYDRUGS 2026-02-17:
+ret_5d, market_ret_5d, stock_minus_market_5d all recomputed by hand from raw
+bars) — exact match.
+
+### Result
+
+| | Cohort A median | Control median | Gap |
+|---|---|---|---|
+| Stock ret_5d | +0.70% | -0.27% | +0.98 |
+| Market ret_5d | +0.27% | +0.27% | **+0.00** |
+| Stock-minus-market_5d | +0.33% | -0.54% | +0.87 |
+| Stock ret_20d | +1.68% | -0.71% | +2.38 |
+| Market ret_20d | +0.58% | +0.58% | **+0.00** |
+| Stock-minus-market_20d | +0.57% | -1.40% | +1.97 |
+
+**Market return gap is exactly zero, both horizons** — a clean, free sanity
+check confirming the same-date matching is working correctly (cohort A and
+its controls, by construction, share the same calendar date, so the market's
+own return on that date is necessarily near-identical for both groups).
+
+**The key answer: stock-minus-market barely shrinks the gap versus absolute
+stock momentum** — 5D gap goes from +0.98 (absolute) to +0.87 (relative, ~89%
+retained); 20D gap goes from +2.38 to +1.97 (~83% retained). **The trend/
+momentum signal is predominantly IDIOSYNCRATIC to the stock, not primarily a
+reflection of broad market-wide movement.** Removing the contemporaneous
+market return barely changes the picture, because both cohort and control
+events experience the same market days by construction — most of the earlier
+signal was never "the whole market moved" in the first place.
+
+**The liquidity gradient from 07A-3R survives on the relative measure too,
+confirming it isn't a market-participation artifact**: stock_minus_market_20d
+gap climbs from +1.08 (low liquidity tercile) to +4.69 (high liquidity
+tercile) — same shape as the absolute-momentum liquidity gradient.
+
+**What this does NOT test**: sector-relative momentum (is the stock strong
+relative to ITS SECTOR specifically, vs. the whole market) — genuinely
+different question, still blocked on the same historical-sector-mapping
+limitation, not attempted here per the deliberately narrow scope.
+
+**Disposition, per critic's own decision framework** ("if relative adds
+information beyond absolute -> build the full infrastructure; if not, we
+haven't wasted a major engineering cycle"): market-relative momentum does NOT
+add much SEPARATION beyond absolute momentum already found — not because the
+signal is weak, but because absolute momentum already captures nearly all of
+it, since market-wide movement contributes little to the gap either way. This
+is a meaningful, reassuring result about the signal's genuineness (it's real
+stock-specific strength, not market beta), but it's a different question from
+whether SECTOR-relative momentum would add something absolute momentum
+misses — that remains open and untested. Critic's read needed on whether this
+result justifies building the full sector infrastructure or not.
+
+**Files**: `08_relative_strength_proxy.py`, `relative_strength_proxy.csv`
+(205,674 rows).
