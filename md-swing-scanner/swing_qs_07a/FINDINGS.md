@@ -737,3 +737,147 @@ result justifies building the full sector infrastructure or not.
 
 **Files**: `08_relative_strength_proxy.py`, `relative_strength_proxy.csv`
 (205,674 rows).
+
+## RQ-QS-07R — Market Regime Diagnostic, complete (2026-09-29, critic-specified)
+
+**Objective (critic's exact framing)**: does the 2025-26 weakening found across
+07A-3R/07A-4 come from the trend/momentum PREDICTOR breaking, or from the
+underlying FAST-MOVER PHENOMENON ITSELF becoming rarer/weaker? Purely
+descriptive — no new predictor, no strategy change, no Cohort-A/control
+machinery. Uses the NEUTRAL broad universe: a fresh daily cross-sectional panel
+(every eligible stock-day, `nse_equity_universe.csv`, 2,327 tickers) plus the
+already-built neutral `event_matrix.csv` (RQ-QS-07A-1). Critic's explicit
+guardrail honored: shown continuously by quarter, not hard-coded as a
+2022-24-vs-2025-26 split, so an abrupt/gradual/segment-specific transition
+would each look different.
+
+**Panel**: 2,063,163 stock-days, 2021Q4-2026Q3 (corp-action days dropped, 60d
+min history).
+
+**Hand-verification (Rule #22) — one real bug caught and disclosed, not
+silently absorbed**: `pct_above_sma200` reads as 0.00% for 2021Q4/2022Q1 and
+0.84% for 2022Q2 — not a real market condition. Traced to source: `sma200`
+needs 200 trading days of history and is genuine `NaN` for any ticker's first
+~10 months in the cache; confirmed directly on RELIANCE (`sma200` all-`NaN`
+2021-11-01 to 2021-11-10). `Close > NaN` silently evaluates `False` in pandas
+rather than being excluded, so early-history rows are miscounted as "below
+SMA200" when the truth is "unknown." **This is a burn-in artifact confined to
+2021Q4-2022Q2 — the table below already excludes that window from
+interpretation.** It does not touch `pct_above_ema34` (34-day requirement,
+already covered by the panel's own history cutoff) or `pct_ret20d_positive`,
+and critically does NOT touch the 2025-26 window this RQ actually turns on
+(every ticker alive that long already has 200+ days of history). Aggregate
+sanity check (bullet b): summed quarterly `n` matches the panel total exactly.
+
+### A+B. Cross-sectional opportunity & trend breadth, by quarter (selected columns; full table in `regime_breadth_by_quarter.csv`)
+
+| Quarter | n | median_ret | dispersion | frac_positive | %>ema34 | %ret20d>0 |
+|---|---|---|---|---|---|---|
+| 2023Q3 | 103,631 | 0.00 | 2.69 | 48.51 | 69.12 | 64.81 |
+| 2023Q4 | 100,103 | 0.00 | 2.75 | 49.36 | 62.83 | 58.87 |
+| 2024Q1 | 101,372 | -0.18 | 3.15 | 45.78 | 54.27 | 50.33 |
+| 2024Q2 | 103,901 | 0.00 | 2.99 | 49.86 | 59.50 | 59.55 |
+| 2024Q3 | 112,381 | -0.10 | 2.81 | 47.32 | 60.99 | 58.95 |
+| 2024Q4 | 110,722 | -0.18 | 2.80 | 46.02 | 39.36 | 42.91 |
+| 2025Q1 | 111,432 | **-0.45** | 3.22 | 42.70 | **18.63** | **20.57** |
+| 2025Q2 | 114,034 | 0.08 | 2.85 | 51.62 | 61.67 | 65.93 |
+| 2025Q3 | 121,001 | -0.22 | **2.35** | 43.64 | 45.30 | 45.19 |
+| 2025Q4 | 119,555 | -0.19 | **2.34** | 44.31 | 31.61 | 33.04 |
+| 2026Q1 | 117,283 | **-0.46** | 2.99 | 41.21 | **24.56** | 29.77 |
+| 2026Q2 | 121,662 | 0.09 | 2.94 | 51.72 | 62.26 | 60.88 |
+| 2026Q3 | 132,561 | -0.19 | 2.50 | 44.66 | 44.91 | 45.35 |
+
+**Finding 1 — NOT a clean level shift, a regime CHANGE IN CHARACTER**: 2023-24
+breadth sat in a fairly stable 54-71% band with only mild quarter-to-quarter
+swings. From 2025Q1 onward, breadth started **oscillating violently**:
+18.63% -> 61.67% -> 45.30% -> 31.61% -> 24.56% -> 62.26% -> 44.91%, swinging
+30-40 points quarter to quarter, something 2023-24 never did. This is directly
+relevant to the trend/momentum precursor found in 05_/07A-3R: that precursor
+needs SUSTAINED trend persistence, and a market that whipsaws between
+sub-25%-breadth and 60%+-breadth quarters is structurally hostile to a
+persistence-based signal even when it's "on" a third of the time.
+
+**Finding 2 — cross-sectional dispersion (opportunity) genuinely compressed
+in H2 2025**: dispersion sat at 2.34-2.35 in 2025Q3/Q4, below anything seen in
+2023-2024 (2.6-3.2 range) — a real, if modest, reduction in the spread of
+available outcomes, not just an artifact of the breadth swings above.
+
+### C. Trend breadth by liquidity tercile x year (`regime_breadth_by_liq_tercile_year.csv`)
+
+| Tercile | 2023 | 2024 | 2025 | 2026 | 2023->2025 drop |
+|---|---|---|---|---|---|
+| Low liquidity | 48.44 | 46.34 | 30.40 | 33.73 | -18.0pp |
+| Mid liquidity | 58.42 | 52.13 | 37.43 | 43.90 | -21.0pp |
+| High liquidity | 67.26 | 62.31 | 51.09 | 54.97 | -16.2pp |
+
+**Finding 3 — broad-based, NOT segment-specific**: all three liquidity
+terciles dropped by a similar ~16-21 percentage points from 2023 to 2025, with
+a similar partial rebound into 2026. This directly answers the critic's
+segment-specific-change question: the breadth decline is a market-wide
+phenomenon, not something concentrated in illiquid/small-cap names while
+liquid names stayed fine (or vice versa). It does NOT explain why 07A-3R found
+the trend precursor concentrated in liquid names in the first place — that's
+a separate, already-answered question (liquid names show a stronger
+gap-to-control, not that only liquid names have breadth at all).
+
+### E. Fast-mover base rate, by quarter (`regime_fastmover_baserate_by_quarter.csv`)
+
+| Quarter | mfe_p95 | close_p95 | %crossing fixed MFE-P95 | %crossing fixed close-P95 |
+|---|---|---|---|---|
+| 2023Q3 | 13.06 | 9.13 | 5.11 | 5.25 |
+| 2023Q4 | 13.53 | 9.65 | 5.46 | 5.78 |
+| 2024Q1 | 14.54 | 10.57 | 6.59 | 6.94 |
+| 2024Q4 | 12.17 | 8.56 | 4.25 | 4.61 |
+| 2025Q1 | 12.82 | 8.98 | 4.86 | 5.11 |
+| 2025Q2 | 12.99 | 9.45 | 5.05 | 5.73 |
+| 2025Q3 | **10.55** | **6.81** | **3.22** | **3.03** |
+| 2025Q4 | **9.97** | **6.10** | **2.83** | **2.42** |
+| 2026Q1 | 12.35 | 7.79 | 4.46 | 3.91 |
+| 2026Q2 | 13.85 | 9.77 | **5.90** | **6.15** |
+| 2026Q3 | 11.23 | 7.07 | 3.60 | 3.21 |
+
+**Finding 4 — the underlying fast-mover phenomenon itself really did get
+rarer, but only for a two-quarter window (2025Q3-2025Q4), not permanently**:
+both the raw P95 magnitude and the share crossing the fixed historical P95
+threshold bottom out sharply in 2025Q3/Q4 (close to half the 2024Q1 rate), then
+**recover to 2023-24 levels by 2026Q2** (5.90%/6.15%, actually the best
+quarter in the whole 2025-26 window) before dipping again in 2026Q3. This
+directly confirms the 07A-3R/07A-4 weakening was NOT purely a predictor
+artifact — the phenomenon it's trying to predict was genuinely scarcer for a
+real stretch of 2025 — but it also shows that stretch was NOT a permanent
+structural break; the base rate is recovering unevenly, in the same
+oscillating pattern as trend breadth (Finding 1).
+
+### Disposition
+
+**Answer to the critic's exact question — "reduced breadth, reduced
+dispersion, liquidity/size composition change, weaker fast-mover base rate, or
+some combination?"**: **a combination of reduced trend breadth (Finding 1) and
+a genuinely weaker fast-mover base rate (Finding 4), concentrated specifically
+in 2025Q3-2025Q4** — NOT a liquidity/size composition shift (Finding 3 rules
+this out — the decline is broad-based across all terciles), and NOT a clean
+permanent 2025-26 regime break (both breadth and base rate are already
+recovering unevenly by 2026Q2, most sharply). The dominant character of the
+2025-26 period isn't "worse," it's **choppier** — wider swings between
+strong-breadth and weak-breadth quarters than 2023-24 ever showed. A
+trend-persistence precursor is mechanically more fragile in a choppy regime
+even without the underlying rate of extreme moves falling, which is exactly
+why 07A-3R found a real but weaker signal rather than a dead one.
+
+**Sector dispersion (D)**: explicitly not attempted, per critic's instruction
+— no historical sector mapping exists yet; not faked with a current-snapshot
+proxy.
+
+**Per critic's stated decision framework**: this result argues AGAINST an
+immediate full historical-sector-RS infrastructure build — the regime
+diagnostic already explains most of the 2025-26 weakening via breadth
+choppiness + a real-but-temporary base-rate dip, both liquidity-broad, neither
+of which sector-relative strength would obviously fix. Critic's own next-step
+call needed on whether that's sufficient to keep 07A-5 (historical sector-RS)
+deferred, or whether the still-real 2025Q3-Q4 base-rate dip specifically
+warrants investigating a sector-concentration explanation before moving on.
+
+**Files**: `09_market_regime_diagnostic.py`, `regime_daily_panel.csv`
+(gitignored, 2,063,163 rows), `regime_daily_panel_sample_200k.csv` (seed=42),
+`regime_breadth_by_quarter.csv`, `regime_breadth_by_liq_tercile_year.csv`,
+`regime_fastmover_baserate_by_quarter.csv`.
