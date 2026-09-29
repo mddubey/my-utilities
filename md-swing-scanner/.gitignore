@@ -17,3 +17,13 @@ nifty_index/nifty_index_position.json
 swing_qs_07a/event_matrix.csv
 swing_qs_07a/regime_daily_panel.csv
 swing_qs_07a/trend_state_anatomy.csv
+# 2026-09-29: large derived-data CSVs stripped from git history (see
+# md-swing-scanner CLAUDE.md-adjacent decision -- these are 100% regeneratable
+# from their .py scripts + data_cache/, add no code-review value, and the
+# result tables that matter are already embedded in swing_qs_07a/FINDINGS.md
+swing_qs_07a/precursor_features.csv
+swing_qs_07a/pivot_distance_features.csv
+swing_qs_07a/relative_strength_proxy.csv
+swing_qs_07a/trend_robustness_audit.csv
+swing_qs_07a/trend_state_anatomy_sample_200k.csv
+swing_qs_07a/regime_daily_panel_sample_200k.csv
