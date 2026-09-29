@@ -439,3 +439,71 @@ precursor search is a natural next step, not yet begun).
 **Files**: `05_precursor_discovery.py`, `precursor_features.csv` (205,674
 rows, committed — feature values only, no returns/outcomes duplicated in this
 file, cross-referenced to `cohort_a_events.csv` by ticker+date).
+
+## RQ-QS-07A-3, pivot-distance supplement (2026-09-29, direct user request)
+
+**Motivation, checked before building anything**: user's own live observation
+of a COAL INDIA R1 rejection. Verified against real cached bars first — 2026-09
+-28 shows exactly this: High 429.30 poked above R1 (428.05), failed to clear R2
+(430.00), closed 422.50, back below the pivot itself. A real, genuine instance.
+2026-09-29 (the fictional "today") does NOT yet show the same clean pattern in
+the EOD cache (High so far 426.00, still below R1 at 427.47) — flagged honestly
+as a live-vs-cache timing gap, not asserted as matching.
+
+**Added `monthly_pivots()` to `pivots.py`**, reusing the exact same shared
+`_levels()` formula and prior-period-shift, no-lookahead convention as the
+existing `weekly_pivots()` — own dedicated test added to `tests/test_pivots.py`
+(monthly analogue of the existing weekly/daily tests, including the same
+no-lookahead assertion). 3/3 pivot tests pass.
+
+**Hourly, explicitly NOT run as a population-wide check**: real intraday data
+only covers 2026-06-10 to 2026-09-23 (confirmed directly against
+`intraday_cache/`, ~3.5 months) — only 11,582 of 205,674 (5.63%) of the
+Cohort A + control population falls inside that window, too thin a slice for
+a population-wide finding. Reported as a known, disclosed gap, not attempted.
+
+**Same population/method as 05_** (full Cohort A, matched controls, identical
+seed/reconstruction). Spot-checked one row (AARVI 2024-10-15) against raw
+recomputation — exact match.
+
+### Result — the same pattern found in moving averages, but weaker, and it's the PIVOT itself that carries it, not R1/R2
+
+| Feature | Cohort A median | Control median | Gap |
+|---|---|---|---|
+| dist_daily_pp_pct | +0.13% | -0.27% | +0.40 |
+| dist_daily_r1_pct | -1.93% | -2.03% | +0.09 |
+| dist_daily_r2_pct | -4.05% | -3.87% | -0.18 |
+| dist_weekly_pp_pct | +0.31% | -0.49% | +0.80 |
+| dist_weekly_r1_pct | -4.36% | -4.44% | +0.07 |
+| dist_weekly_r2_pct | -8.75% | -8.29% | -0.46 |
+| dist_monthly_pp_pct | +1.25% | -0.79% | **+2.04** |
+| dist_monthly_r1_pct | -8.53% | -9.06% | +0.53 |
+| dist_monthly_r2_pct | -16.88% | -16.56% | -0.31 |
+
+**Distance to the pivot (PP) itself echoes the exact same pattern as the
+moving-average family in 05_ — real, and growing with timeframe (daily +0.40
+-> weekly +0.80 -> monthly +2.04)**, essentially the same "moderately stronger
+trend position" signal seen through a different, classical-TA lens rather than
+a new, independent discovery.
+
+**Direct, honest answer to the user's actual question: distance to R1 and R2
+SPECIFICALLY does not show a clear, consistent precursor signal.** Every R1/R2
+gap is small (0.07 to 0.53 in magnitude) and inconsistent in sign — R1 gaps are
+positive (weakly favoring cohort A) while R2 gaps are negative (weakly favoring
+the control) at every timeframe tested. This does not support "proximity to
+R1/R2 resistance predicts an upcoming large move" as a population-wide
+pattern. The real, single COAL INDIA instance checked above is a genuine
+example of price behavior AT a resistance level — but that is a different
+claim from "being near R1/R2 beforehand distinguishes future big movers from
+similar stocks that don't move," which this data does not support.
+
+**Disposition**: does not add a new candidate on top of 05_'s trend/momentum
+finding — it's the same underlying signal (already-moderately-strong trend
+position), visible via pivots too, not an independent confirmation from a
+different mechanism. R1/R2 distance specifically is closed as a population-
+wide precursor candidate; a real, single rejection event (like COAL INDIA) is
+a live/reactive observation, not shown here to be predictable in advance.
+
+**Files**: `06_pivot_distance_features.py`, `pivot_distance_features.csv`
+(205,674 rows), `pivots.py` (added `monthly_pivots()`),
+`tests/test_pivots.py` (added test).

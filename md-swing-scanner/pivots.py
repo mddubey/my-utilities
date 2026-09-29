@@ -34,6 +34,21 @@ def weekly_pivots(df):
     return result
 
 
+def monthly_pivots(df):
+    """Monthly floor-trader pivots (PP, R1/R2, S1/S2), computed from the PRIOR
+    completed month's H/L/C and held constant for every day of the current month.
+    No lookahead -- same shared `_levels()` formula and same PRIOR-period-shift
+    convention as `weekly_pivots()` above (added 2026-09-29, on direct user
+    request to check pivot-rejection behavior at daily/weekly/monthly scales)."""
+    month = df.index.to_period("M")
+    monthly = df.groupby(month).agg({"High": "max", "Low": "min", "Close": "last"})
+    pp = (monthly.High + monthly.Low + monthly.Close) / 3
+    levels = _levels(pp, monthly.High, monthly.Low).shift(1)  # use PRIOR month's levels
+    result = levels.reindex(month)
+    result.index = df.index
+    return result
+
+
 def daily_pivots(df):
     """Floor-trader pivots from the PRIOR day's H/L/C. No lookahead."""
     h, l, c = df.High.shift(1), df.Low.shift(1), df.Close.shift(1)

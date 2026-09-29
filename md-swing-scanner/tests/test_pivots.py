@@ -1,6 +1,6 @@
 import pandas as pd
 
-from pivots import weekly_pivots, daily_pivots
+from pivots import weekly_pivots, daily_pivots, monthly_pivots
 
 
 def _daily_df(rows):
@@ -41,6 +41,35 @@ def test_weekly_pivots_formula_and_no_lookahead():
 
     # week 1 itself must NOT have week 1's own pivots available (shift(1) — no lookahead)
     assert pd.isna(levels.loc["2024-01-01"].pp)
+
+
+def test_monthly_pivots_formula_and_no_lookahead():
+    # month 1: Jan 2024 -> H=110, L=90, C=100 (last close of the month)
+    # month 2: Feb 2024 -- should see Jan's pivots, not Feb's own (very different range)
+    df = _daily_df([
+        ("2024-01-15", 105, 95, 100),
+        ("2024-01-25", 110, 90, 95),
+        ("2024-01-31", 107, 97, 100),  # month 1 close
+        ("2024-02-01", 200, 180, 190),  # month 2 -- very different range
+        ("2024-02-02", 205, 185, 195),
+    ])
+    levels = monthly_pivots(df)
+    pp = (110 + 90 + 100) / 3
+    r1 = 2 * pp - 90
+    s1 = 2 * pp - 110
+    r2 = pp + (110 - 90)
+    s2 = pp - (110 - 90)
+
+    for date in ("2024-02-01", "2024-02-02"):
+        row = levels.loc[date]
+        assert row.pp == pp
+        assert row.r1 == r1
+        assert row.s1 == s1
+        assert row.r2 == r2
+        assert row.s2 == s2
+
+    # month 1 itself must NOT have month 1's own pivots available (shift(1) -- no lookahead)
+    assert pd.isna(levels.loc["2024-01-15"].pp)
 
 
 def test_daily_pivots_formula_and_no_lookahead():
