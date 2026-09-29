@@ -112,3 +112,100 @@ this RQ, as designed.
 and re-accel buckets (that's the critic's stated "critical comparison," explicitly for
 after Layer B exists); no promotion of the 3x/5%/3-trading-day parameters, all three
 are pre-declared search-net choices, not validated thresholds.
+
+## RQ-QS-05A, Layer B — Post-Breakout Decay characterization (2026-09-29)
+
+Per critic's exact spec: range decay, volume decay, decay-day-count, monotonic vs
+merely-declining, whether price holds the breakout area, whether there's a
+subsequent expansion. No thresholds, no returns, no gate. Two forward windows
+pre-declared before running: 15 trading days (Bulkowski's own stated flag/pennant
+duration) and 40 (long enough to have caught JUSTDIAL's real Aug-28 secondary pop
+during the earlier hand-check — chosen for that documented reason, not tuned after
+seeing this script's output). Reused the existing production `vol_declining5` column
+(the literal 5-day-declining-volume flag `reject_theta_trap()` already uses for an
+unrelated options-side rejection rule) rather than reimplementing it, plus a new
+`decay_run_len` anchored at the episode's own end (vol_declining5 is a rolling flag
+anywhere in history, not anchored to "counting from right after this breakout").
+
+**Full population (14,032 episodes, 703 tickers, ~5yr), 15-day window:**
+
+| Metric | P25 | P50 | P75 | P90 |
+|---|---|---|---|---|
+| vol_ratio_to_baseline (vs trailing-50d median) | 1.28x | 1.81x | 2.88x | 4.71x |
+| vol_trend_corr (day-index vs Volume) | -0.545 | -0.304 | 0.027 | 0.305 |
+| range_over_atr | 0.78x | 0.93x | 1.12x | 1.34x |
+| range_trend_corr | -0.382 | -0.137 | 0.134 | 0.350 |
+| decay_run_len (consecutive day-over-day vol drops) | 1 | 1 | 2 | 3 |
+| min_low_vs_prebreakout_pct | -8.3% | -1.1% | 3.7% | 7.6% |
+
+vol_trend_corr negative in 73.0% of episodes; range_trend_corr negative in 63.2%.
+vol_declining5 (the literal production flag) is True on 0% of days at P50 — median
+episode never even hits one qualifying 5-day run, let alone the user's screener's
+implicit "watch for this" moment. Only 44.5% of episodes keep their low above the
+pre-breakout close within 15 days; 0.2% keep the low above the flagpole's own peak
+High (this last field is closer to tautological given how extreme a 1-2 day spike's
+own High typically is — reported for completeness, not a real finding on its own).
+Subsequent expansion (another qualifying episode, same ticker) within 15 days:
+30.0%; within 40 days: 57.6%.
+
+**40-day window**: same shape, slightly softer — vol_ratio_to_baseline P50 1.75x,
+vol_trend_corr P50 -0.150 (67% negative), only 30.8% hold above the pre-breakout
+close by then.
+
+**Descriptive split by novel_252d (NOT a performance comparison, per critic's
+instruction)** — the gap is small in both directions and doesn't cleanly support
+"novel breakouts decay better":
+
+| | novel (n=880) | re-accel (n=13,152) |
+|---|---|---|
+| vol_trend_corr median, 15d | -0.320 | -0.304 |
+| holds above pre-breakout, 15d | 41.9% | 44.7% |
+| subsequent expansion, 15d | 26.1% | 30.2% |
+| holds above pre-breakout, 40d | 26.7% | 31.1% |
+| subsequent expansion, 40d | 48.2% | 58.3% |
+
+Novel breakouts are, if anything, marginally LESS likely to hold above their own
+pre-breakout level in this simple cut — the opposite direction of the naive
+hypothesis, though the gap is small enough (2-5pp) that it shouldn't be read as a
+real reversal either. Re-accel's higher subsequent-expansion rate is intuitive on
+its own (a stock that already spikes often is more likely to spike again soon,
+almost by construction) and doesn't by itself say anything about decay QUALITY.
+
+**Rule #22 anchors — the two hand-checked examples show a clean, real contrast that
+the population split above does NOT capture:**
+
+- **JUSTDIAL** (episode 2026-07-13->07-14): 15d vol_trend_corr **-0.625** (strong real
+  decay), decay_run_len 3, min_low_vs_prebreakout **+24.1%** (held well above where it
+  broke out from). 40d: vol_trend_corr still -0.421, min_low_vs_prebreakout still
+  **+13.0%**, subsequent_expansion_day=**33** — correctly detects the real Aug-28
+  secondary pop found in the manual chart read.
+- **GOCLCORP** (single-day episode, 2026-09-03 only — confirms this one was a lone
+  spike, not a 2-day flagpole like JUSTDIAL/its own March events): 15d vol_trend_corr
+  **+0.211** (volume rising, not decaying), decay_run_len 1, min_low_vs_prebreakout
+  **-3.8%** (gave back the whole move within 15 days), subsequent_expansion_day=**9**
+  (re-accelerated again in under 2 weeks). Both windows agree.
+
+**Honest disposition**: the two anchor cases behave exactly as their hand-checks
+predicted and cleanly opposite each other — real signal exists for AT LEAST some
+episodes. But this does NOT show up as a strong population-level effect when split
+simply by novel-vs-re-accel at one horizon: the aggregate gap is small (2-5pp) in
+both directions, the literal "N consecutive declining volume days" the user's own
+screener checks for is a rare event (median run-length 1, not 5), and a meaningful
+minority of ALL episodes (55-70%, depending on window) give back the entire
+breakout move rather than holding it. Two honest readings, not yet adjudicated:
+(a) the true discriminating factor isn't well-captured by "novel vs re-accel at
+252d" as currently defined, or (b) a real effect exists in a genuinely distinct
+minority subset (mirroring how RQ-QS-04A found an 18% "holds-above-A" subset
+buried inside a much noisier overall population) and averaging across all 14,032
+episodes dilutes it. Not resolved here — no threshold-hunting attempted, per
+critic's explicit instruction. Next step, per this project's own established
+04A->04B precedent, would be a further DESCRIPTIVE (still no returns) anatomy pass
+isolating episodes with an unusually sustained/monotonic decay AND price holding
+the pre-breakout level, to see if THAT specific slice looks like JUSTDIAL — not yet
+run, pending critic's read on whether that's the right next cut or whether this
+result should instead close the "generic decay after any big-volume breakout"
+framing the way 04B closed the "holds-above-A pause" framing.
+
+**Not yet done**: any performance/return numbers anywhere in this line; any subset
+isolation/anatomy beyond the coarse novel/re-accel split; any promotion of the
+15d/40d windows or the 3x/5% Layer A trigger.
