@@ -134,3 +134,127 @@ the winner-vs-control comparison, comes next and has not started.
 `event_matrix.csv` (2,056,725 rows, 474MB, gitignored — fully reproducible from
 `data_cache/` + `nse_equity_universe.csv`, not committed), `event_matrix_sample_
 200k.csv` (deterministic seed=42 sample, committed for quick inspection).
+
+## RQ-QS-07A-2 — Fast-Mover Cohort Characterization + Matched Controls (2026-09-29, critic-specified)
+
+**Method, exactly as pre-registered**: two separate cohorts, kept deliberately
+distinct per critic's core 07A-1 finding ("large opportunity and large sustained
+movement are not the same phenomenon"). **Cohort A (Opportunity)**: D3 MFE >= its
+own empirical P95 (12.94%). **Cohort B (Sustained)**: D3 close-to-close return >=
+ITS OWN empirical P95 (8.89% — not the MFE threshold forced onto a different
+distribution). Both n=102,837 by construction. Matched control: same calendar
+date + same cross-sectional liquidity decile (`traded_value_sma20` at T, ranked
+among all eligible stock-days that date) + not itself a cohort member, one draw,
+seed=42. 100% matched (130,175 of 130,175 cohort events found a same-date/decile
+non-cohort partner). Circuit-day annotation added to the event matrix itself
+(O==H==L==C within 0.05% tolerance, the exact KOTYARK signature verified in
+07A-1), plus liquidity, F&O, NIFTY-500 as stratification, not filters — nothing
+removed from either cohort. `burst_clean` (max_return_d1>0, secondary label) added
+alongside `burst_v0` (unchanged, per critic: "don't rerun... carry burst_v0").
+
+**Rule #22**: hand-verified JIOFIN 2024-02-01 (deterministic middle-of-list pick
+from the "clean tradeable" subset defined below, not cherry-picked) against raw
+bars — every field exact, including day_of_max correctly identifying day 2 (the
+Feb 5 spike to 295.70) as the peak, with day 3's close still up 7.35% despite the
+peak already softening intraday.
+
+**Cohort A and B overlap heavily (73.4%) despite measuring different things.**
+Most extreme-MFE events are also extreme-sustained-return events. The "not the
+same phenomenon" finding from 07A-1 describes the OVERALL population (where the
+median diverges sharply, MFE +2.94% vs close +/-0.21%) — at the very top of
+either distribution, the two substantially converge. Worth holding both facts at
+once, not treating them as contradictory.
+
+### Cohort A (Opportunity) vs. matched control
+
+| | Cohort A | Matched control |
+|---|---|---|
+| max_return_d1 (median) | 5.00% | 2.06% |
+| max_return_d3 (median) | 15.91% | 3.56% |
+| close_ret_d3 (median) | 12.34% | 0.26% |
+| adverse_d3 (median) | -0.51% | -2.38% |
+| path_shape: progressive | 59.2% | 20.5% |
+| path_shape: spike_and_fade | 6.6% | 21.5% (pop. baseline 38.3%) |
+| NIFTY 500 member | 11.2% | 15.0% |
+| F&O eligible | 3.0% | 5.2% |
+
+**The path-shape gap is the single starkest number, and it's largely mechanical,
+not a deep discovery — worth being honest about that.** Selecting for an extreme
+D3 MFE naturally selects for paths whose peak keeps extending through day 3
+(progressive-like), and mechanically excludes early-peak-then-fade paths from
+ever reaching that extreme (a fade, by construction, caps out before D3). This
+IS still useful — it confirms the cohort is behaviorally coherent, not noise —
+but it should not be oversold as an independent predictive insight; it follows
+substantially from how the cohort and the path-shape taxonomy are both derived
+from the same underlying MFE/day-of-max quantities.
+
+**Cohort A skews toward LOWER liquidity even after matching on liquidity decile
+against the control** — 16.9% of Cohort A sits in the lowest liquidity decile
+(vs. an even 10% if liquidity didn't matter at all), falling steadily to 3.6% in
+the highest decile. Real opportunity is genuinely concentrated in the less-liquid
+tail, exactly the pattern the critic anticipated when the universe was widened
+past NIFTY 500 — now quantified, not assumed.
+
+### Cohort B (Sustained) vs. matched control — very similar shape to Cohort A
+
+`path_shape` even more skewed toward progressive (72.5%) with almost no
+spike_and_fade (0.2% — makes sense, spike_and_fade's own definition requires a
+big D3 giveback, which is close to the opposite of what defines Cohort B).
+NIFTY-500/F&O representation (14.4%/4.7%) sits between Cohort A and the control,
+consistent with sustained moves being somewhat, but not dramatically, more
+common among larger/liquid names than pure MFE spikes are.
+
+### Tradeability audit of Cohort A — a breakdown, not a filter
+
+| | % of Cohort A |
+|---|---|
+| 0 circuit days | 91.3% |
+| 1 circuit day | 4.2% |
+| 2 circuit days | 2.7% |
+| 3 circuit days (KOTYARK-style) | 1.8% |
+| F&O eligible | 3.0% |
+| NIFTY 500 member | 11.2% |
+
+**Circuit-locking is real but is NOT the dominant driver of the extreme tail** —
+91.3% of Cohort A involves zero circuit days. Circuit involvement concentrates
+almost entirely in the non-F&O population (F&O share falls from 3.3% among
+zero-circuit events to 0.3% among fully-circuit-locked ones — exactly the
+pattern expected, since F&O eligibility requires liquidity/market-cap floors
+that make circuit hits rare).
+
+**The clean, tradeable-looking subset (0 circuit days AND F&O-eligible) is small
+(3,072 events, 3.0% of Cohort A) but its outcomes are just as strong as the
+cohort as a whole** — median max_return_d3 15.74% (vs. 15.91% cohort-wide),
+close_ret_d3 12.58% (vs. 12.34%). **This is the most economically important
+result of the pass**: real, large, sustained short-horizon moves are not only a
+microcap/illiquid phenomenon — they occur, at comparable magnitude, within the
+genuinely liquid, F&O-tradeable universe too, in a meaningful (if not huge)
+sample. Hand-verified example above (JIOFIN, 2024-02-01) is a member of exactly
+this subset.
+
+### Year-by-year (Rule #16), Cohort A's share of the eligible population
+
+| Year | Cohort A n | Total n | % |
+|---|---|---|---|
+| 2021 (partial) | 1,176 | 16,955 | 6.94% |
+| 2022 | 22,746 | 379,442 | 5.99% |
+| 2023 | 19,504 | 400,802 | 4.87% |
+| 2024 | 23,990 | 428,328 | 5.60% |
+| 2025 | 18,461 | 465,974 | 3.96% |
+| 2026 | 16,960 | 365,224 | 4.64% |
+
+Roughly stable around the 5% construction rate every year, with 2025 notably
+lower (3.96%) — consistent with the same "something changed after 2024" softer-
+regime pattern several other lines in this project (QS-A's own year-by-year
+among them) have independently flagged. Not investigated further here.
+
+**Not yet done**: no predictive feature has been tested against cohort
+membership (this is still outcome/stratification characterization, not a
+"what precedes it" search — that is the next, separate step); no ML, score, or
+threshold promoted; the delisted-companies universe gap (RQ-QS-07U) still applies
+to any performance-adjacent reading of these numbers.
+
+**Files**: `03_cohort_matched_controls.py`, `cohort_a_events.csv` (102,837 rows),
+`cohort_b_events.csv` (102,837 rows). `event_matrix.csv` rebuilt with
+`traded_value_sma20`, `circuit_days_in_window`, `burst_clean` columns added
+(still gitignored, 528MB, reproducible).

@@ -77,14 +77,27 @@ def event_matrix_for(ticker, nifty500_set, fo_set):
     df = df.reset_index()
 
     close = df.Close.values
+    open_ = df.Open.values
     high = df.High.values
     low = df.Low.values
     corp = df.corp_action_day.values
+    liquidity = df.traded_value_sma20.values  # (Close*Volume) 20d avg, decision-time-safe at T
 
     h1, h2, h3 = np.roll(high, -1), np.roll(high, -2), np.roll(high, -3)
     l1, l2, l3 = np.roll(low, -1), np.roll(low, -2), np.roll(low, -3)
     c1, c2, c3 = np.roll(close, -1), np.roll(close, -2), np.roll(close, -3)
+    o1, o2, o3 = np.roll(open_, -1), np.roll(open_, -2), np.roll(open_, -3)
     corp1, corp2, corp3 = np.roll(corp, -1), np.roll(corp, -2), np.roll(corp, -3)
+
+    # circuit-lock day: Open==High==Low==Close (within a tiny float tolerance) -- the
+    # exact signature found by hand-verifying KOTYARK (RQ-QS-07A-1's extreme-tail
+    # example), a genuine no-real-intraday-range price-band-hit day, not a computation
+    # artifact. Counted per forward day, not blended into the return math itself.
+    def _is_circuit(o, h, l, c):
+        with np.errstate(invalid="ignore"):
+            rng = np.maximum(h, c) - np.minimum(l, c)
+            return (rng / np.where(c != 0, c, np.nan)) < 0.0005
+    circ1, circ2, circ3 = _is_circuit(o1, h1, l1, c1), _is_circuit(o2, h2, l2, c2), _is_circuit(o3, h3, l3, c3)
 
     max_h_d1 = h1
     max_h_d2 = np.maximum(h1, h2)
@@ -111,12 +124,15 @@ def event_matrix_for(ticker, nifty500_set, fo_set):
     clean_forward = ~corp1.astype(bool) & ~corp2.astype(bool) & ~corp3.astype(bool)
     eligible = valid_history & valid_future & ~corp.astype(bool) & clean_forward
 
+    circuit_days_in_window = circ1.astype(int) + circ2.astype(int) + circ3.astype(int)
+
     out = pd.DataFrame({
         "ticker": ticker, "date": df.Date.dt.date, "close": close,
         "max_return_d1": max_return_d1, "max_return_d2": max_return_d2, "max_return_d3": max_return_d3,
         "adverse_d1": adverse_d1, "adverse_d2": adverse_d2, "adverse_d3": adverse_d3,
         "close_ret_d1": close_ret_d1, "close_ret_d2": close_ret_d2, "close_ret_d3": close_ret_d3,
-        "day_of_max": day_of_max,
+        "day_of_max": day_of_max, "traded_value_sma20": liquidity,
+        "circuit_days_in_window": circuit_days_in_window,
     })[eligible].reset_index(drop=True)
     if out.empty:
         return out
@@ -132,6 +148,12 @@ def event_matrix_for(ticker, nifty500_set, fo_set):
     out.loc[progressive, "path_shape"] = "progressive"
     out.loc[burst, "path_shape"] = "burst"
     out.loc[spike_and_fade, "path_shape"] = "spike_and_fade"
+
+    # burst_clean (2026-09-29, critic's exact instruction): burst_v0 (path_shape=="burst")
+    # kept as originally pre-registered, NOT rewritten -- 69% of it turned out to have no
+    # real day-1 upside at all. burst_clean is a secondary, explicitly-separate descriptive
+    # label requiring genuine max_return_d1>0, carried alongside, not replacing, the original.
+    out["burst_clean"] = burst & (out.max_return_d1 > 0)
 
     out["nifty500_member"] = ticker in nifty500_set
     out["fo_eligible"] = ticker in fo_set
