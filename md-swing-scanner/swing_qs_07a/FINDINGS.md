@@ -258,3 +258,83 @@ to any performance-adjacent reading of these numbers.
 `cohort_b_events.csv` (102,837 rows). `event_matrix.csv` rebuilt with
 `traded_value_sma20`, `circuit_days_in_window`, `burst_clean` columns added
 (still gitignored, 528MB, reproducible).
+
+## RQ-QS-07A-2B — Cohort B Tradeability Symmetry Audit (2026-09-29, critic-specified, small scope)
+
+**Purpose, per critic**: "Does B also retain its extreme behavior inside the
+zero-circuit, F&O-eligible subset? If yes, that strengthens the interpretation
+that both tails contain genuine tradeable phenomena. If no, that's important
+too." Deliberately small — no feature search, no filtering, no new thresholds.
+
+**Rule #22**: hand-verified JSWENERGY 2022-08-01 (deterministic middle-of-list
+pick from the clean subset, not cherry-picked) — max_return_d3=11.60%,
+close_ret_d3=11.19%, day_of_max=3, all matched raw bars exactly.
+
+| | Cohort A | Cohort B |
+|---|---|---|
+| Zero circuit days | 91.3% | 90.4% |
+| F&O eligible | 3.0% | 4.7% |
+| NIFTY 500 member | 11.2% | 14.4% |
+| Clean subset (0 circuit + F&O) n | 3,072 | 4,752 |
+| Clean subset % of cohort | 3.0% | 4.6% |
+
+**The answer to the critic's own question is a genuine, honest "partially."**
+Cohort A's clean subset retained essentially the FULL cohort's magnitude
+(max_return_d3 15.74% vs 15.91% cohort-wide — a ~1% relative difference).
+**Cohort B's clean subset shows real, if modest, magnitude compression**:
+max_return_d3 13.26% vs 15.48% cohort-wide (~14% relative reduction),
+close_ret_d3 11.08% vs 12.43% cohort-wide (~11% relative reduction). Still
+large, real, substantial numbers — this is NOT a collapse — but a genuinely
+different pattern from Cohort A's near-identical clean/full comparison. This is
+exactly the kind of asymmetry the 73.4% A/B overlap could otherwise obscure: A
+and B behave similarly at the surface level but are not fully interchangeable,
+and B's extreme sustained moves lean somewhat more (not overwhelmingly) on the
+noisier, less liquid part of the population than A's extreme MFE moves do.
+
+**Year-by-year clean-subset coverage** stays in a similar 3.4%-8.4% range as
+Cohort A's, with the same modest recent-year softening (2025: 4.3%, 2026: 3.4%,
+vs 2021-2022's 8.4%/4.8%) — consistent with every other year-by-year check this
+project has run recently.
+
+**Disposition**: does not contradict anything found in 07A-2 — both cohorts
+contain a real, meaningful, liquid/tradeable subset, not purely microcap noise,
+but B's is somewhat softer than A's. No filtering applied to either cohort as a
+result of this audit — both stay fully intact for RQ-QS-07A-3.
+
+**Files**: `04_cohort_b_audit.py` (no new CSV output — reuses `cohort_b_events.
+csv` and `event_matrix.csv` directly).
+
+## RQ-QS-07A-3 — scope correction, logged before building (2026-09-29)
+
+**Sequencing correction, critic + user jointly**: the original 07A-3 proposal
+(restrict discovery search to the clean F&O subset) was REVISED after direct
+user pushback — "why are we restricting to just F&O... given we have not yet
+filtered out on what is actually causing these outcomes... we should only run
+the F&O filtering after that." Critic agreed explicitly: conditioning the
+DISCOVERY population on F&O eligibility before searching for a precursor risks
+hiding the real mechanism if it exists more broadly (e.g., in non-F&O names)
+and only occasionally shows up in F&O names too — F&O eligibility is itself a
+market-quality label (NSE's own criteria: rolling market cap, traded value,
+order-size, deliverable-value, position limits), not a neutral characteristic,
+so conditioning on it upfront changes the population being studied.
+
+**Corrected architecture, adopted**:
+- **Phase 1 (next)**: precursor discovery on the FULL Cohort A (102,837 events)
+  + its already-built matched controls (03_). F&O/NIFTY/circuit/liquidity
+  recorded as stratification/annotation on every row, NOT used as a pre-filter
+  on the search population and NOT used as a candidate predictor feature
+  itself (they are market-quality labels, not the kind of "precursor state"
+  being searched for).
+- **Phase 2 (after a candidate precursor is found)**: check whether it
+  survives/generalizes across those same strata (F&O vs non-F&O, liquidity
+  buckets, circuit-involved vs not) — this is where the question "does this
+  predict fast movers, or only fast movers because F&O names have
+  characteristic liquidity" gets answered.
+- **Phase 3 (only after that)**: an explicit actionability/product-fit gate
+  (F&O eligibility) applied to whatever real precursor survives Phase 2.
+
+Cohort A and Cohort B stay separate outcome labels throughout — not unioned,
+no A-vs-B classifier, no A-only/B-only study yet (the 73.4% overlap is evidence
+worth having, not a reason to collapse the two questions). Once a candidate
+precursor is found, it will be checked against A, B, and A∩B/A\B/B\A as
+evaluation, not built around one of them chosen in advance.
