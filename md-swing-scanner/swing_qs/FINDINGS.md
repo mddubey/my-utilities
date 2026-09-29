@@ -2672,3 +2672,78 @@ Observe step only, same discipline as RQ-06.
 
 **Files**: `trajectory_replay/rq_qs_06b_favorable_state_trajectory.py`,
 `trajectory_replay/rq_qs_06b_state_trajectory.csv` (46,613 rows).
+
+## RQ-QS-06C — Real-Time Archetype Separability Audit (2026-09-29, critic-specified)
+
+**Question**: at the moment a QS-A trade first reaches a given favorable state, is
+there already enough information in its trajectory to distinguish future
+burst_then_exhaustion from future persistent_continuation — BEFORE the outcome is
+known? No exit rule, no threshold optimization, no intervention.
+
+**Discipline, per critic's explicit instruction**: outcome labels (the 06B
+archetypes) are future truth, used only to EVALUATE separability after computing
+predictors — never fed into the predictors themselves. Predictors are strictly
+censored at each landmark (first +0.5R/0.75R/1.0R/1.5R/2.0R), using only days up to
+and including that landmark day. **Label-leakage audit done explicitly before
+building anything**: both archetype definitions use the FINAL/eventual exit R and
+the FINAL/eventual 15D peak — neither is a function of the close on the specific
+day a landmark is first touched, so the 4 predictors below (all computed from days
+<= the landmark) do not reference the archetype-defining quantities.
+
+**A real join bug caught before trusting anything (Rule #22)**: the first version
+merged `rq_qs_06_envelope.csv` and `rq_qs_06b_state_trajectory.csv` on just
+(ticker, entry_date) — but that pair is NOT a unique key (46,613 rows, only 30,374
+unique pairs; the same ticker/date can legitimately trigger under more than one of
+the 10D/20D/40D lookbacks simultaneously). The merge produced 89,097 rows from two
+46,613-row inputs — more than either input, the exact mathematically-impossible-
+for-an-inner-join signal this project's own Rule #22 names explicitly. Killed the
+run, added `entry_definition` to the join key, added an assertion (`len(src) ==
+len(env)`) to prevent recurrence, verified 1:1 before rerunning at scale.
+
+**Predictors (deliberately small, per critic's preference)**: `days_to_landmark`,
+`close_r_at_landmark`, `peak_retention` (close_r / running MFE that day — how much
+of the excursion is still being held right now), `is_new_closing_high` (is today's
+close the highest close of the trade so far, vs prior days only), `trailing_
+persist_3d` (of the last up-to-3 days ending at the landmark, how many closed at/
+above half their own running peak as of that day).
+
+**Separability timeline — burst_then_exhaustion vs persistent_continuation**:
+
+| Landmark | peak_retention median (burst / persistent) | gap | IQRs overlap? | is_new_closing_high (burst / persistent) |
+|---|---|---|---|---|
+| +0.5R | 69.3% / 75.1% | 5.8pp | **Yes** | 97.8% / 97.5% |
+| +0.75R | 72.9% / 78.8% | 5.9pp | **Yes** | 96.7% / 97.0% |
+| +1.0R | 74.7% / 80.3% | 5.6pp | **Yes** | 94.6% / 95.9% |
+| +1.5R | 75.7% / 83.0% | 7.4pp | **Yes** | 86.7% / 95.6% |
+| +2.0R | 78.5% / 83.8% | 5.3pp | **Yes** | 86.7% / 93.6% |
+
+**Honest verdict, mapped to critic's own Case 1/2/3 framework: closest to Case 3,
+not Case 1 or a clean Case 2.** `peak_retention`'s IQRs fully overlap at EVERY
+landmark tested, including the latest/most-confirmed one (+2.0R) — the gap is
+real, small (5.3-7.4pp), and consistently in the same direction (persistent always
+retains more), but never separates cleanly. `days_to_landmark` and `trailing_
+persist_3d` show essentially no useful difference at any landmark. The one
+modestly promising signal is `is_new_closing_high`, whose gap grows at the LATER
+landmarks specifically (+1.5R: 86.7% vs 95.6%, a real 8.9pp; +2.0R: 86.7% vs
+93.6%) — real and directionally consistent, but still nowhere near a clean split
+(both groups mostly show high rates).
+
+**This is NOT evidence that no separation is possible** — it's evidence that this
+SMALL, deliberately-limited, trajectory-only predictor set doesn't cleanly separate
+the two archetypes early. Per critic's own stated fallback, the natural next step
+if this simple pass is weak is to bring in additional contemporaneous information
+(relative strength, market regime, sector movement, volume, ATR/volatility) — not
+yet tested here, and not started without further direction.
+
+**Context, not the primary comparison**: at +1.0R, `unclassified` trades (the 58.5%
+majority) show peak_retention median 71.9%, sitting BETWEEN burst (74.7%) and
+persistent (80.3%) — consistent with `unclassified` being a genuine mixed bag
+rather than a distinct third behavior. `wick_and_fail` trades that happen to reach
++1.0R (a small, n=343 edge case — most wick_and_fail trades are stopped before
+ever reaching this level) show a sharply negative median peak_retention (-18.3%),
+the one clearly distinguishable group, but too small and too late-arriving to be
+useful as an early signal.
+
+**Files**: `trajectory_replay/rq_qs_06c_real_time_separability.py`,
+`trajectory_replay/rq_qs_06c_separability.csv` (111,199 landmark-observations
+across 19,864 trades that reached at least one landmark).
