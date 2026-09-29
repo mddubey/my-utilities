@@ -8,7 +8,7 @@ the cross happens, forward returns measured from that day's Close.
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv("data_cache/_NIFTY.csv")
+df = pd.read_csv("../data_cache/_NIFTY.csv")
 df["Date"] = pd.to_datetime(df.Date)
 
 delta = df.Close.diff()

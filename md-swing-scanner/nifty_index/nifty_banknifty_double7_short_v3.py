@@ -84,8 +84,8 @@ def report(trades, label):
     print()
 
 
-nifty = load_index("data_cache/_NIFTY.csv", has_adx=True)
-banknifty = load_index("data_cache/_BANKNIFTY.csv", has_adx=False)
+nifty = load_index("../data_cache/_NIFTY.csv", has_adx=True)
+banknifty = load_index("../data_cache/_BANKNIFTY.csv", has_adx=False)
 
 for adx_max in [20, 18]:
     print(f"########## ADX < {adx_max} (range-bound filter) ##########")

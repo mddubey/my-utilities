@@ -9,7 +9,7 @@ import pandas as pd
 import glob
 import os
 
-OPTIONS_DIR = "options_cache"
+OPTIONS_DIR = "../options_cache"
 
 files = sorted(glob.glob(f"{OPTIONS_DIR}/*.csv"))
 files = [f for f in files if os.path.basename(f)[:4] >= "2024"]

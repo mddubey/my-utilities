@@ -7,7 +7,7 @@ question is whether a cheaper, higher-gamma current-week PE would do even better
 import pandas as pd
 import os
 
-OPTIONS_DIR = "options_cache"
+OPTIONS_DIR = "../options_cache"
 
 
 def compute_adx(df, period=14):
@@ -24,7 +24,7 @@ def compute_adx(df, period=14):
     return dx.ewm(alpha=1 / period, min_periods=period, adjust=False).mean()
 
 
-nifty = pd.read_csv("data_cache/_NIFTY.csv")
+nifty = pd.read_csv("../data_cache/_NIFTY.csv")
 nifty["Date"] = pd.to_datetime(nifty.Date)
 nifty["adx14_c"] = compute_adx(nifty)
 nifty["sma200_20ago"] = nifty.sma200.shift(20)

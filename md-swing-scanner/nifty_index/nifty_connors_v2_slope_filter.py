@@ -6,7 +6,7 @@ as nifty_connors_strategies.py.
 """
 import pandas as pd
 
-df = pd.read_csv("data_cache/_NIFTY.csv")
+df = pd.read_csv("../data_cache/_NIFTY.csv")
 df["Date"] = pd.to_datetime(df.Date)
 
 delta = df.Close.diff()

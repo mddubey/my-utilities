@@ -13,7 +13,7 @@ import pandas as pd
 
 CUTOFF_TIME = "13:30"
 
-nifty = pd.read_csv("data_cache/_NIFTY.csv")
+nifty = pd.read_csv("../data_cache/_NIFTY.csv")
 nifty["Date"] = pd.to_datetime(nifty.Date)
 h, l, c = nifty.High.shift(1), nifty.Low.shift(1), nifty.Close.shift(1)
 nifty["pp"] = (h + l + c) / 3

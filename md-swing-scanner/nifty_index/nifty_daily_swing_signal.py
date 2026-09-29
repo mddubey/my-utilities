@@ -12,7 +12,7 @@ day itself.
 """
 import pandas as pd
 
-df = pd.read_csv("data_cache/_NIFTY.csv")
+df = pd.read_csv("../data_cache/_NIFTY.csv")
 df["Date"] = pd.to_datetime(df.Date)
 
 df["high10_prior"] = df.High.shift(1).rolling(10).max()

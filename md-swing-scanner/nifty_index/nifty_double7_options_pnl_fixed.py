@@ -10,8 +10,8 @@ of skipping the trade.
 import pandas as pd
 import os
 
-OPTIONS_DIR = "options_cache"
-nifty = pd.read_csv("data_cache/_NIFTY.csv")
+OPTIONS_DIR = "../options_cache"
+nifty = pd.read_csv("../data_cache/_NIFTY.csv")
 nifty["Date"] = pd.to_datetime(nifty.Date)
 nifty_idx = nifty.set_index("Date").Close
 

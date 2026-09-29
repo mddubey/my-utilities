@@ -19,7 +19,7 @@ import pandas as pd
 import glob
 import os
 
-OPTIONS_DIR = "options_cache"
+OPTIONS_DIR = "../options_cache"
 trades = pd.read_csv("nifty_double7_long.csv", parse_dates=["entry_date", "exit_date"])
 
 results = []

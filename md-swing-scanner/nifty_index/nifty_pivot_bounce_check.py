@@ -7,7 +7,7 @@ the Sept 22 case, tested at scale rather than assumed from one example.
 """
 import pandas as pd
 
-df = pd.read_csv("data_cache/_NIFTY.csv")
+df = pd.read_csv("../data_cache/_NIFTY.csv")
 df["Date"] = pd.to_datetime(df.Date)
 
 h, l, c = df.High.shift(1), df.Low.shift(1), df.Close.shift(1)

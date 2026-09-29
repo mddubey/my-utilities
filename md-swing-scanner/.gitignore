@@ -12,3 +12,5 @@ open_positions.csv
 primed_cache.json
 calibration_audit_raw.csv
 reference/strykex/*.pdf
+positions.csv
+nifty_index/nifty_index_position.json

@@ -14,7 +14,7 @@ import yfinance as yf
 import pandas as pd
 
 # real, pre-computable pivots (prior-day H/L/C, no lookahead) -- same as nifty_pivot_bounce_check.py
-nifty = pd.read_csv("data_cache/_NIFTY.csv")
+nifty = pd.read_csv("../data_cache/_NIFTY.csv")
 nifty["Date"] = pd.to_datetime(nifty.Date)
 h, l, c = nifty.High.shift(1), nifty.Low.shift(1), nifty.Close.shift(1)
 nifty["pp"] = (h + l + c) / 3

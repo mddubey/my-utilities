@@ -16,7 +16,7 @@ df.columns = df.columns.droplevel(1) if isinstance(df.columns, pd.MultiIndex) el
 df.index = df.index.tz_convert("Asia/Kolkata")
 df["date"] = df.index.date
 
-OPTIONS_DIR = "options_cache"
+OPTIONS_DIR = "../options_cache"
 expiry_dates = set()
 for f in glob.glob(f"{OPTIONS_DIR}/*.csv"):
     date_str = os.path.basename(f)[:8]
