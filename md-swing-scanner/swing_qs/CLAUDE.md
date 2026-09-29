@@ -120,3 +120,23 @@ folder (product-specific, not general measurement rules)
    product objective — don't treat a label boundary as settled just because it's been
    used in several tables already. (FAST/SLOW/FAKE are swing_qs product abstractions,
    not a general project concept.)
+
+
+## Standing closed result (2026-09-29) — early burst-vs-persistent prediction, do not re-litigate without new evidence
+
+RQ-QS-06C (price trajectory: peak_retention, is_new_closing_high, days_to_landmark,
+trailing_persist_3d) and RQ-QS-06D (contemporaneous volume/volatility/market state:
+volume_ratio, volume_trend_3d, atr_expansion, day_range_over_atr, nifty_return_3d)
+jointly, independently, and cleanly failed to separate future burst_then_exhaustion
+from future persistent_continuation at any of 5 landmarks (+0.5R through +2.0R) —
+06C's IQRs overlapped at every landmark; 06D was 25/25 cells overlapping. Per
+critic's own pre-declared decision rule, this CLOSES early prediction of this
+specific archetype split using the current trade's own price trajectory plus
+contemporaneous volume/volatility/market context. Further feature hunting on this
+exact question (sector, relative strength, intraday, or any other new feature
+family bolted onto the SAME prediction target) needs new evidence to reopen, not
+just another feature family tried for its own sake. Full detail: FINDINGS.md,
+"RQ-QS-06C"/"RQ-QS-06D" sections. Research pivoted instead to RQ-QS-06E (reactive
+deterioration anatomy — recognize the turn once it has happened, not predict it)
+and, as a fully independent track, RQ-QS-07A (reverse-engineering fast movers from
+scratch, not gated on Track A's outcome).

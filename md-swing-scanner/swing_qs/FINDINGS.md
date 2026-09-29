@@ -2804,3 +2804,91 @@ than continued prediction attempts.
 
 **Files**: `trajectory_replay/rq_qs_06d_contemporaneous_state.py`,
 `trajectory_replay/rq_qs_06d_contemporaneous.csv` (111,199 rows).
+
+## RQ-QS-06E — Post-Peak Deterioration Anatomy (2026-09-29, critic-specified)
+
+**Question changes from "can we predict the turn" (06C/06D, both closed — see
+CLAUDE.md's standing closed result) to: "can we RECOGNIZE the turn once it has
+actually happened, and react without systematically damaging
+persistent_continuation trades?"** No exit rule, no giveback threshold chosen as
+an intervention — Observe only.
+
+**Deterioration event, fully decision-time-safe (no hindsight on "which day was
+the peak")**: the first day T such that (a) day T-1 just set a fresh running-MFE
+high, AND (b) day T's Close < day T-1's Close. Uses only information through day
+T, exactly like a live system could observe it in real time — this is a genuinely
+different, cleaner construction than 06C/06D's landmark-based censoring, and was
+checked for this property before building. Population: trades whose own eventual
+15-day MFE reaches >=0.5R (this project's standing "meaningful" floor), n=30,394.
+Volume/ATR are DESCRIPTIVE ANNOTATIONS around the already-defined event only, per
+critic's explicit instruction — NOT re-tested as predictors (06D already closed
+that question).
+
+**Rule #22**: hand-verified 360ONE 2023-07-04 (the same trade used to hand-verify
+06B/06C) end-to-end — peak_day=6 (mfe 0.89, a fresh high vs day 5's 0.65),
+deterioration_day=7 (close 0.77 < day 6's close 0.80), drawdown 0.89-0.77=0.12,
+fate=transient (recovers to eventual max 2.38R by D10) — all matched the raw bars
+exactly, including the subtle case of day 7 ALSO setting a marginal fresh intraday
+high (mfe 0.96) while closing weaker than the day before.
+
+**A deterioration event fires on 93.6% of ALL meaningful trades (n=28,444 of
+30,394)** — this pattern (a pullback close right after a fresh high) is close to
+universal, not a rare warning sign. Only 6.4% never show it at all within 15 days
+(the smoothest, most relentless movers). 98.4% of pre-deterioration peaks are
+genuine closing highs (real acceptance), not merely intraday wicks. Median
+drawdown at the deterioration moment: 0.62R (P25 0.38R, P75 0.99R). Median
+consecutive lower closes from that point: just 1.
+
+**Fate after the first deterioration event (n=28,444)**:
+
+| Fate | n | % |
+|---|---|---|
+| transient (recovers to a NEW high beyond the pre-deterioration peak) | 21,464 | 75.5% |
+| terminal (eventually stopped out, S1b) | 4,820 | 16.9% |
+| persistent_decay (never recovers, never stops either) | 2,160 | 7.6% |
+
+**The decisive result — the FIRST deterioration event is the wrong trigger,
+exactly the failure mode critic pre-warned about:**
+
+| | burst_then_exhaustion | persistent_continuation |
+|---|---|---|
+| n (eventual MFE >=0.5R) | 7,860 | 5,705 |
+| Marker fires at all | 94.7% | 97.1% |
+| Of those, fate='transient' | 73.1% | **90.3%** |
+| Median eventual_max_mfe after the marker fires | 2.34R | 4.04R |
+
+**The marker fires at essentially the SAME rate (94.7% vs 97.1%) in both
+archetypes — it carries almost no discriminating information about WHETHER it
+fires, confirming 06C/06D's own finding from a different angle.** Worse: reacting
+to the very first deterioration event would destroy 90.3% of persistent_
+continuation's later opportunity — those trades go on to a median additional
++4.14R of MFE AFTER the marker fires. And even within burst_then_exhaustion
+specifically, the marker fires mostly on ordinary, recoverable pullbacks too —
+only 26.9% of burst trades where it fires show a genuinely non-recovering
+deterioration (fate != transient). A naive "exit on first deterioration" rule
+would be economically indefensible: it would give up the large majority of good
+continuation while only correctly flagging about a quarter of the bad outcomes
+even within the population it's specifically meant to catch.
+
+**Contextual annotation at the deterioration moment (descriptive only, per
+critic's instruction — NOT retested as a predictor)**: volume_ratio median 0.92x
+(roughly normal, not elevated), day_range/ATR median 0.97x (an ordinary-sized day,
+not a violent reversal candle), and only 22.2% show volume EXPANDING vs the prior
+(peak) day — the typical first deterioration is a quiet fade on unremarkable
+volume, not a dramatic, volume-confirmed reversal. Consistent with 06D's own
+closed finding that contemporaneous volume/volatility carries no separating
+signal.
+
+**Honest disposition**: this cleanly answers the question asked — the FIRST
+deterioration event, as defined, is not a usable reactive trigger; it's too
+common, too early, and nearly archetype-blind. This does NOT mean deterioration-
+based reactive management is dead — it means the FIRST such event specifically
+is the wrong signal. The natural next question (NOT run here, needs explicit
+direction per this project's standing discipline against unprompted threshold-
+hunting) is whether a LATER or DEEPER deterioration event — e.g. a SECOND
+consecutive failure to make a new high, or a larger drawdown magnitude — shows
+better separation than the first one did. No such follow-up threshold was chosen
+or tested in this script.
+
+**Files**: `trajectory_replay/rq_qs_06e_deterioration_anatomy.py`,
+`trajectory_replay/rq_qs_06e_deterioration.csv` (30,394 rows).
