@@ -2066,15 +2066,34 @@ liquidity, S skews high-liquidity) — reproduces out of sample.
 
 ### Disposition
 
-**The methodology generalizes.** Both routes reproduce their training-period
-character out of sample: S's incidence, D3 distributions, and — most
-tellingly — its extreme persistence (90.4% vs. 91.9% in-sample) all
-reproduce closely. W's headline incidence looked like an improvement but,
-once a real and independently-corroborated 2-day market event is accounted
-for, essentially matches training too. Neither route shows a degradation
-severe enough to call this a specification failure. **CG3 (prospective,
-started 2026-09-25) continues untouched in parallel** — this holdout result
-is faster evidence, not a replacement for the cleaner test.
+**CORRECTION (2026-09-30, critic's exact wording, adopted)**: the original
+version of this line overclaimed. "The frozen candidate definitions show
+encouraging temporal generalization across the Apr-Sep 2026 historical
+holdout, with route structure and incidence broadly reproducing their
+training character" — not "the methodology generalizes," full stop. Two
+reasons: this was not a pristine blind experiment (the researcher-
+conditioning caveat above still applies), and W's May-August incidence
+(6.25-6.96%) sitting meaningfully below training's 10.23% is real and
+shouldn't be smoothed over even though it isn't a specification failure.
+
+**The strongest evidence is the structural replication, not any single
+headline incidence number**: S's incidence (7.26% vs. 8.47% training) and —
+most tellingly — its extreme persistence (90.4% vs. 91.9% in-sample) both
+reproduce closely, as does W's single-day-episode rate (55.0% vs. 52.7%)
+and liquidity/F&O/circuit anatomy. That's evidence the frozen definitions
+reproduce the KIND OF POPULATION they were built to describe, not merely a
+lucky aggregate number. W's headline incidence looked like an improvement
+but, once the real and independently-corroborated 2-day market event is
+excluded, closely matches training (10.01% vs. 10.23%). Neither route shows
+a degradation severe enough to call this a specification failure.
+
+**Closed here, per critic's explicit instruction: no second holdout cutoff.**
+Not because it's forbidden, but because a second cutoff would turn a fast
+temporal-generalization check into repeated historical validation-hunting —
+exactly the research loop this project's own discipline exists to prevent.
+**CG3 (prospective, started 2026-09-25) continues untouched in parallel** —
+this holdout result is faster, encouraging evidence; the accumulating
+prospective log remains the cleanest remaining test.
 
 **Not promotable, not a strategy** — this is a specification-generalization
 check, same discipline as every other RQ in this line: no threshold changed,
