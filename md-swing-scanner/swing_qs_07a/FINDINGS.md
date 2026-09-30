@@ -2551,8 +2551,70 @@ opportunity (1) and retention (3) reversed together in 2026 — the
 diagnostic points toward critic's "more fundamental" interpretation (S no
 longer identifies the same opportunity type in this specific period), not
 the narrower "QS-A's exit mechanics simply mishandle a still-real
-opportunity" reading. This does not automatically license a new regime
-filter or threshold (explicitly not authorized) — it is reported as the
-honest anatomy of the failure, for the critic's own next-step call.
+opportunity" reading.
+
+### FINAL CLOSURE (2026-09-30, critic's exact verdict — branch closed, do not re-litigate without new evidence)
+
+**P6 settles this.** Both properties that made P4 attractive independently
+reversed — the original story required BOTH "S has at least as much
+opportunity" AND "S retains more of it":
+
+| | Pre-2025 | 2025 | 2026 |
+|---|---|---|---|
+| D5 MFE gap (S−non-S) | +0.033 | +0.048 | **-0.142** |
+| Stop-rate gap | -0.2pp | -1.2pp | **+5.6pp** |
+| Giveback | S better | S better | **S worse** |
+| Overall intervention | positive | positive | **negative** |
+
+**The simultaneity is recorded as a research observation, not investigated
+further**: "the 2026 intervention failure is coordinated across
+opportunity and retention, suggesting an upstream change in the
+conditional meaning of the S state rather than an isolated exit-engine
+failure." That word — *suggesting* — is deliberate: the upstream cause is
+NOT demonstrated, and chasing it now (regime? breadth? sector? liquidity?
+volatility? relative strength? price level? F&O composition? a regime
+filter? an optimized regime threshold?) is explicitly the dangerous fork
+this project's own discipline exists to prevent. **Not pursued.** The 2026
+ticker-concentration finding (27.0% top-10 share) does not rescue or fully
+explain the failure either — 115 tickers and 236 episodes is broad enough
+that this is a genuine reversal, not two stocks breaking a small sample; at
+most it qualifies the magnitude, not the direction.
+
+**One finding preserved as telemetry, explicitly not acted on**: S-tagged
+trades' persistently wider natural stop distance (~5% vs. ~3.8%
+`initial_risk_pct`, stable across every period) is real and worth knowing,
+but changing S's stop specifically because it naturally carries wider
+structural risk would change the risk unit and destroy comparability with
+everything already measured in P4/P5 (Rule #20, Risk Unit Integrity). Not
+touched.
+
+**Final ledger, frozen**:
+
+| Layer | Status |
+|---|---|
+| S discovery | 🟢 Validated — the strong-state precursor is a real historical fast-mover phenomenon |
+| S → QS-A observational relationship | 🟢 Established historically — P3 showed correlation with better retention |
+| S-filtered QS-A intervention | 🔴 OOS-failed — P5 demonstrated reversal in 2026 |
+| Failure anatomy | 🟢 Explained sufficiently for disposition — P6 shows both channels reversed |
+| S → QS-A production integration | 🔴 **CLOSED / PARKED** |
+| S threshold/regime rescue | 🔴 Not authorized |
+| Standalone S product | 🟡 Not automatically validated — the discovery stays in the research archive, does not inherit production credibility merely because it worked historically |
+| W → QS-A integration | 🔴 CLOSED (P3) — remains closed, not reopened |
+| W standalone product | 🟡 PARKED (P3) — remains parked, not reopened |
+
+**The correct headline, per critic's own explicit framing — not "S
+failed"**: *"S was a valid historical state detector, but its apparent
+QS-A product edge was regime-dependent and did not survive chronological
+OOS intervention testing."*
+
+**07A has completed its job on this branch**: discovery → mechanism →
+decision-time validation → frozen candidate → historical holdout → real
+QS-A overlay → intervention → chronological OOS → failure anatomy. The
+research system caught an attractive-looking intervention before
+production, exactly what the guardrails exist to do. **Next direction, per
+critic**: return to QS-A's actual open product problem — exit/
+monetization (RQ-06's own original unresolved question) — using
+everything learned from 06 and 07A as context, not attempting to make S
+the answer to it.
 
 **Files**: `25_p6_failure_anatomy.py`, `p6_failure_anatomy.csv`.

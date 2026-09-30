@@ -46,3 +46,38 @@ claim from this line inherits that limitation; structural/descriptive findings
   04A/06B/every other RQ this session).
 - Path-shape categories are PRE-DECLARED in the script's own docstring before
   running — not chosen after seeing which one looks most interesting.
+
+## Standing closed result (2026-09-30) — S→QS-A integration, do not re-litigate without new evidence
+
+RQ-QS-07A-P3 through P6 jointly established two precursor states (W = weak-
+state/oversold-reversal, S = strong-state/trend-continuation), tested S as a
+frozen intervention on QS-A's real 46,613-position trade population (Track A),
+and CLOSED the integration attempt. Full chain: P3 (observational overlay — S
+correlated with better retention historically; W structurally incompatible
+with QS-A's breakout-high entry, cannot even coincide) → P4 (frozen S(T-1)
+filter intervention on the full historical population — looked strongly
+positive on every metric) → P5 (pre-registered chronological OOS validation,
+cutoff 2025-01-01, chosen BEFORE looking at results — the intervention's
+advantage reversed in 2026 specifically, not just weakened) → P6 (failure
+anatomy using only already-existing trajectory variables — both the
+opportunity/MFE channel AND the retention/giveback channel reversed together
+in 2026, not a clean exit-only failure).
+
+**Per critic's exact verdict, adopted verbatim**: "S was a valid historical
+state detector, but its apparent QS-A product edge was regime-dependent and
+did not survive chronological OOS intervention testing" — not "S failed."
+S discovery remains validated on its own population; only S→QS-A production
+integration is closed. **Do not reopen**: no new S threshold/regime filter, no
+"why did 2026 specifically break" causal investigation (explicitly the
+dangerous fork the critic warned against — regime? breadth? sector?
+liquidity? volatility? relative strength? price level? F&O composition? —
+none of it authorized), no rescuing the failure via re-slicing 2025-vs-2026
+after the fact. W remains separately parked (structurally incompatible with
+QS-A, never a failure of W itself — whether W could become its OWN standalone
+event-driven product is a genuinely different, still-open future question,
+just not opened now). Full detail: `FINDINGS.md`, "RQ-QS-07A-P3" through
+"RQ-QS-07A-P6" sections — the P6 section's "FINAL CLOSURE" block has the
+complete frozen ledger. Per critic's own next-step pointer: research should
+return to QS-A's actual open product problem (exit/monetization, RQ-06's
+original unresolved question) using everything learned here as context, not
+attempting to make S the answer to it.
