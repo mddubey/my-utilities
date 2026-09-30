@@ -2356,3 +2356,107 @@ validation before being trusted operationally is the critic's call.
 
 **Files**: `23_p4_s_state_intervention.py`, `p4_winrate_stack.csv`,
 `p4_baseline_positions.csv` (gitignored — 46,613 rows, fully regeneratable).
+
+## RQ-QS-07A-P5 — S-State Intervention Chronological OOS Validation, complete (2026-09-30, critic-specified)
+
+**Question**: does P4's intervention (S(T-1) eligibility on top of frozen
+QS-A) survive on QS-A trades chronologically AFTER a pre-registered cutoff
+— not "is S real" (already validated), but "does the intervention's
+advantage generalize to a later period." Everything frozen per critic's
+exact prohibition list: same CG1 S specification, same QS-A machinery,
+same S1b stop, same 15-day horizon, same realized-R convention (reused
+directly from P4's own already-computed `final_r`/`exit_date`).
+
+**Cutoff, pre-registered before looking at any comparison result:
+2025-01-01** — a clean calendar-year boundary, deliberately different from
+CG3-H's 2026-03-31 cutoff (critic's explicit instruction not to repeat that
+exact holdout), and coinciding with the already-established tougher 2025-26
+regime (07R, CG3-H) — a harder test, not an easy one. Discovery: 30,134
+positions (2021-11-29 to 2024-12-31). Holdout: 16,467 positions (2025-01-01
+to 2026-09-25), S-filtered n=1,323 (8.0% coverage, 195 tickers, 526
+episodes) — checked for adequate power before building the comparison.
+
+### The honest, sobering result: the advantage does NOT clearly survive the holdout
+
+| | Discovery (pre-2025) | Holdout (2025-01-01 onward) |
+|---|---|---|
+| Baseline mean R | +0.287 | **-0.032** |
+| S-filtered mean R | **+0.389** | **-0.059** |
+| Baseline D15 close | +0.246R | -0.077R |
+| S-filtered D15 close | +0.394R | **-0.140R** |
+| Baseline giveback | 59.7% | 68.5% |
+| S-filtered giveback | 56.8% | 69.1% |
+
+**In the discovery period, S-filtered clearly beats baseline on every
+metric — but in the holdout, S-filtered is WORSE than baseline**, not
+just weaker. This is a genuine reversal, not a shrinking effect.
+
+### Year-by-year within the holdout (never pooled) — the reversal is concentrated in 2026, not uniform
+
+| Year | Baseline n / mean R | S-filtered n / mean R |
+|---|---|---|
+| 2025 | 9,425 / -0.051 | 738 / **+0.040** |
+| 2026 | 7,042 / -0.006 | 585 / **-0.184** |
+
+**2025 alone still shows S-filtered beating baseline** (+0.040 vs. -0.051,
+consistent with P4's direction, just both weaker than discovery). **2026
+shows a sharp reversal** — S-filtered underperforms baseline by a wide
+margin (-0.184 vs. -0.006). Hand-verified (Rule #22) before trusting this:
+pulled 5 real S-filtered 2026 trades (NETWEB, CAPLIPOINT, NATIONALUM,
+ASHOKLEY, JSL) — all legitimate, `final_r` computed correctly (e.g. JSL
+stopped on day 1, `final_r` correctly capped at -1.0 despite `close_r_D15`
+showing a worse -2.78 if it had kept riding; ASHOKLEY never stopped,
+`final_r` correctly equals its real +1.59R close). **The 2026 S-filtered
+stop-out rate is 67.2%** — notably elevated, and this directly explains the
+negative mean: more trades hitting the -1R stop, not a computation error.
+
+### Capacity sensitivity (secondary, illustrative only — critic's explicit instruction, not a production capacity decision)
+
+Discovery: baseline turns solidly positive at capacity ≥10 (+44.7 to
++516.0 across 10-50); S-filtered is positive at every capacity (+17.6 to
++738.2). **Holdout: baseline is negative at EVERY capacity tested (-52.8 to
+-565.1); S-filtered is also negative at every capacity except 10
+(+10.7)** — a materially weaker picture across the board than the pooled
+P4 result, consistent with the mean-R reversal above.
+
+### Cross-checked against already-established, independent findings — the broad regime-weakening is real, not a P5 artifact
+
+Baseline QS-A's OWN performance (not just the S-filter's added value) fell
+sharply from discovery to holdout (+0.287 → -0.032 mean R) — this matches,
+independently, the SAME 2025-26 regime-weakening already found in 07R
+(reduced breadth/fast-mover base rate) and CG3-H (weaker W/S incidence in
+the holdout window). This triangulation across three separate RQs, using
+different populations and methods, gives confidence the DIRECTION (2025-26
+harder across the board) is real, not a P5-specific bug. What's NEW and
+specific to P5 is that **S's RELATIVE advantage over baseline, not just its
+absolute level, reverses in 2026 specifically** — that's a different and
+more consequential claim than "everything got harder."
+
+### Researcher-conditioning caveat (same discipline as CG3-H)
+
+This is a chronological OOS validation of the frozen intervention at the
+numerical level, NOT fully independent blind validation — CG1's S
+specification was derived from a reference population spanning through
+2026-09-24, which includes this holdout window, and this general period has
+already been examined extensively across 07R and CG3-H.
+
+### Disposition
+
+**P4's intervention does not cleanly survive this pre-registered
+chronological holdout.** The 2025 slice alone is still directionally
+consistent with P4 (S-filtered ahead of baseline, both weaker than
+discovery); 2026 shows a real reversal, hand-verified as genuine rather
+than a bug. Per this project's own Rule #10 (negative/inconclusive results
+are closed threads, not open ones to re-litigate under a new name): **this
+result should be logged as a genuine, disclosed qualification of P4, not
+smoothed into "S still works."** The honest current state is: S's
+retention advantage is well-established across 2022-2024 and partially
+holds in 2025, but does not replicate in 2026 — whether that's a
+temporary regime effect (matching the broader 2025-26 weakening already
+found elsewhere) or a sign the intervention itself is less robust than P4
+alone suggested is not yet resolved by this RQ. **Not ready for a
+production-integration discussion on the strength of P4 alone** — that
+conversation needs to explicitly account for this holdout result, not
+proceed as if P4's pooled numbers were the final word.
+
+**Files**: `24_p5_s_intervention_holdout.py`, `p5_discovery_vs_holdout.csv`.
