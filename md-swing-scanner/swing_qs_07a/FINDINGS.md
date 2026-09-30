@@ -1877,3 +1877,51 @@ CG2 found in-sample) cannot be answered yet with 0 resolved D3 windows.
 **Files**: `19_forward_validation_cg3.py`, `cg3_forward_candidates.csv`
 (will be regenerated/extended on each re-run — small enough to keep
 committed as a living artifact, not gitignored).
+
+### Hardening addendum (2026-09-30, critic's follow-up review — infrastructure only, NOT a new RQ)
+
+**Critic's status call: CG3 = RUNNING / PARKED.** No new RQ, no acting on
+partial numbers, no investigating day-to-day candidate-count variation, no
+filters, no touching the frozen constants — the only job now is to
+accumulate until a real checkpoint (critic's target: ~20-30 D3-resolved OOS
+dates, several hundred W events, several thousand S events — chosen because
+observations are temporally correlated, especially for S, not an arbitrary
+candidate count).
+
+Three concrete infrastructure hardenings implemented, all requested before
+the artifact accumulates further (retrofitting later would be messier):
+
+1. **Three separate timestamps per row**: `date` (the candidate/observation
+   day T), `run_date` (when the decision was first computed), and
+   `d3_resolution_date` (the real calendar date D3 became resolved, NaN
+   while pending) — lets a future review demonstrate "generated on T using
+   only information available then; outcome resolved on T+3," not just an
+   OOS-labeled CSV.
+2. **Append-only design**: a candidate decision (composite,
+   `decline_from_high10d_pct`, `ret_1d`, `is_W`, `is_S`, `persistence`,
+   `run_date`) is computed once and is now immutable — a re-run
+   integrity-checks already-recorded rows by recomputing and comparing
+   (flagging any mismatch loudly rather than silently overwriting, per
+   critic's explicit instruction) and only ever ADDS new rows or REFRESHES
+   outcome fields (which are supposed to change as more days resolve).
+   Verified by running the script twice in succession: second run added 0
+   new rows, integrity-checked all 425 existing rows with 0 mismatches.
+3. **D1/D2 explicitly labeled** `[PARTIAL/NOT-FOR-EVALUATION]` in every
+   printout — retained as pipeline telemetry (useful for catching future
+   data/logic failures) but never a success label, never compared.
+
+One migration note, disclosed: the very first version of
+`cg3_forward_candidates.csv` (written minutes earlier, same session, before
+this hardening) lacked the new schema entirely. Since every decision field
+is fully deterministic and already proven reproducible, it was regenerated
+under the new schema this one time (`run_date` backfilled to today, since
+that's genuinely when these decisions were first computed) — from this run
+forward, the file is truly append-only.
+
+**Clustering guardrail for whoever runs the eventual checkpoint review**
+(critic's explicit statistical instruction, not yet actionable — nothing to
+evaluate at 0 resolved dates): S's candidate-events are not independent
+observations (the same ticker can appear on many consecutive dates) — a raw
+event-level incidence rate must never be reported with an unclustered
+confidence interval, e.g. never "S had X% winners across N observations,
+therefore..." without acknowledging that clustering.
