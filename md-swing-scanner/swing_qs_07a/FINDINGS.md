@@ -2291,23 +2291,31 @@ marginally shallower for S-filtered (-1.223R vs. -1.243R baseline).
 
 Reused `risk_of_ruin.py`'s standing FCFS-by-entry-date methodology
 (no ranking) — this project's own default for comparing differently-sized
-populations. **Disclosed explicitly**: no `max_concurrent` portfolio-
-capacity parameter has ever been established for QS-A specifically in this
-codebase (checked directly, no hits) — reported as a sensitivity sweep
-across 3/5/10/20/50 concurrent slots, not a single arbitrary pick.
+populations. No `max_concurrent` portfolio-capacity parameter had ever
+been established for QS-A specifically in this codebase (checked directly,
+no hits) — reported as a sensitivity sweep across 3/5/10/20/50 concurrent
+slots rather than a single arbitrary pick.
 
-| Max concurrent | Baseline cumulative R | S-filtered cumulative R |
-|---|---|---|
-| 3 | -35.1 | **+27.8** |
-| 5 | -25.9 | **+58.6** |
-| 10 | -59.0 | **+121.1** |
-| 20 | -30.7 | **+167.7** |
-| 50 | +67.0 | **+565.4** |
+**CONFIRMED (2026-09-30, user's direct statement)**: the user's real
+operating range has always been 5-10 concurrent positions — this is not a
+hypothetical any longer.
 
-**Baseline QS-A is flat-to-negative at every realistic small-portfolio
-capacity (3-20 concurrent slots) and only turns positive at 50. S-filtered
-is strongly positive at EVERY capacity level tested, including the
-smallest.** This surprising magnitude was hand-verified (Rule #22) before
+| Max concurrent | Baseline cumulative R | Baseline max DD | S-filtered cumulative R | S-filtered max DD |
+|---|---|---|---|---|
+| 3 | -35.1 | -66.0 | **+27.8** | -29.0 |
+| **5** | **-25.9** | **-90.5** | **+58.6** | **-34.7** |
+| **10** | **-59.0** | **-135.9** | **+121.1** | **-60.2** |
+| 20 | -30.7 | -229.2 | **+167.7** | -114.2 |
+| 50 | +67.0 | -536.9 | **+565.4** | -129.5 |
+
+**At the user's actual operating range (5-10 concurrent positions),
+baseline QS-A loses money with a deeper drawdown, while S-filtered is
+strongly profitable with roughly half the drawdown — this is no longer an
+illustrative sensitivity result, it's the answer at the real, confirmed
+capacity this system is actually run at.** Baseline QS-A is flat-to-
+negative at every capacity from 3 through 20 and only turns positive at 50.
+S-filtered is strongly positive at every capacity level tested, including
+the smallest. This surprising magnitude was hand-verified (Rule #22) before
 being trusted: pulled the real admitted trades at `max_concurrent=3` —
 legitimate NSE tickers (POLYMED, MAXHEALTH, LALPATHLAB, TORNTPHARM,
 PFIZER, BEML), correct date ordering (0 cases of exit-before-entry),
