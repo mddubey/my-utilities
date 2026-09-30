@@ -2194,17 +2194,30 @@ trades happen to look good."
 
 ### Disposition
 
-**Per the critic's own three-outcome framework**: W is Outcome C (a
-different mechanism, structurally incompatible with QS-A's current
-breakout-high entry — not integratable as designed, not a failure of W
-itself, which remains established as a real phenomenon on its own
-population). **S shows Outcome A characteristics** (materially better
-sustained close and lower giveback, similar entry opportunity) — real
-integration evidence, though this is an OBSERVATIONAL overlay, not proof
-that acting on it would improve the product (no intervention has been
-tested). Per critic's explicit framing, this does NOT yet establish
-"add an S filter to QS-A" — it establishes that S-state at T-1 is worth
-a genuine intervention-test candidate for the next research step.
+**CORRECTION/PRECISION (2026-09-30, critic's exact three-way status,
+adopted)**: W's status is not a single verdict — three separate, distinct
+statuses:
+- **W discovery: OPEN/VALIDATED** — the phenomenon itself (07A-5 through
+  07A-6U) remains a real, robustness-tested, decision-time-plausible
+  finding on its own population. Nothing about P3 closes or weakens it.
+- **W → QS-A integration: CLOSED** — structurally incompatible by
+  construction (a breakout-to-new-high entry cannot coincide with a
+  deeply-below-recent-high precursor). Do not keep this alive as an
+  eventual QS-A enhancement — no re-testing at T instead of T-1, no relaxed
+  W thresholds, no "W shortly before breakout," no distance-decay variants.
+  That would be manufacturing overlap between two deliberately different
+  mechanisms.
+- **W standalone product: PARKED, not opened** — whether W could become
+  its OWN separate event-driven entry product (with its own entry/stop/
+  exit) is a genuinely different, real future question, given W has a real
+  mechanism and demonstrated fast-mover incidence — but not opened now; no
+  evidence yet that a tradable entry/stop/exit structure exists around it.
+
+**S**: P3 showed Outcome A characteristics (observational). **P4 (below)
+has now promoted this to a genuine controlled intervention result** —
+materially better mean R, win-rate stack, payoff ratio, and
+capacity-constrained cumulative R than baseline QS-A, with everything else
+held frozen. See RQ-QS-07A-P4 for the full result.
 
 **Not built here, per critic's prohibition list**: no threshold change, no
 entry change, no exit change, no new predictor, no W+S combination, no
@@ -2213,3 +2226,125 @@ strategy simulation.
 **Files**: `21_extend_qsa_envelope_d15.py`, `22_p3_wstate_overlay.py`,
 `qsa_envelope_d15.csv` (gitignored — 46,653 rows, fully regeneratable),
 `p3_qsa_wstate_overlay.csv`.
+
+## RQ-QS-07A-P4 — S-State Entry Intervention, complete (2026-09-30, critic-specified)
+
+**The controlled intervention P3 earned the right to**: the only change from
+frozen QS-A is S(T-1) eligibility. Same universe, same 10/20/40 breakout
+definitions, same frozen v0.1 gate, same intraday breach, same entry price,
+same S1b stop, same MAX_HOLD_DAYS=15, same `walk_ticker()` mechanics. No
+threshold search, no S-coverage tuning (CG1's S definition stays frozen),
+no combination with W (closed for QS-A integration in P3 — structurally
+incompatible).
+
+### Pre-intervention integrity audit (done first, per critic's instruction)
+
+S vs. non-S, split by each of the three entry definitions, using the
+already-established P3 overlay:
+
+| Lookback | S D15 close_r | non-S D15 close_r | S giveback | non-S giveback |
+|---|---|---|---|---|
+| 10D | +0.284R | +0.119R | 58.4% | 63.8% |
+| 20D | +0.291R | +0.099R | 57.4% | 62.6% |
+| 40D | +0.277R | +0.089R | 58.6% | 62.1% |
+
+**Passes cleanly — the S effect survives in all three lookback
+definitions**, not concentrated in one. Proceeding to the intervention.
+
+### Production-consistent realized R
+
+Critical distinction from P3's `close_r_D15` column: a real QS-A position
+exits at exactly `STOP_R=-1.0` if stopped within the 15-day window
+(confirmed against `qs_dashboard.py`'s own `STOP_R`/`MAX_TRACK_DAYS`
+constants), or at the D15 close if never stopped. `envelope()`'s trajectory
+columns deliberately keep tracking past a stop for opportunity measurement
+(RQ-06's own purpose) — using `close_r_D15` directly for a stopped position
+would silently assume the trade kept riding past its own stop. `final_r`
+computed accordingly for all 46,601 positions with a resolvable exit
+(46,613 minus 12 with no locatable index position).
+
+### Primary comparison — win-rate stack (this project's standing convention)
+
+| Group | n | Mean R | Median R | Gross>0 | ≥0.25R | ≥0.5R | ≥1.0R | Payoff ratio |
+|---|---|---|---|---|---|---|---|---|
+| Baseline (all QS-A) | 46,601 | +0.174 | -1.000 | 35.9% | 32.8% | 29.8% | 24.0% | 2.51 |
+| **S-filtered (intervention)** | **6,687** | **+0.301** | -1.000 | **37.4%** | **34.1%** | **30.9%** | **25.7%** | **2.76** |
+| Excluded | 39,914 | +0.153 | -1.000 | 35.7% | 32.6% | 29.6% | 23.7% | 2.47 |
+
+**S-filtered beats baseline on every single metric in the win-rate stack**
+— mean R is ~73% higher (0.301 vs. 0.174), every win-rate threshold is
+higher, payoff ratio is higher. The median is -1.000 for all three groups
+(the stop-out rate exceeds 50% everywhere, expected given QS-A's own
+already-established exit problem) — the improvement shows up in the mean
+and the right tail, not the median, consistent with S improving *retention
+of favorable moves* (P3's finding) rather than *reducing the base stop-out
+rate*.
+
+### Secondary — D3/D5/D10/D15, MFE/MAE (repeats P3's comparison, now alongside win-rate stack for full context)
+
+Same pattern as P3: MFE nearly identical across groups (D1≈0.34-0.35R,
+D3≈0.61-0.65R, D5≈0.79-0.82R), while D15 close diverges sharply
+(baseline +0.135R, S-filtered +0.282R, excluded +0.105R) and MAE is
+marginally shallower for S-filtered (-1.223R vs. -1.243R baseline).
+
+### Capacity-constrained comparison — the most decisive number, hand-verified before trusting it
+
+Reused `risk_of_ruin.py`'s standing FCFS-by-entry-date methodology
+(no ranking) — this project's own default for comparing differently-sized
+populations. **Disclosed explicitly**: no `max_concurrent` portfolio-
+capacity parameter has ever been established for QS-A specifically in this
+codebase (checked directly, no hits) — reported as a sensitivity sweep
+across 3/5/10/20/50 concurrent slots, not a single arbitrary pick.
+
+| Max concurrent | Baseline cumulative R | S-filtered cumulative R |
+|---|---|---|
+| 3 | -35.1 | **+27.8** |
+| 5 | -25.9 | **+58.6** |
+| 10 | -59.0 | **+121.1** |
+| 20 | -30.7 | **+167.7** |
+| 50 | +67.0 | **+565.4** |
+
+**Baseline QS-A is flat-to-negative at every realistic small-portfolio
+capacity (3-20 concurrent slots) and only turns positive at 50. S-filtered
+is strongly positive at EVERY capacity level tested, including the
+smallest.** This surprising magnitude was hand-verified (Rule #22) before
+being trusted: pulled the real admitted trades at `max_concurrent=3` —
+legitimate NSE tickers (POLYMED, MAXHEALTH, LALPATHLAB, TORNTPHARM,
+PFIZER, BEML), correct date ordering (0 cases of exit-before-entry),
+`n_admitted` scaling monotonically with capacity in both groups as
+expected. A minor numerical discrepancy surfaced between an independent
+ad-hoc recomputation and the script's own logged run (435 vs. 437
+admitted, -43.2 vs. -35.1 cumulative R at capacity=3) — traced to FCFS tie-
+breaking order among same-day entries, not a data or logic error; the
+qualitative finding (baseline negative, S-filtered strongly positive, at
+every low-to-moderate capacity) is unaffected either way.
+
+**Plausible mechanism, not asserted as proven**: at low capacity, FCFS
+admission disproportionately locks in whichever trades triggered first and
+holds them for their full duration before a slot frees up — interacting
+directly with QS-A's own already-established giveback problem (RQ-06).
+S-filtered's ~85% smaller candidate pool faces far less competition for
+scarce slots, letting its higher-quality trades actually get admitted
+rather than being crowded out.
+
+### Disposition
+
+**Real, hand-verified, consistent evidence across every metric tested — per
+capacity assumptions still flagged, not yet a production recommendation.**
+This is now stronger than "observational" (P3's status) — it is a genuine
+controlled intervention (only S eligibility changed, everything else held
+frozen) showing S-filtered QS-A outperforming baseline QS-A on mean R,
+every win-rate threshold, payoff ratio, and cumulative R at every tested
+capacity. The capacity-constrained numbers rest on an explicitly-flagged,
+not-yet-established portfolio-size assumption — the DIRECTION is robust
+across the whole sweep, but the exact magnitude at any single capacity
+should not be treated as a validated production forecast. **Not yet
+promoted to production**: no transaction-cost/slippage modeling beyond
+what's already implicit in `initial_risk_pct`, no out-of-sample check on
+this SPECIFIC intervention (unlike the underlying W/S discovery itself,
+which passed both a historical holdout and has an accumulating prospective
+log) — whether this intervention itself needs the same CG3/CG3-H-style
+validation before being trusted operationally is the critic's call.
+
+**Files**: `23_p4_s_state_intervention.py`, `p4_winrate_stack.csv`,
+`p4_baseline_positions.csv` (gitignored — 46,613 rows, fully regeneratable).
