@@ -1517,3 +1517,129 @@ the critic's call.
 
 **Files**: `15_decision_time_stabilization.py`, `decision_time_joint_separation.csv`,
 `decision_time_intraday_sidecheck.csv`.
+
+## RQ-QS-07A-CG1 — Candidate Definition Freeze, complete (2026-09-30, critic-specified)
+
+**Phase change, explicit per critic**: everything through 07A-6U asked "what
+distinguishes historical winners?" (research/discovery). This RQ asks "given
+information available on date T, which stocks would a FROZEN definition have
+actually surfaced?" (candidate generation). Not a predictor search, not
+threshold optimization, not a strategy, not an architecture decision.
+
+**Two archetypes, both already fully established, neither re-searched**:
+Route W (weak-state: 07A-5's D0 discovery + 07A-6/6R's decline-depth
+mechanism + 07A-6U's T-close green/red stabilization) and Route S
+(strong-state: 07A-5's D9 trend-continuation archetype, already
+robustness-tested in 07A-3/07A-3R).
+
+### Critical implementation discipline: freezing reference statistics to prevent leakage
+
+The composite score's percentile ranks and the D0/D9 decile boundaries were
+originally computed via `.rank(pct=True)`/`pd.qcut` over the FULL 5-year
+research population — legitimate for research, but reusing that machinery
+naively for candidate generation would leak future observations into a
+historical candidate decision. Fixed by extracting exact numeric reference
+statistics ONCE from the closed population (2022-09-02 to 2026-09-24,
+1,668,305 rows) and hard-coding them as literal constants:
+
+- `composite_p10_weak_state_cutoff` = **16.728**
+- `composite_p90_strong_state_cutoff` = **84.064**
+- `decline_from_high10d_pct_median_weak_state` = **-10.433**
+- Per-variable percentile breakpoint tables (101 points each) for the 5
+  composite inputs, saved to `frozen_candidate_spec.json`.
+
+**Frozen definitions**:
+- **Route W**: `composite ≤ 16.728` AND `decline_from_high10d_pct ≤ -10.433`
+  AND `ret_1d ≥ 0` (T green, natural zero-crossing, no frozen constant
+  needed).
+- **Route S**: `composite ≥ 84.064` (single gate, matches 07A-5's already-
+  established finding — no additional T-close refinement, since that
+  refinement work was specific to Route W).
+
+**Real bug caught before trusting the demonstration (Rule #22)**: the first
+run of the demonstration showed Route S producing exactly 0 candidates on
+EVERY single day — traced to an `inner` merge against
+`weak_state_mechanism_features.csv` (which only covers D0 rows from `12_`'s
+own D0-only pass), silently dropping every non-D0 row before Route S's gate
+was even evaluated. Caught by directly checking `decile==9` counts in the
+demo window (1,008 real D9 rows exist, not 0) before trusting the printed
+output. Fixed with a `left` join; re-verified Route S then correctly
+produces 93-197 candidates/day in the same window.
+
+**Precision note, disclosed not hidden**: `compute_composite()` (using the
+101-point frozen breakpoint table) reproduces the already-saved
+`trend_strength_composite` column to within 0.037 percentile-rank-points
+(20-row random sample) — a small, expected discretization artifact from
+using a compact 101-point lookup table instead of storing the full
+1.66M-row historical sample forever. Negligible relative to the ~67-point
+gap between the P10 and P90 cutoffs.
+
+### Demonstration (real historical dates, resolved D1-D3 outcomes — 2026-09-08 to 2026-09-17)
+
+| Date | Weak-state n | Weak-state Cohort A rate | Strong-state n | Strong-state Cohort A rate |
+|---|---|---|---|---|
+| 2026-09-08 | 19 | 15.8% | 197 | 6.1% |
+| 2026-09-09 | 12 | 0.0% | 181 | 6.1% |
+| 2026-09-10 | 15 | 6.7% | 173 | 5.8% |
+| 2026-09-11 | 17 | 5.9% | 162 | 1.9% |
+| 2026-09-15 | 14 | 0.0% | 93 | 15.1% |
+| 2026-09-16 | 34 | 11.8% | 95 | 13.7% |
+| 2026-09-17 | 50 | 10.0% | 107 | 11.2% |
+
+Candidate decision (composite/decline/ret_1d, all T-close) and outcome
+lookup (Cohort A rate, D1-D3 MFE) are strictly separated — the outcome
+columns are looked up only AFTER each day's candidate list is already fixed,
+never used to construct the list. Zero overlap between W and S candidates
+on every day, as expected by construction (opposite tails of the same
+composite score). Route W's candidate lists are consistently much smaller
+than Route S's (12-50 vs. 93-197) — the three-gate compound definition is
+substantially more selective than Route S's single gate. **These per-day
+hit rates are a demonstration of mechanics, not a performance claim** — 7
+days, 12-50 names each, is far too small and unrepresentative to draw
+conclusions from (0.0% and 15.8% both appear in the same 7-day window).
+
+### Coverage over the full 5-year reference population
+
+D0 alone: 10.00% (by construction, a decile). D9 alone: 10.00% (by
+construction). **Route W's complete 3-gate definition: 13.46% of D0 rows →
+1.35% of the full population** — meaningfully more selective than the raw
+D0 decile alone, consistent with the T-close stabilization gate doing real
+work (matches 07A-6U's joint-separation finding).
+
+### Hand-verification (Rule #22)
+
+3 real weak-state candidates checked against all 3 gates directly (ABREL,
+AERONEU, AFCONS — all correctly `True` on every gate). 3 real D0-but-
+rejected examples checked (360ONE ×2, 3MINDIA — each correctly fails
+exactly the gate it should: two on the `ret_1d≥0` gate, one on the decline-
+depth gate). Classification logic verified correct by direct inspection, not
+just aggregate counts.
+
+### Disposition
+
+**Labeled explicitly, per critic's instruction, as an EOD / next-session
+candidate generator — NOT a claim about QS-A's current intraday-breach
+entry architecture.** That compatibility question remains separately
+tracked and unestablished (07A-6U: plausible, not confirmed at scale).
+Critic's status table, current state:
+
+| Layer | Status |
+|---|---|
+| Historical fast-mover phenomenon | Established |
+| Weak-state precursor | Established |
+| T-close stabilization | Established |
+| Pre-breach/intraday stabilization | Plausible, unconfirmed |
+| **EOD candidate generator** | **Frozen (this RQ)** |
+| Current QS-A intraday entry compatibility | Unestablished |
+| Production rule | Not established |
+
+**Not a strategy, not optimized, not ranked.** No thresholds searched, no
+ML, no sector overlay, no market-regime filter, no volume confirmation, no
+intraday confirmation, no options layer, no entry/exit rules, no combined
+W+S composite score — all explicitly out of scope per critic's prohibition
+list. Next stage, per critic, is candidate EVALUATION (concentration,
+liquidity, F&O availability, circuit involvement, year/regime stability
+across a much larger sample of dates) — not more phenomenon discovery.
+
+**Files**: `16_candidate_definition_freeze.py`, `frozen_candidate_spec.json`,
+`candidate_freeze_demo_candidates.csv`.
