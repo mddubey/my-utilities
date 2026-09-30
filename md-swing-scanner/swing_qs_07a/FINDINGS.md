@@ -1664,3 +1664,130 @@ across a much larger sample of dates) — not more phenomenon discovery.
 
 **Files**: `16_candidate_definition_freeze.py`, `frozen_candidate_spec.json`,
 `candidate_freeze_demo_candidates.csv`.
+
+## RQ-QS-07A-CG2 — Frozen Candidate Population Evaluation, complete (2026-09-30, critic-specified)
+
+**Objective**: not "what else can we discover" but "what does this frozen
+machine actually surface when we let it run?" Uses the CORRECTED frozen spec
+from CG1's integrity patch (0 boundary flips verified). Population: every
+eligible historical stock-day already in `trend_state_anatomy.csv`
+(2022-09-02 to 2026-09-24, 1,668,305 rows, 1,003 trading dates, D1-D3
+already resolved) — no date sampling, no threshold changes, no candidate
+filtering, no W/S combination. **Labeling discipline (critic's explicit
+correction)**: every number below is IN-SAMPLE DESCRIPTIVE characterization
+of what the frozen definitions produce historically, since the frozen
+constants were derived FROM this same population — reported as "historical
+candidate events had X% Cohort A incidence," never "hit rate."
+
+### Primary 1 — Coverage
+
+| Route | n | % of eligible stock-days | Candidates/trading-day | Dates with ≥1 candidate |
+|---|---|---|---|---|
+| W | 22,462 | 1.346% | 22.39 | 944 of 1,003 |
+| S | 166,831 | 10.000% (by construction, decile) | 166.33 | 1,003 of 1,003 |
+
+### Primary 2 — historical Cohort incidence (in-sample, not a forward claim)
+
+| Route | Cohort A incidence | Cohort B incidence | D3 MFE median/P90 | D3 close median/P90 |
+|---|---|---|---|---|
+| W | 10.23% (baseline 4.68%) | 10.16% (baseline 4.72%) | 4.31 / 13.07 | 0.03 / 8.98 |
+| S | 8.47% (baseline 4.68%) | 8.22% (baseline 4.72%) | 3.75 / 11.82 | -0.25 / 7.78 |
+
+Both routes show real historical enrichment over the population baseline
+(~2x for both A and B, both routes) — consistent with everything already
+established in 07A-5/07A-5R/07A-6U (these numbers match those RQs' own
+decile-9/decile-0 findings exactly, as they should — same population, same
+gates, reused not re-derived).
+
+### Primary 3 — temporal stability, per year (never pooled)
+
+| Route | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|
+| W (%Cohort A, n) | 7.81% (730) | 16.31% (2,753) | 10.06% (2,634) | 9.46% (9,153) | 9.18% (7,192) |
+| S (%Cohort A, n) | 9.77% (8,782) | 8.20% (52,980) | 9.60% (64,861) | 6.35% (19,669) | 7.04% (20,539) |
+
+Both routes show the SAME qualitative pattern already found independently
+across 07A-3R/07R/07A-5R: a real step-down into 2025-2026 relative to
+2023-2024's peak (S: ~8-10% down to ~6-7%; W noisier given its much smaller
+n, but the same general late-window softening is visible). Quarterly
+breakdown (secondary view, saved to `candidate_eval_by_quarter.csv`)
+confirms this isn't a single bad quarter — it's a broad multi-quarter
+pattern, matching 07R's own regime characterization.
+
+### Primary 4 — overlap, concentration, and the standout finding: candidate persistence
+
+**W vs S overlap: 0 rows** — confirmed empirically (not just "should be"),
+opposite composite tails as designed.
+
+**Concentration**: Route W has 1,769 distinct candidate tickers ever, top 10
+= 2.54% of all events, top 20 = 4.71% — broad, not dominated by a handful of
+names. Route S has 1,805 distinct tickers, top 10 = 2.19%, top 20 = 4.04% —
+similarly not concentrated by RAW ticker share.
+
+**But candidate PERSISTENCE tells a very different story** (critic's own
+added dimension — this is the standout result of CG2): Route W is mostly
+transient — 52.7% of its candidate "episodes" are single-day, only 20.8% of
+all W candidate-events belong to a run of 4+ consecutive days. **Route S is
+overwhelmingly persistent** — only 23.0% of episodes are single-day, and
+**91.9% of all S candidate-events belong to a run of 4+ days.** Of Route
+S's 1,805 distinct tickers, 1,537 (85%) appear 20+ times across the whole
+history — its top ticker (CUPID) appears on 403 of 1,003 trading dates
+(40%). **Hand-verified (Rule #22)**: CUPID's real close price went from
+₹3.02 (2023-07-24) to ₹284.40 (2026-09-15) over its candidate span — a
+genuine ~94x multi-year structural uptrend, not a data artifact. Route S is
+correctly, mechanically identifying "stocks currently in a persistent,
+multi-year strong-trend state," which by construction means the SAME small
+set of long-running winners re-qualify day after day for months. **Route S
+is NOT producing ~166 fresh daily discoveries — it's mostly re-confirming a
+relatively stable pool of already-known strong trends, with genuine
+rotation concentrated in a smaller subset.** Route W, by contrast, behaves
+much more like a rotating daily scanner.
+
+### Secondary — liquidity, F&O, circuit (annotated, not filtered)
+
+**Liquidity**: broad population is 30/40/30 (low/mid/high). Route W skews
+toward low liquidity (44.2/39.1/16.7) — consistent with 07A-6/6R/6T/6U's own
+weak-state population being liquidity-broad but base-rate-heavier in
+illiquid names. Route S skews toward high liquidity (19.2/38.3/42.5) —
+consistent with 07A-3R's established trend-continuation-concentrated-in-
+liquid-names finding.
+
+**F&O**: Route W is only 4.63% F&O-eligible (n=1,040); within F&O, Cohort A
+incidence is 4.81% vs. 10.49% non-F&O — the weak-state archetype is
+overwhelmingly a non-F&O phenomenon. Route S is 10.74% F&O-eligible
+(n=17,913); within F&O, Cohort A incidence is 4.11% vs. 8.99% non-F&O —
+same qualitative pattern (F&O names show a much lower absolute Cohort A
+incidence than non-F&O for BOTH routes), consistent with large/mid-cap
+names simply producing fewer 15%+ three-day moves overall (already
+established in 07A-5R).
+
+**Circuit**: Route W is 2.33% circuit-involved (n=523); circuit-involved
+median D3 MFE is far higher (13.97 vs. 4.25 structural) — consistent with
+circuit events being inherently more volatile (07A-5's own finding). Route
+S is 7.55% circuit-involved (n=12,596); circuit-involved median D3 MFE
+14.9→4.90 vs. 3.70 structural, same direction, smaller gap.
+
+### Disposition
+
+**This is the descriptive character of the frozen generator, not a
+performance claim.** Route W: small, selective, rotating, non-F&O-heavy,
+low-liquidity-skewed, ~10% historical Cohort A incidence. Route S: large,
+persistent (dominated by long-running trend names), somewhat more
+F&O/liquidity-present, ~8.5% historical Cohort A incidence, but the vast
+majority of its "candidates" on any given day are the SAME small pool of
+already-qualified names, not fresh signals.
+
+**Per critic's explicit guardrail, no stratification above is acted on** —
+the F&O/liquidity/circuit patterns are annotations, not new filters. Any of
+these that looks worth pursuing (e.g., "should Route S dedupe its
+persistent core?") is a candidate for a NEW RQ, not a CG2 modification.
+
+**Next stage, per critic**: assuming this behaves sensibly (it does — no
+red flags, internally consistent with every prior RQ in this line), the
+research moves to genuine forward/out-of-sample validation (RQ-QS-07A-CG3)
+— running the already-frozen generator on dates NOT used to define it,
+without refitting the constants.
+
+**Files**: `18_candidate_population_evaluation.py`, `candidate_eval_by_year.csv`,
+`candidate_eval_by_quarter.csv`, `candidate_eval_route_w.csv`,
+`candidate_eval_route_s.csv`.
