@@ -1402,3 +1402,118 @@ but the architecture question still awaits both this and any further
 actionability work.
 
 **Files**: `14_weak_state_transition_anatomy.py`, `weak_state_transition_anatomy_summary.csv`.
+
+## RQ-QS-07A-6U — Decision-Time Stabilization Test, complete (2026-09-30, critic-specified)
+
+**Objective**: the first genuinely "can we use it" RQ in this line, after
+five "is this pattern real" RQs. Critic's exact question: "Within frozen D0,
+can eventual fast movers be distinguished from ordinary D0 names using only
+information available at the candidate decision time?" Two distinct notions
+of "T information" tested SEPARATELY, never conflated: Level 1 (T-close —
+tells us whether the phenomenon is observable at all) and Level 2
+(pre-close/early-session — the real actionability question). Frozen: D0_A,
+D0_ordinary (unfiltered), no new cohort definitions, no new features, no
+threshold optimization, no composite, no strategy simulation, no
+candidate-generation freeze.
+
+### Part A — T-close feasibility ceiling (full 166,831-row D0 population)
+
+Joint separation via natural, non-arbitrary splits (population's own median
+for continuous variables, `ret_1d`'s natural zero-crossing for T's own
+direction — no fitted threshold anywhere):
+
+| Decline depth (median split) | T's own direction | n | %Cohort A | %Cohort B |
+|---|---|---|---|---|
+| Below median (deeper) | Green (`ret_1d`≥0) | 22,462 | **10.23** | 10.16 |
+| Below median (deeper) | Red (`ret_1d`<0) | 60,953 | 9.17 | 9.50 |
+| Above median (shallower) | Green | 30,303 | 4.99 | 5.05 |
+| Above median (shallower) | Red | 53,113 | 3.07 | 3.13 |
+| *Marginal: below-median alone* | *(any direction)* | 83,415 | *9.45* | *9.68* |
+| *Marginal: any depth* | *T green alone* | 52,765 | *7.22* | *7.23* |
+
+(Same table using `ret_3d` instead of `decline_from_high10d_pct` shows the
+identical qualitative pattern: deep+green=8.94%, deep+red=7.84%,
+shallow+green=6.54%, shallow+red=4.05%.)
+
+**Yes, there is a real joint signature at T-close** (best cell 10.23% vs.
+worst cell 3.07%, over 3x spread) — **but decline depth is the dominant
+driver, and T's own green/red status adds a real but smaller secondary
+lift on top.** Within the deep-decline group, green vs. red only moves the
+rate from 9.17%→10.23% (1.12x); within the shallow-decline group, the same
+green/red split moves it from 3.07%→4.99% (1.62x) — T's own direction
+matters proportionally MORE when the stock isn't as deeply oversold, and
+less once it already is. Both joint cells beat their own single-dimension
+marginal (10.23% > 9.45% "below-median alone"; 10.23% > 7.22% "green
+alone") — real joint information, not redundant with either dimension solo.
+
+**Important technical distinction for actionability, not previously
+flagged**: `decline_from_high10d_pct`/`ret_3d`/`dist_low10d_pct` are all
+computed from T's CURRENT price relative to an ALREADY-KNOWN prior 10-day
+high/low — meaning the dominant separating variable is, in principle,
+continuously observable INTRADAY (it updates live with the current quote,
+it does not require T's close to be known), unlike `close_loc_pct`/
+`lower_wick_pct` (both null in 07A-6 anyway) which genuinely require the
+full day's H/L/C. `ret_1d`'s sign is similarly observable live at any point
+in the session, just not "final" until close — a live-green reading can
+still flip red by close, or vice versa.
+
+### Part B — earliest-available-information side-check (SMALL SAMPLE, exploratory only)
+
+Real 5-minute intraday cache covers only 2026-06-10 to 2026-09-23 (~3.5
+months, 500 tickers) — **2,255 of 166,831 D0 events (1.35%) fall in this
+window with cached intraday data, of which only 42 are Cohort A.** Explicitly
+NOT a population-wide finding — reported honestly as a small exploratory
+check, same disclosed-limitation convention as `06_pivot_distance_features.py`'s
+own hourly-pivot side-check.
+
+Compared each event's first-hour (09:15-10:15 IST) return against its full
+day's `ret_1d`: sign-agreement between first-hour and full-day direction is
+LOWER for Cohort A (69.0%, n=42) than for ordinary D0 events in the same
+window (78.0%, n=2,213) — directionally consistent with fast movers being
+more likely to change character between the first hour and the close (fits
+the "stabilization develops during the day" story), but n=42 is far too
+small to treat this gap as established.
+
+**The one number worth carrying forward, heavily caveated**: within this
+tiny window, `%Cohort A` when the first hour is already green is 2.34%
+(n=853) vs. 1.57% when the first hour is red (n=1,402) — a ~1.49x relative
+lift from JUST the first hour of trading, arguably a LARGER relative lift
+than the full-day-close green/red marginal shows in the full 5-year
+population (7.22% vs. the population's 6.61% baseline, ~9% relative lift).
+This is directionally consistent with the stabilization signature being
+detectable early in the session, not something that only crystallizes at
+close — but it rests on 42 real events from a single 3.5-month window and
+cannot be treated as more than suggestive.
+
+### "Earliest defensible observation time" (critic's explicit requested deliverable)
+
+**The dominant mechanism variable (decline depth) is intraday-observable in
+principle** — it only needs the CURRENT live price against an
+already-known prior 10-day high, not T's close. **The secondary variable
+(today's own direction) is also live-observable, but not "locked in" until
+close** — a real risk that a live read reverses intraday. **The tiny
+available intraday sample (n=42) is directionally consistent with an early,
+pre-close signal existing**, but is nowhere near sufficient to confirm this
+at the population scale the T-close result (Part A) was established at.
+Honest answer: **decision-time observability looks PLAUSIBLE, not yet
+ESTABLISHED** — this project's own real intraday data coverage is the
+binding constraint, not the phenomenon itself.
+
+### Disposition
+
+Per critic's outcome taxonomy: closest to **Outcome A "stabilization
+plausibly visible before/at breach"**, but with an important qualifier —
+the T-close result (Part A, full population, robust) is the solid finding;
+the pre-close result (Part B) is suggestive but small-sample, not yet
+established at scale. Per critic's explicit guardrail, **no candidate
+definition is frozen here** — this result argues the weak-state pathway is
+worth continuing toward candidate-generation consideration, but the
+critic's own three-part checklist (visible at T-close ✓, visible
+before/at entry — plausible but unconfirmed at scale, information lost
+moving earlier — not yet fully measured) is not fully closed. Whether that
+residual uncertainty is acceptable to proceed, or whether it requires
+either a longer intraday history or an alternative decision-time proxy, is
+the critic's call.
+
+**Files**: `15_decision_time_stabilization.py`, `decision_time_joint_separation.csv`,
+`decision_time_intraday_sidecheck.csv`.

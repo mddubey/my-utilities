@@ -1,0 +1,13 @@
+split_var,dimension1,dimension2,n,pct_cohort_a,pct_cohort_b
+decline_from_high10d_pct,"below-median (decline_from_high10d_pct, deeper/more-negative)",T green (ret_1d>=0),22462,10.23,10.16
+decline_from_high10d_pct,"below-median (decline_from_high10d_pct, deeper/more-negative)",T red (ret_1d<0),60953,9.17,9.5
+decline_from_high10d_pct,"above-median (decline_from_high10d_pct, shallower)",T green (ret_1d>=0),30303,4.99,5.05
+decline_from_high10d_pct,"above-median (decline_from_high10d_pct, shallower)",T red (ret_1d<0),53113,3.07,3.13
+decline_from_high10d_pct,MARGINAL: below-median only,(any T direction),83415,9.45,9.68
+decline_from_high10d_pct,(any decline depth),MARGINAL: T green only,52765,7.22,7.23
+ret_3d,"below-median (ret_3d, deeper/more-negative)",T green (ret_1d>=0),14903,8.94,9.16
+ret_3d,"below-median (ret_3d, deeper/more-negative)",T red (ret_1d<0),68512,7.84,8.3
+ret_3d,"above-median (ret_3d, shallower)",T green (ret_1d>=0),37862,6.54,6.47
+ret_3d,"above-median (ret_3d, shallower)",T red (ret_1d<0),45554,4.05,3.88
+ret_3d,MARGINAL: below-median only,(any T direction),83415,8.04,8.45
+ret_3d,(any decline depth),MARGINAL: T green only,52765,7.22,7.23
