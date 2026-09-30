@@ -1,0 +1,10 @@
+metric,training_CG2,holdout
+Baseline Cohort A incidence,4.68,4.64
+W coverage (% of eligible),1.346,0.893
+W Cohort A incidence,10.23,15.48
+S coverage (% of eligible),10.0,7.297
+S Cohort A incidence,8.47,7.26
+W D3 MFE median,4.31,4.95
+S D3 MFE median,3.75,3.73
+W D3 close median,0.03,1.48
+S D3 close median,-0.25,-0.19

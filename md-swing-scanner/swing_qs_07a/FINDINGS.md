@@ -1925,3 +1925,162 @@ observations (the same ticker can appear on many consecutive dates) — a raw
 event-level incidence rate must never be reported with an unclustered
 confidence interval, e.g. never "S had X% winners across N observations,
 therefore..." without acknowledging that clustering.
+
+## RQ-QS-07A-CG3-H — Historical Holdout Validation, complete (2026-09-30, critic-specified — revised recommendation)
+
+**Why this exists**: the user pushed back on CG3's 5-7 week timeline to the
+first meaningful checkpoint and asked why a faster historical holdout wasn't
+used instead. The critic explicitly revised their earlier recommendation:
+a chronological train/test split is statistically legitimate (distinct from
+the CG1 constants leaking holdout data, which is prevented here) — the
+earlier caution was about **researcher-conditioning** (this research arc has
+already examined 2022-2026 repeatedly across a dozen-plus RQs, so a holdout
+slice from that same window isn't equivalent to genuinely-unseen future
+data), which is a real but different concern that doesn't invalidate the
+test, only its interpretation. **Runs in parallel with CG3, not instead of
+it.**
+
+**Method**: an INDEPENDENT specification, entirely separate from CG1's
+frozen constants (reusing those would defeat the purpose). Train:
+2022-09-02 → 2026-03-31 (1,436,926 rows) — every reference statistic
+(composite percentile distributions, P10/P90, decline-depth median, sorted-
+array lookup tables) derived exclusively from this period, same exact-ECDF
+methodology as CG1's integrity patch. Holdout: 2026-04-01 → 2026-09-24
+(231,379 rows) — used only to compute each day's candidate state via the
+TRAINING-derived constants; no holdout statistic flows back into the
+definition. Training-derived constants: P10=16.550, P90=84.190,
+decline_median=-10.700 (close to but not identical to CG1's full-population
+16.728/84.064/-10.433 — expected, different reference population).
+
+### Coverage and incidence
+
+| Route | Holdout events | Holdout incidence | Training (CG2) incidence | Baseline |
+|---|---|---|---|---|
+| W | 2,067 (0.893% of eligible, 17.08/day, 701 tickers) | 15.48% | 10.23% | 4.64% (holdout) / 4.68% (training) |
+| S | 16,883 (7.297% of eligible, 139.53/day, 872 tickers) | 7.26% | 8.47% | — |
+
+D3 MFE/close full distributions (P50/P75/P90/P95/P99): W max_return_d3 =
+4.95/10.06/15.64/19.94/31.59, close_ret_d3 = 1.48/6.39/12.57/15.72/25.24. S
+max_return_d3 = 3.73/6.88/11.11/15.01/22.52, close_ret_d3 =
+-0.19/3.21/7.31/10.78/18.15.
+
+### Hand-verification (Rule #22) — the headline W number needed a hard look, and the real story is better than it first appeared
+
+**Surprising number caught before trusting it**: April 2026 alone contributes
+602 of 2,067 W events (29% of the entire 6-month holdout) at a 33.89%
+incidence — 3-5x every other month (May-Sep range: 6.25%-12.08%). Drilled
+further: **342 of those 602 fall on a single day, 2026-04-01, and another
+127 on 2026-04-02 — 78% of April's entire total on just two days**, right at
+the very start of the holdout window.
+
+**Checked against real market data before accepting or dismissing this**:
+NIFTY fell from 23,306 (2026-03-25) to 22,331 (2026-03-30) — a real, broad
+~4.2% market-wide decline over 3-4 sessions — then bounced +1.56% on
+2026-04-01 (the first holdout day) and +0.15% on 04-02. **This is a genuine,
+broad market event, not a bug or a boundary artifact**: many stocks
+simultaneously satisfied "deep decline + green day" because the WHOLE
+MARKET was oversold and turned green together — the weak-state mechanism
+playing out at market scale, coincidentally timed right at the train/
+holdout boundary. **Cross-checked against an independent, already-established
+finding** (RQ-QS-07R, built earlier this same session): 2026Q2 (April-June)
+was independently found to be the strongest quarter in the entire 2025-26
+window for both market breadth (62.26% above EMA34) and fast-mover base
+rate (07R's own words: "actually the best quarter in the whole 2025-26
+window") — April 2026 falls inside that exact quarter. The surprising
+number corroborates, rather than contradicts, prior research — exactly the
+kind of cross-check this project's own "theoretical sanity check before
+reporting" discipline calls for.
+
+**Sensitivity check, excluding just 2026-04-01/04-02**: W drops from 2,067
+to 1,598 events, and **Cohort A incidence drops from 15.48% to 10.01% —
+essentially IDENTICAL to training's 10.23%.** D3 MFE median 4.03 (training
+4.31), D3 close median 0.37 (training 0.03) — both closely comparable. **The
+honest headline is NOT "W outperforms out-of-sample" — it's "W's holdout
+performance closely matches training once one specific, real, identifiable
+2-day market event is excluded."** Both framings are reported here rather
+than picking the more flattering one.
+
+### Monthly stability (never pooled)
+
+| Month | W n | W %CohortA | W median MFE | S n | S %CohortA | S median MFE |
+|---|---|---|---|---|---|---|
+| 2026-04 | 602 | 33.89 | 10.30 | 2,074 | 8.78 | 4.44 |
+| 2026-05 | 274 | 6.57 | 3.98 | 2,766 | 8.46 | 3.79 |
+| 2026-06 | 317 | 6.62 | 3.45 | 3,186 | 7.31 | 4.02 |
+| 2026-07 | 230 | 6.96 | 4.11 | 2,913 | 4.63 | 3.29 |
+| 2026-08 | 288 | 6.25 | 3.14 | 3,427 | 7.12 | 3.50 |
+| 2026-09 | 356 | 12.08 | 3.94 | 2,517 | 7.87 | 3.67 |
+
+W's May-August months (once past the April event) sit in a tight 6.25-6.96%
+band — real, consistent, if somewhat below training's 10.23%. September
+ticks back up to 12.08% (n=356) — one month, not over-interpreted here. S is
+comparatively stable throughout (4.63%-8.78%), consistent with S's broader,
+simpler single-gate definition being naturally less sensitive to any single
+short-lived event than W's compound 3-gate definition.
+
+### Overlap, concentration, persistence (same methodology as CG2)
+
+W vs S overlap: 0 (confirmed). W: 701 unique tickers, 1,165 episodes, top 10
+tickers = 8.27% of events, 55.0% single-day episodes, 21.1% of events in a
+4+-day run — same transient character as CG2's in-sample finding (52.7%
+single-day). S: 872 unique tickers, 2,050 episodes, top 10 = 5.10%, 23.1%
+single-day, **90.4% of events in a 4+-day run** — matches CG2's in-sample
+91.9% almost exactly, confirming S's persistent-core character reproduces
+out of sample too.
+
+### Secondary — liquidity, F&O, circuit (annotated, not filtered)
+
+W: liq_tercile 49.3/35.3/15.4 (low/mid/high), 5.90% F&O-eligible,
+3.05% circuit-involved. S: liq_tercile 7.9/36.4/55.7, 6.42% F&O-eligible,
+2.01% circuit-involved. Same qualitative pattern as CG2 (W skews low-
+liquidity, S skews high-liquidity) — reproduces out of sample.
+
+### Train vs holdout comparison
+
+| Metric | Training (CG2) | Holdout |
+|---|---|---|
+| Baseline Cohort A incidence | 4.68 | 4.64 |
+| W coverage (% of eligible) | 1.346 | 0.893 |
+| W Cohort A incidence | 10.23 | 15.48 (10.01 excl. 04-01/02) |
+| S coverage (% of eligible) | 10.000 | 7.297 |
+| S Cohort A incidence | 8.47 | 7.26 |
+| W D3 MFE median | 4.31 | 4.95 (4.03 excl.) |
+| S D3 MFE median | 3.75 | 3.73 |
+| W D3 close median | 0.03 | 1.48 (0.37 excl.) |
+| S D3 close median | -0.25 | -0.19 |
+
+### Researcher-conditioning caveat (critic's exact wording, reproduced verbatim)
+
+> Historical holdout limitation: The April–September 2026 period was not
+> used to derive the candidate-definition constants in this holdout
+> experiment, so the test is a genuine chronological train/test split at
+> the numerical specification level. However, the research team had already
+> inspected and analyzed portions of this period during earlier exploratory
+> RQs conducted before the candidate definition was frozen. Therefore this
+> result should not be treated as equivalent to a fully blind prospective
+> validation: researcher-conditioning / research-process information may
+> have influenced earlier hypothesis formation. The holdout is consequently
+> an intermediate validation of temporal generalization, while the
+> independently accumulating post-freeze prospective run remains the
+> cleanest test of forward performance.
+
+### Disposition
+
+**The methodology generalizes.** Both routes reproduce their training-period
+character out of sample: S's incidence, D3 distributions, and — most
+tellingly — its extreme persistence (90.4% vs. 91.9% in-sample) all
+reproduce closely. W's headline incidence looked like an improvement but,
+once a real and independently-corroborated 2-day market event is accounted
+for, essentially matches training too. Neither route shows a degradation
+severe enough to call this a specification failure. **CG3 (prospective,
+started 2026-09-25) continues untouched in parallel** — this holdout result
+is faster evidence, not a replacement for the cleaner test.
+
+**Not promotable, not a strategy** — this is a specification-generalization
+check, same discipline as every other RQ in this line: no threshold changed,
+no filter added, no combination of W+S, no ranking.
+
+**Files**: `20_historical_holdout_cg3h.py`, `full_population_decline_ret1d.csv`
+(gitignored — 1.66M rows, fully regeneratable), `cg3h_by_month.csv`,
+`cg3h_train_vs_holdout.csv`, `cg3h_holdout_route_w.csv` (kept — small enough,
+2,067 rows, and directly supports the April investigation above).
