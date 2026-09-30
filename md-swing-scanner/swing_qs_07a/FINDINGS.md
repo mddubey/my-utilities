@@ -2460,3 +2460,99 @@ conversation needs to explicitly account for this holdout result, not
 proceed as if P4's pooled numbers were the final word.
 
 **Files**: `24_p5_s_intervention_holdout.py`, `p5_discovery_vs_holdout.csv`.
+
+## RQ-QS-07A-P6 — S Intervention Failure Anatomy, complete (2026-09-30, critic-specified)
+
+**Narrow diagnostic, not a predictor search or rescue attempt**: which
+already-observed component moved between the successful pre-2025/2025
+periods and the failed 2026 period (P5)? Uses only already-existing QS-A
+trajectory/realized-R variables — no new features, no new candidate
+definitions, no threshold search, no intervention.
+
+### (1) Opportunity/MFE — the primary finding: it genuinely reversed sign
+
+| Period | MFE D1 gap (S − non-S) | MFE D3 gap | MFE D5 gap |
+|---|---|---|---|
+| pre-2025 | -0.011 | +0.035 | +0.033 |
+| 2025 | +0.006 | +0.090 | +0.048 |
+| **2026** | **-0.071** | **-0.079** | **-0.142** |
+
+**S-tagged trades stopped finding bigger peak moves than non-S trades in
+2026 — the gap doesn't just shrink, it reverses.** In every prior period, S
+generated equal-or-slightly-better MFE than non-S (consistent with P3's own
+original framing, "similar opportunity"). In 2026, S-tagged trades
+generate MEANINGFULLY LESS peak opportunity (D5 gap = -0.142R). This
+directly matches critic's own flagged possibility: **"MFE itself
+collapses... the problem is much more fundamental: S no longer identifies
+the same opportunity type"** — not the alternative ("MFE remains similar
+but giveback explodes," which would point to an exit-mechanics-only
+problem).
+
+### (2) Stop interaction — a real, secondary effect
+
+| Period | Stop rate gap (S − non-S) | S early-stop rate (D1-3) |
+|---|---|---|
+| pre-2025 | -0.2pp | 47.8% |
+| 2025 | -1.2pp | 47.9% |
+| **2026** | **+5.6pp** | **56.5%** |
+
+S-tagged trades stop out more often AND faster in 2026 specifically —
+consistent with, and likely downstream of, the opportunity deterioration
+above (less genuine upside means the stop gets tested sooner). **One
+persistent, structural finding across ALL periods, not specific to 2026**:
+S-tagged trades have a consistently WIDER stop distance (`initial_risk_pct`
+≈4.9-5.2% vs. non-S's ≈3.7-4.0%) — strong-trend names apparently carry
+wider natural daily ranges. This is a real, stable characteristic of S
+trades in general, not part of the 2026-specific reversal.
+
+### (3) Retention/giveback — also genuinely reversed, not merely weakened
+
+| Period | close_r D15 gap | giveback: S vs. non-S |
+|---|---|---|
+| pre-2025 | +0.180 | 56.8% vs. 60.7% (S retains better) |
+| 2025 | -0.014 (nearly flat) | 65.2% vs. 67.4% (S still marginally better) |
+| **2026** | **-0.096** | **81.0% vs. 69.9% (S now retains WORSE)** |
+
+P3's original finding was specifically "S doesn't create more MFE, it
+improves retention." **In 2026, S doesn't just lose its retention edge —
+S-tagged trades now give back MORE of their peak than non-S trades
+(81.0% vs. 69.9%).** Combined with (1), both of the mechanisms that made
+S look attractive (comparable-or-better opportunity, better retention)
+reversed simultaneously in 2026 — this is not a single-channel failure.
+
+### (4) Population structure — real but not obviously disqualifying
+
+Ticker concentration climbs steadily: top-10-ticker share among S-tagged
+trades = 9.6% (pre-2025) → 19.0% (2025) → **27.0% (2026)**. A real,
+disclosed trend, consistent with S's already-known persistence character
+combined with the underlying phenomenon becoming rarer (07R). Still 115
+distinct tickers and 236 episodes in 2026 — not a 2-3-stock artifact, but
+concentration is genuinely higher than in earlier periods and should
+temper how much weight any single 2026 statistic carries. The 10D/20D/40D
+lookback mix stays remarkably stable across all three periods (~32-37%
+each) — rules out "the reversal is a lookback-definition artifact."
+
+### Disposition — critic's exact status table, recorded verbatim
+
+| Layer | Status |
+|---|---|
+| S discovery | 🟢 Validated |
+| S → QS-A observational overlay | 🟢 Strong historical relationship |
+| S → QS-A intervention | 🔴 OOS robustness failed |
+| Production integration | 🔴 Closed / not promoted |
+| S mechanism research | 🟡 Open only for narrow post-mortem (this RQ) |
+| New S threshold/regime filter | 🔴 Not authorized |
+
+**Per critic's own decision rule** ("if P6 shows a clean, previously
+observed mechanism — especially an exit/retention failure — then we can
+decide whether it belongs to the broader QS-A exit research. If it
+doesn't, park S."): **this is NOT a clean exit-only failure.** Both
+opportunity (1) and retention (3) reversed together in 2026 — the
+diagnostic points toward critic's "more fundamental" interpretation (S no
+longer identifies the same opportunity type in this specific period), not
+the narrower "QS-A's exit mechanics simply mishandle a still-real
+opportunity" reading. This does not automatically license a new regime
+filter or threshold (explicitly not authorized) — it is reported as the
+honest anatomy of the failure, for the critic's own next-step call.
+
+**Files**: `25_p6_failure_anatomy.py`, `p6_failure_anatomy.csv`.
