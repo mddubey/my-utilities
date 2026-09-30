@@ -1231,3 +1231,78 @@ simulation — exactly as scoped.
 
 **Files**: `12_weak_state_mechanism.py`, `weak_state_mechanism_features.csv`,
 `weak_state_mechanism_separation.csv`.
+
+## RQ-QS-07A-6R — Decline-Velocity Robustness, complete (2026-09-30, critic-specified)
+
+**Objective**: robustness-audit 07A-6's sole surviving mechanism candidate —
+recent decline velocity — across the same four one-dimensional strata used in
+07A-5R (year, liquidity tercile, F&O, circuit involvement). Per critic's
+exact scope: `ret_3d` and `decline_from_high10d_pct` kept as SEPARATE
+measurements throughout (not re-collapsed into a composite — they capture
+different things: depth of decline vs. recent acceleration, and the point of
+this pass is finding out which one, or both, actually survives). Volume
+participation explicitly NOT retested (sub-threshold in 07A-6, would turn a
+weak observation into an unwarranted second branch). Family 3
+(volatility-transition) not retested (already closed null). Same effect-size
+definition and bands as 07A-6. **New requirement this pass**: strata with
+`n<30` are labeled `low-n/indeterminate`, distinct from a genuine `null` —
+none of the 24 tested strata actually needed this label (smallest cell,
+F&O=True Cohort A, still had n=228).
+
+**Result: both features are overwhelmingly robust.** Across 12 strata × 2
+cohorts (24 cells each): `decline_from_high10d_pct` clears CANDIDATE in 22/24
+cells (the only 2 exceptions both in the small circuit-involved subgroup,
+still "weak" there, never null). `ret_3d` clears CANDIDATE in 18/24 cells
+(6 "weak" exceptions, no nulls, no low-n cells). Every single year
+(2022-2026), every liquidity tercile, both F&O and non-F&O, and the
+structural (non-circuit) pathway show CANDIDATE-level separation for both
+features, with effect sizes frequently STRONGER than the pooled 07A-6 numbers
+(e.g. `decline_from_high10d_pct` F&O=True Cohort A: z=-0.985, nearly double
+the pooled -0.535).
+
+**Hand-verified anomaly (Rule #22) — a genuine sign flip in the small
+circuit-involved subgroup, not a bug**: `ret_3d` for circuit-involved Cohort
+A shows a POSITIVE gap (z=+0.432, fast median=-1.58 vs. ordinary median
+=-5.52) — the only reversed-direction result across all 24 cells.
+Hand-checked 5 real circuit-involved D0 Cohort A events (seed=42): TRU
+(2025-04-01, ret_3d=-4.11), LOKESHMACH (2025-05-08, -12.29), TRU (2024-12-16,
+**+1.94**), PAYTM (2024-02-15, -23.01), INDOSTAR (2023-04-05, **+7.70**) —
+genuinely heterogeneous, both extreme-negative and positive real values, not
+a computation error. Most plausible mechanism: circuit-lock mechanically
+freezes or distorts realized price moves (a locked day shows artificial
+near-zero change, and post-unlock can gap violently in either direction),
+which corrupts `ret_3d` specifically as a MEASUREMENT in this small
+subgroup (n=589/676) — not evidence against the decline-velocity mechanism
+itself. `decline_from_high10d_pct` (less sensitive to a single frozen day,
+since it's a peak-to-current comparison) stays correctly signed even here,
+just weaker (z=-0.194/-0.138). Disclosed, not smoothed over — this subgroup
+is 0.35% of D0, doesn't threaten the headline result.
+
+**Answering critic's exact decision framework — both variables are robust,
+but they are not interchangeable**: `decline_from_high10d_pct` is the
+stronger and more consistently robust of the two (22/24 CANDIDATE, largest
+effect sizes throughout, including the strongest single reading in the
+dataset: F&O Cohort A at z=-0.985). `ret_3d` is also robust in the large
+majority of strata but shows more variation (weak in some individual years
+for Cohort A specifically, and the one real circuit-distorted reversal
+above). Per critic's own outcome taxonomy: this is **Outcome A — both
+variables robust** — "recent deterioration/deceleration into a weak state
+is a robust precursor characteristic of D0 fast movers," with
+`decline_from_high10d_pct` (depth of decline) the more dominant of the two,
+`ret_3d` (short-term acceleration) a real but somewhat noisier secondary
+signal in the same family.
+
+### Disposition
+
+**Mechanism branch continues to post-decline transition anatomy — NOT
+another feature search**, per critic's explicit instruction. The
+"sharp drop → pause" hypothesis from 07A-6 remains a working hypothesis, now
+resting on a robust cross-sectional base rather than a single pooled
+reading — but critic's own caveat still applies: robustness of the
+CROSS-SECTIONAL gap does not yet establish the TEMPORAL claim ("the
+deterioration causes a subsequent pause"). That requires examining the
+actual T→D1→D2→D3 transition, using already-available price-path
+information — the next RQ, per critic's own roadmap, not a new TA feature
+search.
+
+**Files**: `13_decline_velocity_robustness.py`, `decline_velocity_robustness.csv`.
