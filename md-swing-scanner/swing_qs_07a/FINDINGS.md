@@ -1139,3 +1139,95 @@ archetypes rather than one gate explaining both.
 
 **Files**: `11_weak_state_robustness_timing.py`, `weak_state_robustness_matrix.csv`,
 `weak_state_timing_anatomy.csv`.
+
+## RQ-QS-07A-6 — Weak-State Fast-Mover Mechanism, complete (2026-09-30, critic-specified)
+
+**Objective (critic's exact framing)**: "Within the already-frozen weak-state
+D0 population, what decision-time price/volume/volatility transition
+distinguishes the 3-day fast movers from ordinary D0 days?" A WITHIN-D0
+discrimination study — D0 Cohort A/B (fast movers) vs. D0 stock-days that did
+NOT become Cohort A/B ("D0 ordinary") — not D0 vs. D2 anymore (07A-5R already
+closed that: PASS, robust). No catalyst/news infrastructure built (critic's
+explicit deferral — rabbit-hole risk, only pursued if price/volume/
+volatility anatomy fails).
+
+**Frozen**: D0 = bottom decile of the already-built composite from
+`10_trend_state_anatomy.py`, not redefined. Same 166,831-row D0 population,
+same Cohort A/B definitions. Cohort A and B tested separately throughout
+(critic's prose emphasized A; B added here per this project's standing
+A/B-separate discipline).
+
+**Methodological requirement honored (composite-decomposition rule)**: the 5
+state-definition variables (`dist_sma200_pct`, `ret_20d`, `dist_low252_pct`,
+`dist_ema34_pct`, `rsi14`) are reported as descriptive context ONLY — D0 is a
+bottom-decile bucket of exactly these 5, so any within-D0 gap in them is
+expected/partially circular, not a new mechanism claim. All 12 mechanism
+candidates below are verified distinct from the composite's own formulas and
+lookback windows (e.g. `ret_1d`/`ret_3d` use 1/3-day windows vs. the
+composite's 20-day `ret_20d`; `dist_low10d_pct` uses a 10-day local low vs.
+the composite's 252-day `dist_low252_pct`).
+
+**Separation table** (standardized effect size = median gap / ordinary-population
+IQR; bands pre-declared before computing: |z|≥0.30 = CANDIDATE, 0.10-0.30 =
+weak, <0.10 = null):
+
+| Feature | Family | Cohort A z (IQR) | Cohort B z (IQR) | Verdict |
+|---|---|---|---|---|
+| `ret_3d` | 1-Reversal | -0.324 | -0.371 | **CANDIDATE** |
+| `decline_from_high10d_pct` | 1-Reversal | -0.535 | -0.520 | **CANDIDATE** |
+| `dist_low10d_pct` | 1-Reversal | +0.266 | +0.230 | weak |
+| `ret_1d` | 1-Reversal | -0.099 | -0.138 | null/weak |
+| `close_loc_pct`, `lower_wick_pct`, `body_atr` | 1-Reversal | ~0 | ~0 | null |
+| `vol_ratio_10d` | 2-Volume | +0.186 | +0.215 | weak |
+| `vol_zscore` | 2-Volume | +0.152 | +0.186 | weak |
+| `vol_declining5`, `ad_fraction` | 2-Volume | ~0 | ~0 | null |
+| `atr_expansion`, `atr_accel`, `range5_width_over_atr` | 3-Volatility | 0.12-0.13 | 0.12-0.17 | weak |
+| `gap_pct` | 3-Volatility | ~0 | ~0 | null |
+
+**Correlation collapse (critic's decision rule #3 applied)**: `ret_3d` and
+`decline_from_high10d_pct` correlate 0.62 within D0 Cohort A — the two
+CANDIDATEs are substantially the SAME latent signal (recent decline
+velocity/magnitude), not two independent confirmations. `vol_ratio_10d` and
+`vol_zscore` correlate 0.88 — also one signal (volume participation), sitting
+just below the CANDIDATE threshold in both cohorts.
+
+**Result: ONE mechanism family separates — recent decline velocity, not a
+reversal candle.** D0 fast movers arrived at the weak state via a
+meaningfully SHARPER, faster recent decline than ordinary D0 stocks (larger
+3-day drop, larger fall from their own 10-day high) — but T's own candle
+shows NO sign of already reversing (`close_loc_pct` and `lower_wick_pct` are
+both null — T is not disproportionately a "hammer"/reversal-shaped day for
+fast movers vs. ordinary D0 days). The two observations reconcile: fast
+movers fell hard and fast into the state, then paused just enough that by T
+they sit slightly further above their own 10-day low than ordinary D0 stocks
+(`dist_low10d_pct`, weak positive) — a "sharp drop, then a pause" signature,
+not "still actively crashing" and not "already visibly bouncing." Volume
+participation shows a real but sub-CANDIDATE-threshold signal in the same
+direction (fast movers' volume at T is closer to normal, not depressed, vs.
+ordinary D0 days' below-average volume) — consistent, worth carrying forward,
+not yet promotable on its own. Volatility-transition (Family 3) is close to a
+clean null — no feature in that family clears even the weak band by a
+meaningful margin, arguing against "D0 fast movers are a
+compressed-to-expanding volatility transition" as the mechanism.
+
+**Both cohorts agree closely** (e.g. `ret_3d` z=-0.324 vs -0.371, `decline_from_high10d_pct`
+z=-0.535 vs -0.520) — no meaningful A/B divergence in the mechanism
+candidates, matching this line's established pattern.
+
+### Disposition, per critic's pre-registered decision rules
+
+**"If one mechanism family separates: audit it across years/liquidity/F&O/
+circuit-clean in a follow-up RQ"** — this is now the exact next step,
+RQ-QS-07A-6R, matching the 07A-5→07A-5R precedent. Candidate mechanism to
+carry forward: recent decline velocity (`ret_3d`/`decline_from_high10d_pct`,
+treated as one signal per the correlation collapse), with volume
+participation as a secondary, weaker candidate worth including in the same
+robustness pass rather than dropped. Family 3 (volatility-transition) is not
+carried forward — too close to null to be worth a robustness pass.
+
+**Not promotable** (Rule #21): this is first-pass separation only, no
+robustness sweep, no threshold chosen, no filter, no model, no strategy
+simulation — exactly as scoped.
+
+**Files**: `12_weak_state_mechanism.py`, `weak_state_mechanism_features.csv`,
+`weak_state_mechanism_separation.csv`.

@@ -1,0 +1,31 @@
+cohort,family,feature,fast,ordinary,gap,z_iqr,interpretation
+CohortA,Family1-Reversal,ret_1d,-1.234,-0.962,-0.272,-0.099,null
+CohortA,Family1-Reversal,ret_3d,-4.15,-2.672,-1.478,-0.324,CANDIDATE
+CohortA,Family1-Reversal,dist_low10d_pct,3.129,2.205,0.924,0.266,weak
+CohortA,Family1-Reversal,decline_from_high10d_pct,-13.581,-10.258,-3.323,-0.535,CANDIDATE
+CohortA,Family1-Reversal,close_loc_pct,29.31,28.571,0.739,0.02,null
+CohortA,Family1-Reversal,lower_wick_pct,20.438,21.429,-0.991,-0.04,null
+CohortA,Family1-Reversal,body_atr,0.423,0.381,0.042,0.085,null
+CohortA,Family2-Volume,vol_ratio_10d,1.046,0.887,0.159,0.186,weak
+CohortA,Family2-Volume,vol_zscore,-0.002,-0.215,0.212,0.152,weak
+CohortA,Family2-Volume,vol_declining5,0.363,0.513,-0.151,,n/a (rate)
+CohortA,Family2-Volume,ad_fraction,0.35,0.362,-0.012,-0.071,null
+CohortA,Family3-Volatility,atr_expansion,0.931,0.888,0.043,0.127,weak
+CohortA,Family3-Volatility,atr_accel,0.99,0.97,0.02,0.116,weak
+CohortA,Family3-Volatility,range5_width_over_atr,2.263,2.131,0.131,0.132,weak
+CohortA,Family3-Volatility,gap_pct,0.097,0.086,0.011,0.01,null
+CohortB,Family1-Reversal,ret_1d,-1.336,-0.957,-0.379,-0.138,weak
+CohortB,Family1-Reversal,ret_3d,-4.349,-2.66,-1.688,-0.371,CANDIDATE
+CohortB,Family1-Reversal,dist_low10d_pct,3.007,2.209,0.798,0.23,weak
+CohortB,Family1-Reversal,decline_from_high10d_pct,-13.487,-10.254,-3.233,-0.52,CANDIDATE
+CohortB,Family1-Reversal,close_loc_pct,28.986,28.571,0.414,0.011,null
+CohortB,Family1-Reversal,lower_wick_pct,20.359,21.444,-1.085,-0.044,null
+CohortB,Family1-Reversal,body_atr,0.429,0.381,0.048,0.098,null
+CohortB,Family2-Volume,vol_ratio_10d,1.069,0.886,0.184,0.215,weak
+CohortB,Family2-Volume,vol_zscore,0.042,-0.217,0.259,0.186,weak
+CohortB,Family2-Volume,vol_declining5,0.426,0.509,-0.083,,n/a (rate)
+CohortB,Family2-Volume,ad_fraction,0.353,0.362,-0.009,-0.053,null
+CohortB,Family3-Volatility,atr_expansion,0.933,0.888,0.046,0.136,weak
+CohortB,Family3-Volatility,atr_accel,0.99,0.97,0.02,0.12,weak
+CohortB,Family3-Volatility,range5_width_over_atr,2.294,2.129,0.165,0.166,weak
+CohortB,Family3-Volatility,gap_pct,0.058,0.088,-0.03,-0.028,null
