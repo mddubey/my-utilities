@@ -1791,3 +1791,89 @@ without refitting the constants.
 **Files**: `18_candidate_population_evaluation.py`, `candidate_eval_by_year.csv`,
 `candidate_eval_by_quarter.csv`, `candidate_eval_route_w.csv`,
 `candidate_eval_route_s.csv`.
+
+## RQ-QS-07A-CG3 — Forward/Out-of-Sample Candidate Validation, started (2026-09-30, critic-specified)
+
+**The line crossed here, per critic**: from "can we discover another
+precursor?" to "when we freeze what we discovered and let it run forward,
+does it actually surface the phenomenon?" **Strict requirement, honored**:
+the specification is frozen at the CG1 integrity-patched version — no
+recalculation, no re-estimation, no new percentile boundaries, no adding
+recent data to the reference population. Reuses `frozen_candidate_spec.json`
++ `frozen_sorted_arrays.npz` exactly as produced by `17_boundary_flip_audit.py`.
+
+**The clean OOS boundary (critic's exact framing)**: "the first trading date
+after the CG1 freeze that was not used to establish the frozen constants."
+Checked directly, not assumed: the frozen reference population runs through
+2026-09-24, and the real price cache currently has exactly **three** trading
+dates strictly after that — 2026-09-25, 2026-09-28, 2026-09-29. **None of
+these has a fully resolved D1-D3 window yet** (2026-09-25's D3 needs the
+trading day after 2026-09-29, not yet cached; today is 2026-09-30, mid-
+session). Disclosed honestly rather than manufactured — per critic's own
+framing, this is meant to be an ACCUMULATING log, re-run as fresh data
+arrives via `fetch_prices.py`, never a single complete answer on day one.
+
+**Two real bugs caught before trusting this (Rule #22)**: (1) an early
+version produced exactly 0 Route W candidates across all 3 days — traced to
+using the 10-day LOW (always positive) where the frozen definition needs
+distance below the 10-day HIGH (`12_weak_state_mechanism.py`'s exact
+formula); fixed, W then correctly produces 7/9/14 candidates. (2) The W
+persistence label initially used "was in D0 yesterday" (a looser precursor
+gate) as its previous-day reference, which isn't symmetric with S's own
+definition ("remained S" = the FULL S definition on the prior day, not just
+a precursor). Fixed to check the FULL 3-gate W definition on 2026-09-24
+directly (7 tickers qualified that day), matching S's precision. Aggregate
+math check: 395 (S) + 30 (W) = 425, exactly the saved row count — clean
+partition, no double-count. Hand-verified 3 real W and 3 real S candidates
+directly against the raw frozen thresholds — all correct.
+
+### Coverage and persistence, on the 3 available OOS dates
+
+| Date | W candidates (new/persistent) | S candidates (new/persistent) |
+|---|---|---|
+| 2026-09-25 | 7 (6 new / 1 persistent) | 151 (26 new / 125 persistent) |
+| 2026-09-28 | 9 (5 new / 4 persistent) | 117 (9 new / 108 persistent) |
+| 2026-09-29 | 14 (12 new / 2 persistent) | 127 (26 new / 101 persistent) |
+
+W: 30 total events, 24 unique tickers, 23 new episode-starts vs. 7
+persistent continuations (76.7% new) — matches CG2's finding that W is
+mostly transient. S: 395 total events, 176 unique tickers, 61 new
+episode-starts vs. 334 persistent continuations (84.6% persistent) —
+matches CG2's finding that S is dominated by a stable, re-qualifying core.
+**Both forward numbers land close to their respective in-sample
+characterizations from CG2** (W ~53% single-day episodes; S ~92% of events
+in 4+-day runs) — an early, small, but reassuring consistency check between
+the historical characterization and the live forward behavior. Coverage
+counts are also broadly in line with the in-sample averages (W ~22/day
+historically vs. 7-14/day here; S ~166/day historically vs. 117-151/day
+here) — not identical, single-digit-day samples aren't expected to match
+exactly, but not wildly divergent either.
+
+### Whatever outcome is actually resolved so far (partial, D3 pending everywhere)
+
+2026-09-25 (only date with any resolved outcome yet): W D1 MFE median
++2.27 (P90 +4.15, n=7), W D2 MFE median +3.27 (P90 +4.15, n=7); S D1 MFE
+median +1.90 (P90 +5.11, n=151), S D2 MFE median +2.21 (P90 +7.32, n=151).
+2026-09-28: only D1 resolved (W +2.25 median, S +2.22 median). 2026-09-29:
+nothing resolved yet. **These are directional early reads only — D3, the
+primary outcome metric throughout this whole research line, is not
+available for any candidate yet.** No conclusion is drawn from these
+numbers beyond "the pipeline runs correctly and produces sane-looking
+early-day numbers."
+
+### Disposition
+
+**This is not a completed validation — it's the first entry in what needs
+to be an ongoing log.** Per critic's explicit instruction, re-running
+`19_forward_validation_cg3.py` after each future `fetch_prices.py` update
+will (a) extend the OOS candidate window with new trading dates and (b)
+resolve more D1-D3 outcomes for dates already generated — without ever
+touching the frozen spec. The genuinely decisive test (does D3 MFE show the
+same right-tail shift and Cohort-A-equivalent incidence prospectively that
+CG2 found in-sample) cannot be answered yet with 0 resolved D3 windows.
+**No filtering, ranking, W/S combination, or strategy simulation performed**
+— per critic's explicit prohibition list.
+
+**Files**: `19_forward_validation_cg3.py`, `cg3_forward_candidates.csv`
+(will be regenerated/extended on each re-run — small enough to keep
+committed as a living artifact, not gitignored).
