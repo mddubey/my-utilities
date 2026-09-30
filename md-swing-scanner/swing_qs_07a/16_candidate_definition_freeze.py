@@ -1,5 +1,19 @@
 """RQ-QS-07A-CG1 -- Candidate Definition Freeze (2026-09-30, critic-specified).
 
+SUPERSEDED NOTICE (2026-09-30, critic's own required pre-CG2 integrity check):
+this script's `percentile_rank()`/`compute_composite()` used a 101-point
+interpolation table. `17_boundary_flip_audit.py` found that approximation
+flips real W/S membership on 409 rows (189 W + 220 S) out of 1,668,305 --
+small, but not zero, so per critic's explicit instruction the LOOKUP
+MECHANISM (not the P10/P90 thresholds, which are unchanged and correct) was
+replaced with an exact sorted-array ECDF lookup, verified to produce 0
+flips. `frozen_candidate_spec.json` now points to `frozen_sorted_arrays.npz`
+instead of the 101-point table this script generates. Do NOT re-run this
+script's STEP 1 -- it would regenerate and overwrite the corrected spec file
+with the superseded approximation. Kept as the historical record of the
+original approach; `17_` is the authoritative patch; any later script
+(CG2 onward) uses the corrected lookup, not this file's own functions.
+
 PHASE CHANGE, explicit per critic: everything through 07A-6U asked "what
 distinguishes historical winners?" (a research/discovery question). This RQ
 asks a different question: "given information available on date T, which

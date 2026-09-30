@@ -1574,6 +1574,27 @@ using a compact 101-point lookup table instead of storing the full
 1.66M-row historical sample forever. Negligible relative to the ~67-point
 gap between the P10 and P90 cutoffs.
 
+**CORRECTION (2026-09-30, critic's required pre-CG2 integrity check,
+`17_boundary_flip_audit.py`)**: "negligible" was verified, not assumed — a
+full deterministic audit across all 1,668,305 rows found the 101-point
+approximation actually flips real W/S membership on **409 rows (189 W +
+220 S)**, not zero. Per critic's exact instruction, the P10/P90 thresholds
+were NOT retuned — the lookup MECHANISM was replaced with an exact
+sorted-array ECDF lookup (`frozen_sorted_arrays.npz`, ~1.66M stored values
+per composite input, midpoint-of-searchsorted formula matching pandas'
+`rank(pct=True)` averaged-tie convention bit-for-bit on a hand-tie test).
+Re-running the same flip audit against the exact method gives **0 flips**
+— critic's stated acceptance bar. A residual ~0.0000839 max-abs-diff
+remains between the exact recomputation and the saved column; traced to
+CSV float-serialization round-trip (reproduced even using pandas' own
+`.rank(pct=True)` directly on the reloaded file, ruling out a formula
+error) — irrelevant at this magnitude, confirmed by the 0-flips result.
+`frozen_candidate_spec.json` updated accordingly;
+`16_candidate_definition_freeze.py`'s own 101-point functions are now
+superseded (flagged in its docstring) — CG2 onward uses the corrected
+exact lookup. **CG1 is now fully frozen per critic's "last integrity
+check."**
+
 ### Demonstration (real historical dates, resolved D1-D3 outcomes — 2026-09-08 to 2026-09-17)
 
 | Date | Weak-state n | Weak-state Cohort A rate | Strong-state n | Strong-state Cohort A rate |
