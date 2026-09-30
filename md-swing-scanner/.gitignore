@@ -31,3 +31,5 @@ swing_qs_07a/weak_state_mechanism_features.csv
 swing_qs_07a/candidate_eval_route_s.csv
 swing_qs_07a/candidate_eval_route_w.csv
 swing_qs_07a/full_population_decline_ret1d.csv
+swing_qs_07a/qsa_envelope_d15.csv
+swing_qs_07a/p3_qsa_wstate_overlay.csv

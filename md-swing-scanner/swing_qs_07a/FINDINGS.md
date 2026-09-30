@@ -2103,3 +2103,113 @@ no filter added, no combination of W+S, no ranking.
 (gitignored — 1.66M rows, fully regeneratable), `cg3h_by_month.csv`,
 `cg3h_train_vs_holdout.csv`, `cg3h_holdout_route_w.csv` (kept — small enough,
 2,067 rows, and directly supports the April investigation above).
+
+## RQ-QS-07A-P3 — W/S State Overlay on QS-A's Real Trade Population, complete (2026-09-30, critic-specified)
+
+**The first Phase-3 experiment**: does knowing the frozen W or S state at
+T-1 materially change the subsequent QS-A trajectory distribution, relative
+to QS-A entries not in that state? Purely observational — no intervention
+on QS-A's entry, stop, or exit; does not by itself establish that adding
+either state would improve the production system.
+
+**Prerequisite discrepancy caught before building**: `swing_qs/trajectory_replay/rq_qs_06_envelope.csv`
+only tracks D1-D5 (RQ-QS-06's own deliberate scope), not D15 as initially
+assumed — verified by reading the file's actual columns directly rather
+than trusting a secondhand summary. Extended it (`21_extend_qsa_envelope_d15.py`,
+new artifact in this track's own directory, QS-A's original file untouched)
+by generalizing the exact same `envelope()` measurement logic from
+`rq_qs_06_early_monetization_envelope.py` to D1-D15, reusing `walk_ticker()`
+verbatim — no change to entry/stop/exit rules, only a longer observation
+window on the same already-defined trade. **Hand-verified**: re-running
+produced 40 extra positions beyond the original 46,613 — traced to real new
+trading days added to the cache after the original envelope was built
+(every extra row's `entry_date` falls after the original file's 2026-09-25
+cutoff); the 46,613 overlapping positions reproduce `close_r_D5` to
+0.000000 max abs diff. P3 itself uses exactly the original 46,613-position
+population, per critic's explicit "no rebuild" instruction — the 40 extra
+rows are excluded.
+
+**Decision-time discipline (critic's explicit call)**: W(T-1)/S(T-1), not
+W(T)/S(T) — QS-A enters on a real intraday breach during T, so T's own
+completed candle isn't actually available at the entry moment. Using T's
+close (how every other 07A script computed W/S, since those were EOD-
+observed phenomena) would be exactly the leakage this project's Rule #18
+exists to prevent. Reused the ALREADY-VERIFIED-EQUIVALENT `decile` column
+from `trend_state_anatomy.csv` (17_'s audit proved 0 boundary flips vs. the
+exact frozen lookup) plus `full_population_decline_ret1d.csv` — no
+re-estimation of any frozen constant.
+
+**T-1 classifiable for 38,638 of 46,613 positions (82.9%)** — the remainder
+(entries outside the 2022-09-02–2026-09-24 reference window, or with
+insufficient 252-day history) are counted as neither-W-nor-S, not dropped
+from the denominator.
+
+### The headline structural finding: W and QS-A are almost mutually exclusive by construction
+
+**W-tagged QS-A positions: 0 of 46,613.** Not a bug — verified directly:
+5 hand-checked real QS-A entries' T-1 states all sit at composite 83.8-91.7
+(decile 8-9) with `decline_from_high10d_pct` of -0.23% to -2.71% (i.e.,
+already at or within 3% of their own 10-day high). This makes complete
+structural sense: **QS-A's entry mechanism (a breakout to a new 10/20/40-day
+high) requires almost the opposite price state that W requires** (a stock
+10%+ below its own 10-day high, in the bottom composite decile). A stock
+cannot simultaneously be making a new N-day high on day T and have been
+deeply below its 10-day high just one day earlier, except via an extreme,
+vanishingly rare single-day gap. **This is Outcome C from the critic's own
+framework — not "W fails to help QS-A," but "W cannot coincide with QS-A's
+current breakout-high architecture at all."** No P3-W comparison is possible
+with QS-A's existing entry design; the two are structurally different
+products, exactly as the critic anticipated might be the case for W.
+
+### P3-S — a real, growing signal
+
+| Metric | S-tagged (n=6,693) | non-S (n=39,920) |
+|---|---|---|
+| close_r D3 | -0.001R | -0.014R |
+| close_r D5 | +0.008R | -0.005R |
+| close_r D10 | +0.065R | +0.028R |
+| **close_r D15** | **+0.282R** | **+0.105R** |
+| giveback_from_mfe_pct (median) | 58.3% | 63.1% |
+| % giving back the entire move | 30.1% | 34.4% |
+| mfe D1/D3/D5 (secondary) | 0.34/0.65/0.82R | 0.35/0.61/0.79R |
+| stopped_by_D15 rate | 56.9% | 58.0% |
+
+**The opportunity (MFE) is essentially identical between groups — the
+divergence is entirely in what's kept.** S-tagged and non-S positions reach
+nearly the same peak favorable excursion by D1/D3/D5, but S-tagged entries
+give back less (58.3% vs. 63.1% median) and sustain a meaningfully larger
+close-R by D10/D15 — the gap is negligible at D3/D5 (where QS-A's own D5
+giveback problem was already established in RQ-06) and **widens
+substantially by D15: +0.282R vs. +0.105R, roughly 2.7x.** This is exactly
+the pattern the critic flagged as "much stronger integration evidence" —
+similar MFE, materially better sustained close and lower giveback — not
+merely a bigger peak that still gets given back.
+
+**Concentration/persistence guardrail applied**: S-tagged spans 374 distinct
+tickers and 2,646 distinct episodes (~10-day-gap rule) across 6,693
+positions (~2.5 positions/episode on average) — top-10-ticker share is
+9.53% (vs. 3.26% for non-S), higher but not dominated by a handful of
+names. The signal is not merely "one persistently-strong stock's QS-A
+trades happen to look good."
+
+### Disposition
+
+**Per the critic's own three-outcome framework**: W is Outcome C (a
+different mechanism, structurally incompatible with QS-A's current
+breakout-high entry — not integratable as designed, not a failure of W
+itself, which remains established as a real phenomenon on its own
+population). **S shows Outcome A characteristics** (materially better
+sustained close and lower giveback, similar entry opportunity) — real
+integration evidence, though this is an OBSERVATIONAL overlay, not proof
+that acting on it would improve the product (no intervention has been
+tested). Per critic's explicit framing, this does NOT yet establish
+"add an S filter to QS-A" — it establishes that S-state at T-1 is worth
+a genuine intervention-test candidate for the next research step.
+
+**Not built here, per critic's prohibition list**: no threshold change, no
+entry change, no exit change, no new predictor, no W+S combination, no
+strategy simulation.
+
+**Files**: `21_extend_qsa_envelope_d15.py`, `22_p3_wstate_overlay.py`,
+`qsa_envelope_d15.csv` (gitignored — 46,653 rows, fully regeneratable),
+`p3_qsa_wstate_overlay.csv`.
