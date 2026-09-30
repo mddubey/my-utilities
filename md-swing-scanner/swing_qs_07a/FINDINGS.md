@@ -1306,3 +1306,99 @@ information — the next RQ, per critic's own roadmap, not a new TA feature
 search.
 
 **Files**: `13_decline_velocity_robustness.py`, `decline_velocity_robustness.csv`.
+
+## RQ-QS-07A-6T — Weak-State Transition Anatomy, complete (2026-09-30, critic-specified)
+
+**Objective**: test whether "sharp drop → pause → fast move" is actually
+visible in the real day-by-day price path, or merely a plausible reading of
+cross-sectional statistics. Hypothesis defined BEFORE looking at the result
+(critic's exact wording, to avoid hindsight leakage): "the deterioration has
+lost momentum [by T]; the subsequent move begins from a state of
+stabilization rather than continued acceleration downward" — vs. the
+competing reading, "continued extreme downside through T/D1, violent
+reversal only afterwards." No new features, no thresholds, no composite, no
+strategy simulation — pure reuse of already-computed, production-verified
+trajectory columns (`max_return_d1/d2/d3`, `adverse_d1/d2/d3`,
+`close_ret_d1/d2/d3`, `day_of_max`, `path_shape` from `01_event_matrix.py`;
+pre-T anatomy from `12_weak_state_mechanism.py`).
+
+**Groups, all frozen, none redefined**: D0_A (D0 Cohort A, n=11,023) is the
+"successful" tail. D0_ordinary (D0 & ~cohort_a, n=155,808) is the **primary**
+reference — critic's explicit instruction: NOT filtered further, kept as the
+full heterogeneous background (stocks that keep falling, stagnate, recover
+modestly, or move substantially without crossing the P95 threshold). D2_A
+(D2 Cohort A, n=5,583) is a **secondary** reference only.
+
+**Hand-verification (Rule #22)**: `day_of_max`/`path_shape` percentage
+breakdowns all sum to 100.0% (one at 99.9%, rounding) for both groups — clean.
+Pulled one real example (ADANIENSOL, 2022-12-23): 17.2% decline from its own
+10-day high, -15.6% 3-day return into T, then a genuine sustained move (D1
+MFE +9.8%, D1 close +8.6%, shallow adverse excursion capped at -3.9%,
+building to +13.0% close by D3) — matches the aggregate story directly.
+
+### Part 2 — the trajectory itself (this is the decisive result)
+
+| Metric | D0_A (fast movers) | D0_ordinary (unfiltered background) |
+|---|---|---|
+| Cumulative MFE: D1 / D2 / D3 | +5.74 / +13.27 / +16.21 | +1.90 / +2.59 / +3.15 |
+| Cumulative MAE: D1 / D2 / D3 | **-0.38 / -0.49 / -0.57** | -1.56 / -2.36 / -3.00 |
+| Cumulative close return: D1 / D2 / D3 | **+4.75** / +9.54 / +12.28 | **-0.17** / -0.26 / -0.33 |
+| % positive at close: D1 / D2 / D3 | 82.7% / 93.9% / 97.2% | 45.5% / 45.5% / 45.7% |
+| % fresh high vs. prior day: D1→D2 / D2→D3 | 79.2% / 66.6% | 43.1% / 31.6% |
+| `day_of_max` (peaks on D1/D2/D3) | 10.9% / 22.5% / **66.6%** | **44.6%** / 23.8% / 31.6% |
+| `path_shape` dominant label | **progressive (55.3%)** | **spike_and_fade (38.8%)** |
+
+**This settles the question the critic posed, and it settles it toward
+Reading A, not Reading B.** D0_ordinary's own trajectory rules out "continued
+extreme downside through T/D1" — its MAE is modest (-1.56% at D1), not
+violent — but it also shows NO directional resolution: close return
+oscillates near zero the whole window (45.5%→45.7% positive, essentially a
+coin flip), and it disproportionately peaks early then gives it back
+(44.6% `day_of_max`==1, 38.8% `spike_and_fade`). **D0_A, by contrast, shows
+almost NO further downside past T (MAE stays at a shallow -0.38% to -0.57%,
+shallower in absolute terms than D0_ordinary's) combined with a STEADY,
+COMPOUNDING, still-building expansion all the way to D3** (66.6% peak on D3,
+55.3% `progressive` — 3x the rate of the background population). The
+deterioration genuinely appears to stop right around T, and what follows is
+not a single spike that fades (already ruled out — no reversal candle,
+07A-6) but a sustained multi-day build.
+
+### Part 3 — D0_A vs. D2_A: near-identical post-T trajectories
+
+D0_A's and D2_A's trajectories are strikingly close on every measure: MFE
+(5.74/13.27/16.21 vs. 4.99/13.17/16.02), MAE (-0.38/-0.49/-0.57 vs.
+-0.49/-0.58/-0.64), close return (4.75/9.54/12.28 vs. 4.21/9.22/11.78),
+`day_of_max` (10.9/22.5/66.6 vs. 11.2/23.9/64.9%), `path_shape` (progressive
+55.3% vs. 54.0%). **Confirms and substantially deepens 07A-5R's earlier
+aggregate-MFE finding**: this isn't just similar summary statistics, the
+entire day-by-day shape — MAE containment, directional persistence, timing
+of the peak, path-shape mix — matches closely. Per critic's own framing:
+"the weak-state pathway appears to enter essentially the same short-horizon
+fast-mover state as the established continuation pathway, despite arriving
+there through a substantially different pre-T trajectory." Not
+over-interpreted as identical mechanisms — same endpoint class, still a
+materially different pre-T route (Part 1: D0_A arrives via a much sharper
+decline than D2_A, which sits at the trend-strength trough by construction).
+
+### Disposition
+
+**"Sharp drop → pause → fast move" is now visible in the real trajectory,
+not just inferred from cross-sectional statistics** — deep prior drawdown
+(established in 07A-6/07A-6R) is followed by a near-total halt in further
+downside at T, then a sustained, progressive, multi-day expansion. Per
+critic's decision tree: this is the outcome where "the next question becomes
+whether that stabilization is observable EARLY ENOUGH to be useful at entry
+time" — an important distinction from "is the pattern real" (now answered)
+to "is it actionable at decision time" (not yet tested — every trajectory
+column here is POST-T information, legitimate for retrospective anatomy but
+not yet examined for what's knowable at T itself beyond what 07A-6/07A-6R
+already established as decision-time-safe precursors).
+
+**Not promotable** (Rule #21): no threshold, no filter, no entry rule, no
+architecture decision. Product architecture (one entry pathway vs. two)
+remains explicitly parked, per critic's standing instruction — this result
+moves the research tree one step further (post-decline transition: now ✓)
+but the architecture question still awaits both this and any further
+actionability work.
+
+**Files**: `14_weak_state_transition_anatomy.py`, `weak_state_transition_anatomy_summary.csv`.
