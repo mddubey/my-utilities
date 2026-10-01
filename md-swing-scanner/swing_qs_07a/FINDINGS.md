@@ -2637,3 +2637,119 @@ each capped at one focused pass before moving sideways, per the newly
 adopted breadth-before-depth rule).
 
 **Files**: `25_p6_failure_anatomy.py`, `p6_failure_anatomy.csv`.
+
+## RQ-QS-07A-E1 — Weak-State Recovery: First Independent Entry Construct, complete (2026-10-01)
+
+**Phase 3-5 of the reset research posture**: can W (already validated as a real
+precursor state) be converted into its OWN executable entry — not an overlay
+on QS-A? First focused pass, picked as the most impactful of the 5 research-
+board hypotheses given it already has the deepest evidentiary base
+(07A-5/5R/6/6R/6T/6U).
+
+**Frozen design (Research Preflight, declared before any simulation ran)**:
+population = the already-frozen 22,462 historical W events (reused
+classification, not re-derived). Entry = T+1's open (T confirmed via its own
+EOD close, decision-time-safe). Stop = T's own Low (the S1b convention this
+project already uses for QS-A/BC, reused as the direct analogue, not
+invented fresh). Exit = same mechanics as QS-A's own envelope (STOP_R=-1.0,
+MAX_TRACK_DAYS=15, running MFE/MAE, corp-action truncation). Comparison =
+the same win-rate-stack/capacity-constrained methodology already used for
+QS-A (P4), so the two sit side by side — this is NOT an intervention on
+QS-A, a fully independent product measured the same way for comparability.
+
+**Real bug caught and fixed before trusting anything (Rule #22)**: the
+first run's top trade (GLOBAL, 2024-08-16) showed `initial_risk_pct=0.0059%`
+— an entry/stop gap of ₹0.004 — producing a mathematically meaningless
+3399R "return" from dividing by a near-zero denominator. Checked the
+distribution: 10.4% of all 21,399 trades had `risk_pct<1.0%`, and the top 20
+trades in 2024 alone (of 2,553) contributed 91% of that year's ENTIRE R-sum
+— the exact "stop-width bug silently inflating R on winners" failure mode
+this project's own CLAUDE.md already warns about. Mechanism: T's own low
+(right after a stabilization/green day) can coincide almost exactly with
+T+1's open whenever a stock gaps flat, which is common by construction for
+this population. Fixed with a pre-declared, disclosed 1.0% minimum-risk
+floor — a data-integrity exclusion (same category as QS-A's own
+`initial_risk_pct<=0` check, just extended to near-zero, not just non-
+positive), not a tuned profitability threshold. Re-verified: top trades now
+look real and sensible (e.g. MOTILALOFS, +25.8R on a genuine ~38% move,
+1.49% risk distance); 2024's top-20 concentration dropped from 91% to 58.5%
+of that year's sum — still fat-tailed (expected, given the ~20-28% gross win
+rate), not a residual artifact.
+
+### The honest result, corrected
+
+| | This construct | QS-A baseline (P4, context only) |
+|---|---|---|
+| Mean R | **-0.090** | +0.174 |
+| Gross win rate | **19.7%** | 35.9% |
+| Payoff ratio | **3.83** | 2.51 |
+| Median D1/D3/D5 MFE | **+0.50R / +1.05R / +1.39R** | +0.35R / +0.61R / +0.82R |
+| Median D3/D5/D10/D15 close | -0.143R / -0.155R / -0.010R / -0.110R | +0.03 (D15) |
+| Giveback (median) | **100.3%** (50.3% give back the WHOLE move) | ~60% |
+| Stop rate | **77.4%** | ~55-58% |
+| Median stop distance (risk_pct) | 3.37% | 3.7-5.2% |
+
+**Real, substantial opportunity exists — confirmed independently of any
+exit choice**: median D5 MFE is +1.39R, nearly double QS-A's own already-
+real +0.82R. This is NOT in question; it matches 07A-6T's own established
+trajectory finding directly. **But this specific entry/stop/exit construct
+fails to monetize it**: mean R is negative, win rate is low, and the
+capacity-constrained comparison is negative at EVERY tested capacity
+(3 through 50) — worse than QS-A's own already-known capacity problem, which
+at least turns positive at 50.
+
+**Plausible mechanism (not asserted as fully proven, but directly supported
+by the data)**: T's own low — the day right after a sharp decline, by
+definition a stabilization/green day — sits naturally VERY CLOSE to the
+entry price, producing a structurally TIGHT stop relative to this
+population's actual volatility (these are, after all, stocks that just fell
+10%+ and are still finding their footing). A tight stop on a genuinely
+volatile, reversal-driven population produces a high whipsaw rate (77.4%
+stopped) that shakes out trades before the real, large move (confirmed real
+via the huge MFE) has a chance to develop. This is a different, and more
+severe, version of the SAME giveback/exit problem QS-A itself already has —
+not evidence against W as a phenomenon, evidence against THIS SPECIFIC stop
+choice for this specific population.
+
+### Year-by-year (never pooled)
+
+| Year | n | Mean R | Gross win % |
+|---|---|---|---|
+| 2022 | 632 | +0.305 | 33.9% |
+| 2023 | 2,355 | +0.390 | 27.9% |
+| 2024 | 2,275 | +0.308 | 28.8% |
+| **2025** | 8,088 | **-0.394** | 14.4% |
+| 2026 | 5,831 | -0.060 | 18.8% |
+
+**The already-established 2025-26 regime-weakening shows up here too** —
+2022-2024 all show real positive mean R for this construct (+0.31 to
++0.39), consistent with the underlying phenomenon being real in that
+window; 2025 specifically is sharply negative, dragging the pooled mean
+down. This matches the SAME regime pattern independently found in 07R,
+CG3-H, and P5/P6 — a fourth independent confirmation of the same 2025-26
+effect, via a completely different measurement (a standalone entry
+construct, not an overlay or a candidate-generation rate).
+
+### Disposition
+
+**Per the breadth-before-depth discipline**: this is pass 3-4 of the
+weak-state-recovery hypothesis family — a candidate state (pass 1-2,
+already done) converted into an executable entry concept (pass 3) and
+honestly validated (pass 4). **The validation result for THIS SPECIFIC
+construct is negative** — reported as such, not rescued by trying a
+different stop convention within this same pass (that would be exactly the
+"maybe a different stop would work better" fork explicitly ruled out).
+**What remains open, genuinely, and distinct from this result**: whether a
+DIFFERENTLY-CHOSEN stop (e.g., a volatility/ATR-based stop rather than
+T's own low, given the diagnosed tight-stop mechanism above) would behave
+differently is an honest, separate question — not yet tested, not rescued
+here, and whether it's worth a dedicated follow-up pass or the research
+should move to a different hypothesis family on the board is the next
+decision point, not resolved by this RQ alone.
+
+**Not yet attempted, deliberately**: any other stop/entry variant, any
+threshold search, any combination with S, any OOS/holdout validation (that
+would be the natural next step ONLY if a stop variant is found worth
+pursuing further).
+
+**Files**: `26_weak_state_entry_construct.py`, `e1_weak_state_entry_trades.csv`.
