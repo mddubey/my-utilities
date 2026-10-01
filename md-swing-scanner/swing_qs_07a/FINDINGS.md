@@ -2926,3 +2926,68 @@ each: outcome → pre-entry characteristic → one candidate construct →
 kill/promote → move on — not a full strategy build per family upfront.
 
 **Files**: `27_e1s_structural_stop.py`, `e1s_structural_stop_trades.csv`.
+
+## RQ-QS-07A-C1 — Compression → Expansion Discovery, complete (2026-10-01)
+
+**Question**: before an exceptional 3-day move (Cohort A: `max_return_d3 >=
+P95`), do stocks show a measurable period of RANGE CONTRACTION ("the calm
+before the move"), the way VCP/squeeze literature describes for breakouts?
+
+**Literature checked first** (External Reading Guardrail): three legitimate,
+mechanically distinct ways to measure contraction, pre-declared together
+before looking at any data (Rule #19's Parameterized Feature corollary) —
+(1) ATR(5)/ATR(20) ratio, (2) 5-day/20-day High-Low range ratio, (3)
+Bollinger Band Width expressed as a percentile of its own trailing 252-day
+history. All three computed at T0 (the event day itself — same-day,
+decision-time-safe; T0's own High/Low never enters `max_return_d3`/
+`close_ret_d3`, which only use T+1..T+3, so this is not circular with the
+outcome — confirmed by re-reading `01_event_matrix.py`'s actual roll/shift
+logic before trusting it).
+
+**Population**: Cohort A (102,837 events) vs. matched control (same-date +
+same-liquidity-decile, seed=42) — identical construction to 03_/05_/07_/08_,
+reused not rebuilt.
+
+**Result — the opposite of the hypothesis, consistently across all 3
+independent metrics**:
+
+| Feature | Cohort A median | Control median | Gap |
+|---|---|---|---|
+| atr_ratio (5d/20d ATR) | 1.022 | 0.976 | **+0.046** |
+| range_ratio (5d/20d range) | 0.517 | 0.501 | +0.016 |
+| bbw_percentile (own 252d history) | 58.7 | 48.8 | **+9.9 pts** |
+
+Cohort A stocks are, if anything, already *mildly more expanded/volatile*
+at T0 than matched controls — not tighter/coiled. Control sits almost
+exactly at its own historical median (bbw ≈ 48.8, atr_ratio ≈ 0.98,
+essentially neutral); Cohort A sits moderately above both baselines. This
+is a real but modest separation, not a clean split — wide IQR overlap in
+all three (e.g. bbw P25/P75 30.6/82.9 for A vs. 23.4/74.6 for control).
+
+**Hand-verification (Rule #22)**: recomputed `atr_ratio`/`range_ratio` by
+hand from raw OHLC for 5 random Cohort A events (SAKHTISUG 2026-08-18,
+UMESLTD 2023-08-04, BHAGERIA 2024-08-27, PAYTM 2024-07-24, RML 2025-06-12)
+— all 5 matched the stored values exactly, confirming the formulas are
+implemented correctly, not a bug. The examples also explain the mechanism:
+several (BHAGERIA atr_ratio=1.56, bbw=79.8; SAKHTISUG atr_ratio=1.32) show
+T0 itself is already a large-range day — i.e., for a meaningful share of
+Cohort A, **the event day IS the start of the expansion**, not a quiet day
+before it. This is consistent with this track's own earlier `day_of_max`
+observations (07A-1) that these moves often front-load early rather than
+building slowly.
+
+**Verdict: compression-before-expansion is NOT supported as a precursor
+signature for this outcome definition.** All three pre-declared, mechanically
+distinct metrics agree on direction (mild reversal, not just no-signal),
+which is itself a form of cross-metric robustness — no further parameter
+sweep needed to call this closed on the first pass. The effect size is too
+small and the overlap too wide to act on (Rule #21, Signal ≠ Intervention)
+even setting aside the wrong-direction problem. VCP's own specific
+construct (multiple progressively-tighter contractions + volume dry-up) is
+NOT what was tested here and remains untested, but the general "simple range
+contraction precedes this outcome" mechanism this pass checked for is
+closed.
+
+**Files**: `28_compression_expansion_discovery.py`,
+`compression_expansion_features.csv` (gitignored, 17.8MB, fully
+regeneratable).
