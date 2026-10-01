@@ -1,10 +1,18 @@
-# swing_qs_07a — Track B: Reverse-Engineering Short-Horizon Fast Movers
+# swing_qs_07a — Outcome-First Short-Horizon Entry Research
 
-Independent research track, critic's explicit architecture (2026-09-29): **no
-dependency on Track A** (`swing_qs/`'s QS-A monetization arc, closed for the
-session at RQ-06E — see `swing_qs/CLAUDE.md`'s standing closed result). Don't let
-"RQ-07A found feature X" retroactively modify QS-A, and don't let "QS-A has
-feature Y" contaminate the RQ-07A winner population — kept strictly separate.
+**RESET 2026-10-01 (critic + user, explicit correction of the prior framing
+below)**: this is NOT a satellite track that exists to eventually improve
+`swing_qs/`'s QS-A/BC breakout-continuation machinery. The original research
+question was always outcome-first: *forget existing entry philosophy — what
+does a genuinely large short-term move actually look like, and what, if
+anything, is observable before it?* That's why discovery deliberately expanded
+to the full ~2,327-ticker NSE universe rather than staying inside QS-A's
+breakout population. **QS-A/BC is irrelevant to this research question going
+forward** — it was a useful CONTROLLED BASELINE for one integration experiment
+(RQ-QS-07A-P3 through P6, now closed — see below), not the target
+architecture this track exists to serve. Don't let "QS-A has feature Y"
+contaminate discovery here, and don't assume findings here need to flow back
+into QS-A at all.
 
 ## The actual question (RQ-QS-07A-1, critic's exact pre-registered wording)
 
@@ -77,7 +85,130 @@ QS-A, never a failure of W itself — whether W could become its OWN standalone
 event-driven product is a genuinely different, still-open future question,
 just not opened now). Full detail: `FINDINGS.md`, "RQ-QS-07A-P3" through
 "RQ-QS-07A-P6" sections — the P6 section's "FINAL CLOSURE" block has the
-complete frozen ledger. Per critic's own next-step pointer: research should
-return to QS-A's actual open product problem (exit/monetization, RQ-06's
-original unresolved question) using everything learned here as context, not
-attempting to make S the answer to it.
+complete frozen ledger.
+
+**CORRECTION (2026-10-01, critic's own explicit walk-back of the very next
+line that used to be here)**: this does NOT mean "research should return to
+QS-A's exit/monetization problem." That overcorrects. The actual lesson is
+narrower: *S is not validated as an overlay on the existing QS-A entry
+population* — it says nothing about whether the broader outcome-first
+discovery program (this entire track) is finished. See "Research posture,
+reset 2026-10-01" below for where this track actually goes next.
+
+## Research posture, reset 2026-10-01 (critic + user, explicit)
+
+**The research question, stated precisely**: among all NSE-listed stocks,
+what characteristics are present before an exceptional short-term move, and
+can those characteristics become a prospective, executable entry rule? This
+is NOT "how do we improve QS-A" — QS-A was one controlled-baseline
+integration experiment (P3-P6, now closed), not the target architecture.
+W and S are **candidate precursor phenomena for a possibly entirely new
+entry product**, not filters for an old one. The eventual entry architecture
+could look nothing like QS-A's `breakout → gate → breach → entry → exit` —
+it might instead be `broad universe → pre-event state → trigger → entry →
+short-horizon exit`. We have not earned the right to choose between
+architectures yet.
+
+**The five-phase loop for turning a discovered characteristic into an entry**
+(do not skip phases, do not reorder):
+1. **Define the outcome** — frozen beforehand (e.g. "exceptional D3 move from
+   a decision-time reference"); precise about MFE vs. close return, horizon,
+   reference price, minimum meaningful movement, corp-action/circuit handling.
+2. **Discover characteristics** — only information available before the move
+   (most of this is already done — see "What's already established" below).
+3. **Turn a characteristic into a candidate state** — this is where W/S came
+   from. The question is NOT "does state X improve an existing product," it's
+   "if I observed this state at T, can I define an executable trigger at T or
+   T+1 that captures the subsequent exceptional-move distribution?"
+4. **Candidate entry construction** — state + price trigger, state
+   transition, recovery-from-decline, local-structure breakout, volume
+   confirmation, etc. — but ONLY using characteristics that already survived
+   phase 2. Not a new generic-indicator search.
+5. **OOS/prospective validation of the ENTRY itself** — only after an entry
+   construct exists does stop/sizing/exit/options/capacity/slippage become a
+   relevant question. Those are downstream, not now.
+
+**The core scientific-loop discipline (do not invert)**: never define an
+entry by the outcome ("buy stocks that go on to make +10% in 3 days" is
+useless by construction). Always: "among stocks that achieved the outcome,
+what was observable at T-1/T that distinguished them from the rest?" — freeze
+that characteristic, then test it forward.
+
+### Breadth-before-depth rule (explicit, adopted 2026-10-01)
+
+**We are in broad discovery. Breadth matters more than squeezing the last 2%
+out of one feature.** Concretely: a feature gets at most four passes —
+(1) does it have signal? (2) is the signal robust across sensible
+strata/time? (3) can it become a prospective entry concept? (4) does that
+concept survive an honest validation? **If still tweaking definitions,
+thresholds, subgroups, or explanations after four passes — park it and move
+to a different hypothesis family.** Explicitly prohibited as a continuation
+of the SAME feature: "maybe split the period differently," "maybe a
+different percentile," "maybe combine with N other variables," any further
+post-hoc archaeology on a result already reported. Preserve the result
+honestly (as this file and `FINDINGS.md` already do for S/W) and move
+sideways. This is exactly what the S→QS-A chain (P3-P6, four focused RQs,
+then stop) already modeled correctly — keep doing that, don't let any future
+hypothesis get a fifth or sixth pass out of attachment to it.
+
+### What's already established (don't re-derive — reuse, cite, or stratify by)
+
+- Exceptional short-term movers are real and measurable across the broad
+  universe (07A-1 through 07A-2B).
+- Trend strength has real signal, but it's one underlying latent dimension
+  expressed through 5 correlated variables, not 5 independent ones (07A-3R).
+- Market-relative strength (stock-vs-NIFTY) retains ~83-89% of the absolute
+  trend-strength gap — real, but adds little beyond what absolute momentum
+  already captures (07A-4).
+- The trend-strength relationship is NOT monotonic — it's an asymmetric
+  U-shape. The weakest decile shows a real, separate elevation on top of the
+  already-known strong-trend tail (07A-5).
+- Within that weak-state tail, recent DECLINE DEPTH (how far below the
+  stock's own 10-day high) is the dominant, robust mechanism — recent
+  acceleration (3-day return) is secondary and noisier. Robust across every
+  year/liquidity/F&O/circuit stratum tested (07A-6, 07A-6R).
+- The "sharp drop → pause → fast move" shape is visible in the real
+  day-by-day trajectory, not just inferred from cross-sectional stats — MAE
+  stays shallow post-trigger while the move keeps compounding through D3
+  (07A-6T).
+- A real joint T-close signature exists combining decline-depth with the
+  trigger day's own direction; the dominant variable is intraday-observable
+  in principle (needs only the live price vs. an already-known prior high),
+  but genuine pre-close/intraday confirmation remains UNCONFIRMED at scale —
+  bottlenecked by this project's thin (~3.5 month) intraday history, not the
+  phenomenon itself (07A-6U).
+- Generic TA shopping (volume, volatility, candle shape, pivots, RSI in
+  isolation) mostly failed to add independent explanatory power on top of
+  the trend-strength dimension (07A-3, 07A-3R, pivot-distance supplement).
+- The phenomenon is NOT simply "small illiquid stocks go crazy" — liquidity,
+  F&O status, circuit involvement, NIFTY membership, and year all change the
+  magnitude/base rate and must stay STRATIFICATION dimensions, never
+  convenient filters, until a candidate earns promotion on its own terms.
+- S (strong-state) and W (weak-state) are the first two candidate precursor
+  STATES discovered this way — real on their own population (07A-5/5R/6U),
+  frozen into a leak-free candidate spec (CG1), characterized historically
+  (CG2), holdout-validated as a specification (CG3-H, encouraging), and
+  separately found NOT to survive being grafted onto QS-A's specific
+  breakout-continuation entry population (P3-P6, closed — see above). That
+  last result is about QS-A compatibility, not about whether S/W could
+  anchor their OWN entry construct (phase 3-5 above, not yet attempted).
+
+### Research board — small portfolio of distinct hypothesis families, not one rabbit hole
+
+| Hypothesis family | Status | Effort allowed |
+|---|---|---|
+| Weak-state recovery (decline-depth, 07A-6/6R/6T) | 🟡 Candidate — real, robust, not yet converted to an entry construct | One focused entry-design pass (phase 3-5) |
+| Strong-state transition (S, but the TRANSITION into S, not the static state) | 🟡 Candidate — static S already explored via P3-P6; the transition itself is untested | One focused discovery pass |
+| Compression → expansion (range contraction before the move — VCP-adjacent, not VCP-prescriptive) | 🟢 Untested | One discovery pass |
+| Behavioural/state-transition (abnormal return burst, volume/volatility regime shift — NOT another "RVOL>X" test) | 🟢 Untested | One discovery pass |
+| Peer/sector relative strength | ⚪ Infrastructure-blocked (no point-in-time sector mapping exists) | Parked, not attempted |
+| Generic TA combinations (already tried: volume, ATR, candle shape, pivots, isolated RSI) | 🔴 Closed | Do not reopen without new evidence |
+| QS-A/BC integration (P3-P6) | 🔴 Closed | Do not reopen |
+| QS-A exit/monetization | ⚪ Not this track's problem | Ignore here — belongs to `swing_qs/`, not started, not blocking this track |
+
+**Top-level principle**: *harvest a feature's information value, don't
+exhaustively explain it.* If a feature gives a useful clue, capture it. If it
+survives a reasonable robustness test, try to turn it into an entry. If it
+doesn't, move sideways to a different hypothesis family. The goal is
+discovering what KIND of pre-entry information matters, not proving one
+particular feature is the final answer.

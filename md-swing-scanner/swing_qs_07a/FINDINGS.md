@@ -2607,14 +2607,33 @@ failed"**: *"S was a valid historical state detector, but its apparent
 QS-A product edge was regime-dependent and did not survive chronological
 OOS intervention testing."*
 
-**07A has completed its job on this branch**: discovery → mechanism →
-decision-time validation → frozen candidate → historical holdout → real
-QS-A overlay → intervention → chronological OOS → failure anatomy. The
-research system caught an attractive-looking intervention before
-production, exactly what the guardrails exist to do. **Next direction, per
-critic**: return to QS-A's actual open product problem — exit/
-monetization (RQ-06's own original unresolved question) — using
-everything learned from 06 and 07A as context, not attempting to make S
-the answer to it.
+**07A has completed its job on THIS BRANCH ONLY** (the QS-A integration
+attempt): discovery → mechanism → decision-time validation → frozen
+candidate → historical holdout → real QS-A overlay → intervention →
+chronological OOS → failure anatomy. The research system caught an
+attractive-looking intervention before production, exactly what the
+guardrails exist to do.
+
+**CORRECTION (2026-10-01, critic's own explicit walk-back of the line that
+used to be here)**: the next direction is NOT "return to QS-A's exit/
+monetization problem." That overcorrects a narrow result into a broad one.
+The accurate lesson from P3-P6 is only: *S is not validated as an overlay on
+the existing QS-A entry population.* It says nothing about whether the
+broader outcome-first discovery program — this entire 07A track — is
+finished. QS-A/BC was always a controlled-baseline integration experiment,
+never this track's target architecture; the original research question was
+outcome-first from the start ("forget existing entry philosophy — what does
+an exceptional short-term move actually look like, and what's observable
+before it"), which is exactly why discovery expanded to the full NSE
+universe rather than staying inside QS-A's breakout population. W and S
+remain candidate precursor STATES for a possibly entirely new, independent
+entry construct — not filters for an old one. See `swing_qs_07a/CLAUDE.md`'s
+"Research posture, reset 2026-10-01" section for the corrected five-phase
+roadmap (define outcome → discover characteristics → candidate state →
+entry construction → OOS validation of the entry itself) and the research
+board of parallel hypothesis families (weak-state recovery, strong-state
+transition, compression→expansion, behavioural transition, peer/sector —
+each capped at one focused pass before moving sideways, per the newly
+adopted breadth-before-depth rule).
 
 **Files**: `25_p6_failure_anatomy.py`, `p6_failure_anatomy.csv`.
