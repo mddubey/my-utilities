@@ -195,12 +195,17 @@ hypothesis get a fifth or sixth pass out of attachment to it.
 
 ### Research board — small portfolio of distinct hypothesis families, not one rabbit hole
 
+**Next item to attempt, per critic's explicit ordering (2026-10-01)**:
+(1) compression → expansion, (2) behavioural transition, (3) strong-state
+transition (deprioritized — S has already consumed substantial research
+bandwidth across P3-P6).
+
 | Hypothesis family | Status | Effort allowed |
 |---|---|---|
-| Weak-state recovery (decline-depth, 07A-6/6R/6T) | 🔴 Closed as a standalone short-swing entry construct (E1/E1-S, 2026-10-01 — two stop conventions tried, both leave mean R and capacity-constrained cumulative R negative; giveback barely moved between a tight and a structurally-wider stop, suggesting it's a trajectory property, not a stop-placement one) — underlying phenomenon stays validated, open only for a differently-shaped future product (e.g. longer horizon), not pursued now | Do not attempt a third stop variant |
-| Strong-state transition (S, but the TRANSITION into S, not the static state) | 🟡 Candidate — static S already explored via P3-P6; the transition itself is untested | One focused discovery pass |
-| Compression → expansion (range contraction before the move — VCP-adjacent, not VCP-prescriptive) | 🟢 Untested | One discovery pass |
+| Weak-state recovery (decline-depth, 07A-6/6R/6T) | 🔴 **PARKED, final** (E1/E1-S, 2026-10-01 — two stop conventions tried AND a literature check done before accepting closure; oversold-bounce literature's own textbook stop is E1's reversal-candle-low, already failed; widening to E1-S's structural low barely moved giveback (100.3%→99.1%) despite ~53% wider risk — strong evidence the stop isn't the lever at all, so a 3rd stop (ATR-based, also literature-legitimate) was explicitly declined as "stop discovery, not entry discovery." Banked verbatim: "W identifies a genuine exceptional short-term opportunity, but the first standalone entry construct failed under its reversal-candle stop... Published practice confirms multiple legitimate stop conventions, but provides no evidence that another stop would solve W's monetization problem. No third stop variant will be tested at this stage.") Underlying phenomenon stays validated, open only for a differently-shaped future product (e.g. longer horizon, given 33.8% of E1-S trades wanted the full 15-day cap) | Do not attempt a third stop variant without genuinely new evidence that the STOP (not the construct generally) is the cause |
+| Compression → expansion (range contraction before the move — VCP-adjacent, not VCP-prescriptive) | 🟢 Untested — **next up** | One discovery pass |
 | Behavioural/state-transition (abnormal return burst, volume/volatility regime shift — NOT another "RVOL>X" test) | 🟢 Untested | One discovery pass |
+| Strong-state transition (S, but the TRANSITION into S, not the static state) | 🟡 Candidate, deprioritized — static S already explored extensively via P3-P6; the transition itself is untested | One focused discovery pass, after the two above |
 | Peer/sector relative strength | ⚪ Infrastructure-blocked (no point-in-time sector mapping exists) | Parked, not attempted |
 | Generic TA combinations (already tried: volume, ATR, candle shape, pivots, isolated RSI) | 🔴 Closed | Do not reopen without new evidence |
 | QS-A/BC integration (P3-P6) | 🔴 Closed | Do not reopen |

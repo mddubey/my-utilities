@@ -2865,4 +2865,64 @@ untouched, per critic's explicit instruction.** Research moves sideways to
 the next research-board hypothesis (strong-state transition /
 compression→expansion / behavioural transition).
 
+### FINAL CLOSURE (2026-10-01, after a literature check — branch banked, do not reopen without new evidence)
+
+**User's question before accepting E1-S's closure**: was there a published,
+researched convention for stop placement on a bottom/reversal setup, rather
+than inventing one from the backtest alone? Checked directly (web search,
+not assumed) rather than reasoning from memory:
+
+- Stop placement is pattern-specific in published practice: double bottom →
+  below the SECOND low; triple bottom → below the last low; **oversold
+  bounce (the closest match to W) → below the low of the reversal candle
+  itself** — which is almost exactly E1's original stop, already found to
+  fail (77.4% stop rate, 100.3% median giveback).
+- A maximum-risk CAP (commonly 3-5%) and a volatility/ATR-based stop
+  (~1-1.5x ATR below entry) are both legitimate, commonly cited
+  conventions — directly relevant to the uncontrolled risk geometry E1-S
+  showed (P90=11.22%, max=45.59%).
+
+**Critic's verdict on whether this reopens the "no third stop" rule: no.**
+The distinction drawn: "new evidence about how stops are commonly designed"
+is NOT the same as "new evidence that W's monetization problem is CAUSED by
+the stop" — and the existing evidence already points the other way.
+**The decisive prior fact, re-emphasized**: widening the stop from E1 to
+E1-S barely moved giveback at all (100.3%→99.1%) despite a ~53% wider
+median risk distance. If a much wider stop barely changes the behavior
+being diagnosed, an ATR-based stop sitting somewhere between the two
+tested extremes is unlikely to be the answer — testing it would be
+"stop discovery," specifically the T-low → structural-low → ATR → ATR+cap
+sequence the breadth-before-depth rule exists to prevent, not "entry
+discovery."
+
+**A deeper reason, not just a discipline one**: W is not a conventional
+breakout/base setup (weak/declined state → recovery), so borrowing "stop
+below the base" from VCP/breakout literature is a category error — those
+stops encode a thesis about a consolidation absorbing supply before a
+breakout confirms demand, which isn't W's thesis at all. What price level
+actually invalidates "this previously weak stock has begun recovering" is
+a genuinely unresolved, deeper question than "which stop is best" — and is
+explicitly NOT pursued further here.
+
+**Final banked record, verbatim per critic's exact wording — this is the
+authoritative closing statement for RQ-QS-07A-E1/E1-S**:
+
+> W identifies a genuine exceptional short-term opportunity, but the first
+> standalone entry construct failed under its reversal-candle stop. A
+> structurally wider stop produced uncontrolled risk geometry and did not
+> materially improve giveback. Published practice confirms multiple
+> legitimate stop conventions, but provides no evidence that another stop
+> would solve W's monetization problem. No third stop variant will be
+> tested at this stage.
+
+**This is a useful finding, not a failed idea** — W stays preserved as a
+real discovery observation (the phenomenon itself remains validated); what's
+closed is narrower: *we don't currently know how to turn this phenomenon
+into a sufficiently clean, bounded-risk entry product.* Research moves
+sideways, per critic's explicit ordering: (1) compression→expansion,
+(2) behavioural transition, (3) strong-state transition (deprioritized —
+S has already consumed substantial research bandwidth). Discipline for
+each: outcome → pre-entry characteristic → one candidate construct →
+kill/promote → move on — not a full strategy build per family upfront.
+
 **Files**: `27_e1s_structural_stop.py`, `e1s_structural_stop_trades.csv`.
