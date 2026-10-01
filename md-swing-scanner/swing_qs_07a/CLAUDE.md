@@ -197,7 +197,7 @@ hypothesis get a fifth or sixth pass out of attachment to it.
 
 | Hypothesis family | Status | Effort allowed |
 |---|---|---|
-| Weak-state recovery (decline-depth, 07A-6/6R/6T) | 🟡 Candidate — real, robust, not yet converted to an entry construct | One focused entry-design pass (phase 3-5) |
+| Weak-state recovery (decline-depth, 07A-6/6R/6T) | 🔴 Closed as a standalone short-swing entry construct (E1/E1-S, 2026-10-01 — two stop conventions tried, both leave mean R and capacity-constrained cumulative R negative; giveback barely moved between a tight and a structurally-wider stop, suggesting it's a trajectory property, not a stop-placement one) — underlying phenomenon stays validated, open only for a differently-shaped future product (e.g. longer horizon), not pursued now | Do not attempt a third stop variant |
 | Strong-state transition (S, but the TRANSITION into S, not the static state) | 🟡 Candidate — static S already explored via P3-P6; the transition itself is untested | One focused discovery pass |
 | Compression → expansion (range contraction before the move — VCP-adjacent, not VCP-prescriptive) | 🟢 Untested | One discovery pass |
 | Behavioural/state-transition (abnormal return burst, volume/volatility regime shift — NOT another "RVOL>X" test) | 🟢 Untested | One discovery pass |

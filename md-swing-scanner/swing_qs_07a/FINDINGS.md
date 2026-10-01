@@ -2753,3 +2753,116 @@ would be the natural next step ONLY if a stop variant is found worth
 pursuing further).
 
 **Files**: `26_weak_state_entry_construct.py`, `e1_weak_state_entry_trades.csv`.
+
+## RQ-QS-07A-E1-S — W Structural Invalidation Stop, complete (2026-10-01)
+
+**The one allowed follow-up to E1**, per critic's exact framing: "Does a
+structurally meaningful stop, defined from the W setup itself, allow the
+observed opportunity to survive long enough to monetize?" Formally demotes
+"prior day's low" (S1b) as a universal stop convention — user's own
+observation, critic agreed: S1b was a convenient placeholder adopted when no
+stop had been defined yet, not a researched truth, and fits a breakout-from-
+a-base thesis (where it genuinely belongs) far better than it fits W, which
+isn't a classical base-breakout setup.
+
+**Everything frozen except the stop** (same W definition, same T decision,
+same T+1 open entry, same 15-day horizon, same exit engine, same 1.0%
+minimum-risk floor, same capacity methodology, S not revisited). **The only
+change**: stop = the structural low of the SAME 10-day window that already
+defines `decline_from_high10d_pct` (`min(Low)` over the trailing 10 days
+ending at T), not T's own low alone — reusing an existing reference window,
+not a newly-tuned lookback. Mechanically guaranteed to be equal-to-or-wider
+than E1's stop (verified: strictly wider in 79.8% of resolved trades, never
+narrower, confirmed by construction).
+
+### Mandatory risk-geometry audit (critic's explicit requirement, checked BEFORE trusting any outcome number)
+
+| | E1 (T's own low) | E1-S (structural low) |
+|---|---|---|
+| Median risk distance | 3.37% | **5.15%** |
+| P75 / P90 risk distance | — | **7.76% / 11.22%** (max 45.59%) |
+| Median hold duration | — | **7.0 days** (P75 = 15, the full cap) |
+| % held the full 15 days | — | **33.8%** |
+| Stop rate | 77.4% | **66.2%** |
+
+**Hand-verified the extreme tail (Rule #22) before trusting it**: the
+widest-risk trades (42-46% risk distance) are ADANIENT, 2023-02-07 through
+02-16 — the real, well-known Adani Group crisis crash (already referenced
+elsewhere in this research line) — the 10-day structural low legitimately
+sat far below any subsequent bounce attempt during an ongoing crash, not a
+data artifact. The top final-R winners (GLFL, PRECOT, PRAENG, VIRINCHI,
+ANTELOPUS) are real, sensible trades, several correctly held the full 15
+days. **The risk-geometry audit itself confirms what critic anticipated**:
+"it may produce a 7-10%+ risk on some W trades" — it does (P75=7.76%,
+P90=11.22%) — and hold duration (median 7 days, a third of trades running
+the full cap) shows this construct trades width/duration for a lower stop
+rate, exactly as intended, not a free improvement.
+
+### Outcome comparison
+
+| | E1 | E1-S |
+|---|---|---|
+| Mean R | -0.090 | **-0.075** |
+| Gross win rate | 19.7% | **26.5%** |
+| Payoff ratio | 3.83 | 2.73 |
+| Giveback (median) | 100.3% | **99.1%** |
+| % giving back the whole move | 50.3% | **49.7%** |
+| Capacity=5 cumulative R | -425.6 | **-124.7** |
+| Capacity=10 cumulative R | -638.9 | **-190.0** |
+| Capacity=50 cumulative R | -1861.9 | **-647.9** |
+
+**Direction is real and consistent across every secondary metric**: lower
+stop rate, higher win rate, smaller capacity-constrained losses in
+magnitude (roughly 3-4x smaller, not just marginally better). **But the
+two headline criteria from the pre-declared decision rule remain negative**:
+mean R is still negative, and the capacity-constrained comparison is still
+negative at every single tested level (3 through 50) — not a flip to
+positive, an improvement in degree only. **Most importantly, the giveback
+characteristic barely moves at all** (100.3%→99.1% median, 50.3%→49.7%
+full-giveback rate) — this is the most informative single number in this
+whole pass: widening the stop materially changed stop-out mechanics but did
+almost nothing to the underlying "gives back nearly the entire move"
+behavior, suggesting giveback here is a property of the TRAJECTORY itself
+(consistent with 07A-6T's own finding), not primarily a function of where
+the stop happens to sit.
+
+**R-unit comparability caveat, per Rule #20**: E1 and E1-S measure R on
+different risk units (median 3.37% vs. 5.15%) — the apparent MFE drop
+(D5: +1.39R → +0.94R) is largely mechanical (same underlying price moves,
+larger denominator), not evidence the opportunity shrank. Absolute price
+opportunity should be read from the original 07A-6T trajectory work, not
+compared across E1/E1-S's own R-multiples directly.
+
+### Year-by-year (reported, not investigated — per critic's explicit instruction)
+
+Same shape as E1: 2022-2024 all positive (+0.26 to +0.30), 2025 negative
+(-0.30), 2026 modestly negative (-0.07) — the same 2025-26 regime-weakening
+pattern reproduced a fifth independent time this session, via yet another
+measurement. Not investigated further, per critic's explicit instruction
+("we've already spent enough on that phenomenon").
+
+### Disposition — per the pre-registered decision rule, not re-litigated after seeing results
+
+**The pre-declared binary was: materially improves monetization → proceed to
+chronological OOS validation; still poor → bank and move to a different
+hypothesis family, no third W stop.** Mean R is still negative. The
+capacity-constrained comparison is still negative at every tested level.
+**This falls on the "still poor" side of the pre-registered line**, despite
+real, consistent, honestly-reported improvement in stop rate, win rate, and
+loss magnitude. Per critic's own explicit instruction, this is NOT rescued
+by a third stop variant.
+
+**Banked conclusion, verbatim per critic's own pre-declared wording**: *"W
+contains genuine exceptional opportunity, but the first standalone entry
+construct does not produce a viable short-swing trade under structurally
+meaningful risk."* The weak-state-recovery research-board item moves from
+🟡 Candidate to 🔴 Closed (as a standalone short-swing entry construct) —
+the underlying PHENOMENON remains validated and open for a future,
+differently-shaped product (e.g., a longer-horizon construct, given 33.8%
+of trades wanted to run the full 15-day cap and giveback resisted every
+stop tested) — but not pursued further in this research pass. **S remains
+untouched, per critic's explicit instruction.** Research moves sideways to
+the next research-board hypothesis (strong-state transition /
+compression→expansion / behavioural transition).
+
+**Files**: `27_e1s_structural_stop.py`, `e1s_structural_stop_trades.csv`.
