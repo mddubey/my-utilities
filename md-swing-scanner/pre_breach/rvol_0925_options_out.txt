@@ -1,0 +1,7 @@
+intraday-window F&O candidates not fired by 09:25 and within 1.5%: n=469, days=55, fire%=41.8
+| arm (E2, 0% friction, K=3/day) | trades | R/trade | total R | fire% of picks |
+|---|---|---|---|---|
+| blind@09:25 ranked by distance | 155 | -0.053 | -8.2 | 58% |
+| touch, same ranking (s_dist) | 120 | -0.051 | -6.1 | 100% |
+| blind@09:25 ranked by distance+rvol | 155 | -0.070 | -10.9 | 54% |
+| touch, same ranking (s_rvol) | 120 | -0.064 | -7.6 | 100% |

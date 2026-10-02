@@ -1,0 +1,64 @@
+BC v2 canonical population n=10671, 2021-09-29..2026-09-17
+joined to panel: 10219 of 10671 (unmatched = entry days whose T-1 row is not in the panel)
+
+=== pre-open fire score (distance-only logistic): split at median, real primed_engine R ===
+| cohort | n | meanR | medR | win>0 | >=0.25R | >=0.5R | >=1R | payoff |
+|---|---|---|---|---|---|---|---|---|
+| BASELINE | 10219 | +0.080 | +0.034 | 52.6 | 36.0 | 22.7 | 8.8 | 1.22 |
+| score >= median | 5110 | +0.094 | +0.047 | 53.8 | 37.1 | 23.6 | 8.7 | 1.23 |
+| score < median | 5109 | +0.067 | +0.025 | 51.5 | 34.8 | 21.8 | 8.9 | 1.21 |
+per-year meanR (>= median / < median): 2021: +0.138/+0.033, 2022: +0.006/+0.009, 2023: +0.269/+0.267, 2024: +0.090/+0.038, 2025: +0.025/-0.008, 2026: +0.031/-0.070
+
+=== opening gap %: split at median, real primed_engine R ===
+| cohort | n | meanR | medR | win>0 | >=0.25R | >=0.5R | >=1R | payoff |
+|---|---|---|---|---|---|---|---|---|
+| BASELINE | 10219 | +0.080 | +0.034 | 52.6 | 36.0 | 22.7 | 8.8 | 1.22 |
+| gap_pct >= median | 5110 | +0.104 | +0.046 | 53.5 | 37.3 | 23.7 | 9.6 | 1.29 |
+| gap_pct < median | 5109 | +0.056 | +0.026 | 51.8 | 34.6 | 21.7 | 8.0 | 1.16 |
+per-year meanR (>= median / < median): 2021: +0.103/+0.076, 2022: +0.009/+0.006, 2023: +0.290/+0.246, 2024: +0.089/+0.035, 2025: +0.024/-0.003, 2026: +0.042/-0.071
+
+=== open distance (ATR): split at median, real primed_engine R ===
+| cohort | n | meanR | medR | win>0 | >=0.25R | >=0.5R | >=1R | payoff |
+|---|---|---|---|---|---|---|---|---|
+| BASELINE | 10219 | +0.080 | +0.034 | 52.6 | 36.0 | 22.7 | 8.8 | 1.22 |
+| dist_open_atr >= median | 5110 | +0.067 | +0.025 | 51.5 | 34.8 | 21.8 | 8.9 | 1.21 |
+| dist_open_atr < median | 5109 | +0.094 | +0.047 | 53.7 | 37.1 | 23.6 | 8.7 | 1.23 |
+per-year meanR (>= median / < median): 2021: +0.033/+0.138, 2022: +0.009/+0.006, 2023: +0.267/+0.269, 2024: +0.038/+0.090, 2025: -0.008/+0.025, 2026: -0.070/+0.031
+
+gap-through-open entries vs intraday-touch entries:
+| cohort | n | meanR | medR | win>0 | >=0.25R | >=0.5R | >=1R | payoff |
+|---|---|---|---|---|---|---|---|---|
+| gap-through | 1053 | +0.152 | +0.116 | 57.7 | 41.0 | 25.6 | 11.4 | 1.27 |
+Traceback (most recent call last):
+  File "/Users/mdubey/workspace/personal/my-utilities/md-swing-scanner/pre_breach/06_stock_side.py", line 66, in <module>
+    report()
+  File "/Users/mdubey/workspace/personal/my-utilities/md-swing-scanner/pre_breach/06_stock_side.py", line 61, in report
+    print(f"| intraday touch | {stack(j[~j.gap_through].r_multiple)} |")
+  File "/Users/mdubey/Library/Python/3.9/lib/python/site-packages/pandas/core/frame.py", line 4119, in __getitem__
+    indexer = self.columns._get_indexer_strict(key, "columns")[1]
+  File "/Users/mdubey/Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py", line 6212, in _get_indexer_strict
+    self._raise_if_missing(keyarr, indexer, axis_name)
+  File "/Users/mdubey/Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py", line 6261, in _raise_if_missing
+    raise KeyError(f"None of [{key}] are in the [{axis_name}]")
+KeyError: "None of [Index([-1, -2, -1, -1, -1, -1, -1, -1, -1, -1,\n       ...\n       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],\n      dtype='object', length=10219)] are in the [columns]"
+gap-through-open entries vs intraday-touch entries:
+| cohort | n | meanR | medR | win>0 | >=0.25R | >=0.5R | >=1R | payoff |
+|---|---|---|---|---|---|---|---|---|
+| gap-through | 1053 | +0.152 | +0.116 | 57.7 | 41.0 | 25.6 | 11.4 | 1.27 |
+| intraday touch | 9166 | +0.072 | +0.027 | 52.0 | 35.4 | 22.4 | 8.5 | 1.21 |
+
+gap-through fill audit (n=1053): Open above trigger median 0.48%, p90 3.00%
+  engine R (fill at trigger): mean +0.152  median +0.116
+  re-anchored R (fill at Open, same stop/risk unit): mean +0.079  median +0.051
+  intraday-touch entries for reference: mean +0.072
+
+=== realistic-fill R (gap-through filled at Open), median splits ===
+| cohort | n | meanR | medR | win>0 | >=0.25R | >=0.5R | >=1R | payoff |
+|---|---|---|---|---|---|---|---|---|
+| BASELINE | 10219 | +0.073 | +0.028 | 52.2 | 35.4 | 22.4 | 8.5 | 1.21 |
+| score >= median | 5110 | +0.079 | +0.036 | 52.9 | 36.0 | 22.9 | 8.2 | 1.21 |
+| score < median | 5109 | +0.067 | +0.025 | 51.5 | 34.8 | 21.8 | 8.9 | 1.21 |
+| per-year score hi/lo | 2021: +0.107/+0.033, 2022: -0.006/+0.009, 2023: +0.255/+0.267, 2024: +0.072/+0.038, 2025: +0.011/-0.008, 2026: +0.016/-0.070 | | | | | | | |
+| gap_pct >= median | 5110 | +0.089 | +0.033 | 52.6 | 36.2 | 23.0 | 9.1 | 1.27 |
+| gap_pct < median | 5109 | +0.056 | +0.026 | 51.8 | 34.6 | 21.7 | 8.0 | 1.16 |
+| per-year gap_pct hi/lo | 2021: +0.077/+0.076, 2022: -0.003/+0.006, 2023: +0.277/+0.246, 2024: +0.072/+0.035, 2025: +0.008/-0.003, 2026: +0.026/-0.071 | | | | | | | |

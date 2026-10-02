@@ -1,0 +1,26 @@
+1) touch-arm beta sensitivity, per-trade meanR (E1 close / E2 next open), 0% friction; blind-all for reference
+| beta | touch E1 | touch E2 | clamp% | blind E1 | blind E2 |
+|---|---|---|---|---|---|
+| 0.4 | +0.046 | +0.060 | 7.1 | -0.002 | +0.009 |
+| 0.492 | +0.020 | +0.033 | 11.6 | -0.002 | +0.009 |
+| 0.6 | -0.005 | +0.007 | 18.9 | -0.002 | +0.009 |
+| 0.7 | -0.024 | -0.012 | 26.7 | -0.002 | +0.009 |
+
+2) liquid contracts only (day-T contract volume >= 75th pct of its year), E2, 0% friction
+| arm | n | meanR | medR | win | >=0.25R | >=0.5R | >=1R | payoff |
+|---|---|---|---|---|---|---|---|---|
+| blind all (liquid) | 9858 | +0.010 | -0.043 | 43.6 | 19.8 | 9.3 | 2.5 | 1.38 |
+| blind top-decile (liquid) | 988 | +0.064 | -0.030 | 45.9 | 24.0 | 14.1 | 4.1 | 1.76 |
+| touch all (liquid) | 3309 | +0.043 | -0.020 | 47.0 | 19.8 | 9.4 | 2.6 | 1.57 |
+
+3) liquid-only, per year: blind top-decile vs touch-all (E2 and E1), 0% friction; n in parens
+| year | blind-top E2 | touch E2 | blind-top E1 | touch E1 | top-decile fire% | top10 share of blind-top R (E2) |
+|---|---|---|---|---|---|---|
+| 2022 | +0.049 (124) | +0.023 (431) | +0.052 | +0.018 | 94% | 58% |
+| 2023 | +0.114 (212) | +0.071 (761) | +0.092 | +0.049 | 92% | 35% |
+| 2024 | +0.046 (227) | +0.029 (729) | +0.029 | +0.010 | 92% | 33% |
+| 2025 | +0.040 (233) | +0.060 (764) | +0.014 | +0.033 | 92% | 34% |
+| 2026 | +0.069 (194) | +0.020 (628) | +0.062 | +0.017 | 97% | 36% |
+
+pooled blind-top E2 median -0.030; mean w/o top-10 trades +0.044; after 5% friction +0.014
+top-decile liquid composition: gap_through share 52.8 % ; opened <=0.5% below 46.8 %
