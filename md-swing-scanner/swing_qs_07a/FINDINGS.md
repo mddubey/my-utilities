@@ -3154,3 +3154,31 @@ discussion per this project's own precedent with W/E1), or bank BT1+S as
 
 **Files**: `30_s_bt1_combo.py`, `s_bt1_combo.csv` (gitignored, large, fully
 regeneratable).
+
+## RQ-QS-07A-BT1-S-H1 — Resistance/Support Headroom Check, not promoted (2026-10-02)
+
+**User's question**: is the size of the move (how far it rises/falls) random, or does it track known resistance/support structure, such that some candidates could be SKIPPED?
+
+**Result**: distance to the near-term (10-day) high and classic pivot R1 correlates NEGATIVELY with `max_return_d3` (Spearman -0.07 to -0.10, strengthening to -0.21 within the lowest-ATR quartile, so not just a volatility proxy) — i.e. stocks already AT/ABOVE their recent high do BETTER afterward, the opposite of "nearby resistance caps it." The 52-week high shows no effect. Support-side distances show no clean signal independent of ATR (which alone correlates -0.246 with `adverse_d3`).
+
+**Critical catch (user-identified)**: `dist_res_10d_pct < 0` is bit-for-bit the same condition as `signals.py`'s `breakout_continuation()` (`Close > high10_prior`) — the production BC entry trigger. This isn't new information; it's BC's own logic re-appearing inside a completely different population (S, trend-rank based). **Not folded into S/BT1** — would just re-derive BC under a different name, against 07A's explicit reset mandate to stay independent of BC/QS-A.
+
+**Reconciled against a concurrent session's finding (`pre_breach/FINDINGS.md`, RQ-PB-2, read-only, not modified)**: that session found breaches mostly STALL (55.1%), not BLAST (18.5%), measured from the exact intraday TOUCH price. Not a contradiction — different measurement moment: PB-2 studies the fresh intraday touch (where resting sell orders cause the stall, per their cited literature); this check studies stocks that have ALREADY CLOSED above the level (survived that same selling pressure). Confirmed directly against this project's own already-validated Primed Gate numbers: "Extended" (already running) beats "Fresh" (just broke out) — 62.2-62.5% win / +1.36-1.48% expectancy vs. 54.2-56.4% win / roughly flat — independent confirmation that the moment of crossing is the risky part, already correctly handled by the existing production design (Confirmed/Close-based entry vs. Primed/intraday-touch entry).
+
+**Files**: `31_resistance_support_headroom.py`, `resistance_support_headroom.csv` (gitignored).
+
+## RQ-QS-07A-BT1-S-RR — Real Path-Based Stop/Target Simulation, 3-day window: thin edge, not tradeable as-is (2026-10-02)
+
+**Design** (user-directed): entry at T0's own Close (validated as a proxy for "~3pm," median gap to real 3pm price only -0.03%, n=1,795 real intraday days — lets the full multi-year S population be used instead of being restricted to the ~4-month real-intraday-cache window; this entry choice also captures the real overnight gap already measured for S days, median +0.434%, 27% gap >1%, n=2,000, which a T+1-open entry would miss). 3-day horizon (unchanged — matches the whole 07A line's existing outcome unit, not silently extended). Real day-by-day High/Low path walk over T+1..T+3, stop checked before target if both trigger same day (conservative convention). Hand-verified (Rule #22): 5 random trades manually traced from raw OHLC, all matched the script's stored outcome/day/R exactly.
+
+**Script 32 (ATR-scaled)**: stop = 1.0x ATR14 at entry, target swept {2x, 3x, 4x} ATR14. Baseline (all S): mean R +0.061 to +0.092, win rate ~43-44%, median R always negative (-0.20 to -0.22) — a real but thin, tail-carried edge (typical trade is a small loser; a minority of larger winners carry the average).
+
+**BT1 confirmed negative a second, independent way**: burst_count>=1 / cusum_stat>0 show LOWER mean R (+0.033 to +0.069) than burst_count=0 / cusum_stat=0 (+0.089 to +0.154) at every target multiple tested — consistent with the earlier close-based BT1-S result (bigger opportunity, worse realized outcome), now confirmed under a real path-based trade simulation too. **BT1 is closed as a filter for S — not merely unpromoted, actively ruled out by two independent methods.**
+
+**Script 33 (round-number sweep, (stop%,target%) in {(3,9),(4,12),(5,10),(5,15)})**: same conclusion, same magnitude — mean R +0.047 to +0.080 across all 4 pairs, win rate 37.6-44.7%. Choice of exact pair doesn't change the picture materially.
+
+**Decisive reframing, direct user catch**: "win rate means nothing if it's just giving you 1% at the end of the day." Converted mean R into real %-of-capital terms (mean R × stop%): **roughly 0.2-0.25% expected gain per trade**, before any real-world cost. Realistic round-trip costs (STT + stamp + exchange charges, even at zero brokerage, plus slippage — which can easily run 0.2-0.5% on anything less liquid than a large-cap) are comparable to or larger than this entire edge. **Verdict: plain S's edge, as currently defined (composite trend-rank >= P90, 3-day horizon, any of the stop/target pairs tested), is too thin to trade with confidence — not negative, but not clearable of real trading costs either.** This is a genuine, non-trivial research result in its own right (S's opportunity is real per CG2/19_'s historical characterization, but a simple stop/target product built directly on it does not monetize that opportunity meaningfully) — logged as closed for THIS specific product shape, not as "S is worthless."
+
+**Open, unresolved, sent to critic**: does this call for (a) a materially different filter that lifts mean R by multiples (not fractions) before this is worth pursuing further, (b) restricting to the most liquid names to see if costs shrink enough to matter (edge itself doesn't change), or (c) banking S-as-a-standalone-product as closed and moving to a different research-board item.
+
+**Files**: `32_s_bt1_rr_simulation.py`, `s_bt1_rr_simulation.csv` (gitignored); `33_s_round_rr_simulation.py`, `s_round_rr_simulation.csv` (gitignored).
