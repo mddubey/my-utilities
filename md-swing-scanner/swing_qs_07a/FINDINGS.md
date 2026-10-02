@@ -3307,3 +3307,35 @@ Monotonic on the opportunity side (fresh > 2-3 > 4-7 ≈ established). **Year-by
 **Verdict, per critic's pre-registered decision tree: freshness SURVIVES as a distinct phenomenon → proceed to the first actual entry construct around the transition.** Stop-loss discussion comes next, per this project's standing Risk Unit Integrity rule — not skipped ahead of it.
 
 **Files**: `35_sst1_freshness_overlap_audit.py`, `sst1_freshness_overlap.csv` (gitignored).
+
+## RQ-QS-07A-SST1-E1 — First Entry Construct on Fresh Transitions: promising pooled, weak in recent years (2026-10-02)
+
+**Stop-loss, discussed and declared before building (Risk Unit Integrity)**: 1.5x ATR14 at entry — literature-grounded breakout/momentum convention, chosen over "T0's own low" after a mandatory risk-geometry check found T0's-own-low produces a near-zero-risk case in 3.2% of events (the same bug category that corrupted W's first construct) and a much wider, less consistent spread (1.3%-9.6% vs. ATR's 4.6%-9.0% at P10-P90). 1.5x ATR cannot be near-zero by construction.
+
+**Design**: entry at T0's Close (validated ~3pm proxy, reused unchanged), 3-day horizon (unchanged), target swept at {2x,3x,4x} the 1.5x-ATR risk unit, real day-by-day High/Low path walk (identical mechanics to script 32). Population: run_age=1 only (26,536 events — the population that survived SST1-R1's W-overlap audit). Hand-verified (Rule #22): 9 real trades across all 3 outcome types (target/stop/neither) traced from raw OHLC, all matched exactly.
+
+**Pooled result — meaningfully better than plain S**:
+
+| Target | Hit target | Hit stop | Neither | Win rate | Mean R |
+|---|---|---|---|---|---|
+| 2x risk | 9.5% | 17.5% | 72.9% | 47.4% | +0.103 |
+| 3x risk | 3.2% | 17.6% | 79.2% | 47.0% | +0.104 |
+| 4x risk | 1.4% | 17.6% | 81.0% | 47.0% | +0.107 |
+
+Stop rate (~17.5%) is roughly HALF plain S's (~36-37%), median R (-0.05) is much closer to zero than plain S's (-0.20 to -0.22). Converted to real terms (mean R × median risk 6.61%): **~0.68-0.71% expected gain per trade — roughly 3x plain S's ~0.2-0.25%, comfortably above realistic trading costs.**
+
+**Year-by-year check (never pool years, standing rule) — reveals real inconsistency, NOT uniformly robust**:
+
+| Year | n | Mean R | Win% | Stop% |
+|---|---|---|---|---|
+| 2022 | 1,562 | +0.029 | 43.4% | 20.1% |
+| 2023 | 8,015 | **+0.157** | 48.1% | 15.6% |
+| 2024 | 9,677 | **+0.132** | 48.0% | 17.6% |
+| 2025 | 3,593 | +0.014 | 44.9% | 20.2% |
+| 2026 (partial) | 3,689 | +0.037 | 45.6% | 18.5% |
+
+**The pooled +0.104 mean R is carried almost entirely by 2023-2024.** The two most recent years (2025, 2026) show mean R near zero (+0.014, +0.037) — in real terms, ~0.09-0.24% per trade, back down at or below realistic trading costs, essentially matching plain S's already-rejected economics. Sample sizes in 2025/2026 are large enough (3,500+ each) that this is not obviously noise.
+
+**Verdict: a real, meaningfully better construct than plain S on the full-history pool, but with a live-relevance problem the pooled number hides — unresolved, sent to critic.** Does NOT automatically repeat plain S's rejection (the mechanism and historical edge are real), but does NOT yet clear the bar for "ready to trade now" either, given how thin the two most recent years are.
+
+**Files**: `36_sst1_fresh_entry_construct.py`, `sst1_fresh_entry_simulation.csv` (gitignored).
