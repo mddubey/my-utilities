@@ -3244,3 +3244,35 @@ regeneratable).
 - expansion from neutral/intermediate -> strong, rather than strong -> stronger
 
 **Outcome stays the same** (07A's existing exceptional-3-day-mover definition, Cohort A/B) — only the PRECURSOR CHARACTERIZATION changes.
+
+## RQ-QS-07A-SST1 — Strong-State Transition Discovery, first clean positive pass (2026-10-02)
+
+**Question** (critic-specified scope): S asks "is the stock strong?" — a static, persistent-state detector (CG2: ~91.9% of S events in 4+ day runs). This asks "is the stock BECOMING strong, before the static condition has saturated?" First pass characterizes the state CHANGE only — no threshold tuning, no entry construct, per the critic's explicit constraints.
+
+**Literature checked first**: (1) momentum ACCELERATION (rate of change, not level) is a published, mechanically distinct predictor — "accelerating winners" earn higher subsequent alpha than momentum level alone — WITH an explicit caveat carried forward: accelerated increases also carry a higher reversal probability (echoes BT1's own opportunity-vs-giveback pattern). (2) Trend FRESHNESS is separately published — fresh breakouts within an established uptrend outperform mature, aged trends. Two mechanically distinct transition measures pre-declared together (Rule #19): **A. Acceleration** (`composite_delta_5d`/`_10d` = composite(T0) − composite(T−N), N∈{5,10}) tested on the standard Cohort A vs. matched control population; **B. Freshness** (`run_age` = consecutive days the composite has sat ≥P90, including T0) tested within the full historical S population.
+
+**A bug caught before trusting any result (Rule #22)**: the first `run_age` implementation (`groupby((~is_S).cumsum())`) put the False day bordering each new run into the SAME group as the following True run, pushing every freshly-entered day's age to 2 instead of 1 — confirmed by the "1 (fresh)" bucket coming back completely empty (0 of 166,697 rows) in the first run, which is structurally impossible for a correct implementation. Fixed with the standard change-point idiom (`groupby((is_S != is_S.shift()).cumsum())`), re-verified against a minimal example and against 5 real tickers (3 fresh entries showing the correct "yesterday was below P90, today is not" pattern; 2 established runs showing 11/11 consecutive True days matching a stored run_age of 18/35).
+
+**Part A result — real, modest acceleration signal**:
+
+| Feature | Cohort A | Control | Gap |
+|---|---|---|---|
+| delta_5d (median) | +1.00 | −0.51 | +1.51 |
+| delta_10d (median) | +1.46 | −0.89 | +2.35 |
+
+Stocks about to make an exceptional move are climbing in trend-rank terms, not just sitting at a high rank — confirms the literature-grounded acceleration hypothesis, independent of whether either group is currently S.
+
+**Part B result — the cleanest, most robust finding of the whole BT1/SST chain. Fresh S entrants show MORE opportunity than long-established S, every single year, no decay**:
+
+| run_age bucket | n | max_return_d3 (opportunity) | close_ret_d3 (sustained) |
+|---|---|---|---|
+| 1 (fresh) | 26,536 | **+4.14%** | −0.21% |
+| 2-3 | 31,919 | +3.82% | −0.32% |
+| 4-7 | 36,758 | +3.64% | −0.39% |
+| 8+ (established) | 71,484 | +3.62% | −0.18% |
+
+Monotonic on the opportunity side (fresh > 2-3 > 4-7 ≈ established). **Year-by-year check (never pool years, standing rule) — passes cleanly, first time this session**: fresh beats established on median opportunity in every year 2022-2026 (gaps +0.19 to +0.75, no decay in recent years — if anything 2024/2025 show the widest gaps). The sustained/close-based side is noisier/non-monotonic across buckets and years — same caution as every other precursor found this session: opportunity and sustained realized return are different questions.
+
+**Verdict: real signal found on BOTH pre-declared transition mechanisms, with freshness passing robustness more cleanly than any other feature tested in this entire BT1/SST chain.** Per the critic's explicit constraint, this stays a discovery-pass result — no entry construct, no stop, no filter promotion yet. Sent to critic for the phase-2 call (robustness/decompose vs. proceed to a candidate construct).
+
+**Files**: `34_strong_state_transition_discovery.py`, `sst1_acceleration_features.csv`, `sst1_freshness_features.csv` (gitignored).
