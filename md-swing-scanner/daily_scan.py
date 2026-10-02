@@ -71,6 +71,7 @@ a handful can plausibly fire on any given day):
 import argparse
 import json
 import sys
+import time
 from datetime import time as dtime
 from pathlib import Path
 
@@ -123,7 +124,7 @@ def shortlist_primed(tickers):
     return sorted(primed)
 
 
-def shortlist_primed_live(tickers, live_bars, cutoff_ist=LIVE_CUTOFF_DEFAULT):
+def shortlist_primed_live(tickers, live_bars, cutoff_ist=LIVE_CUTOFF_DEFAULT, progress=False):
     """Same structural checks as shortlist_primed(), but built off TODAY's live-
     augmented row when a live bar was fetched for that ticker (see --refresh-primed
     in the module docstring) — lets an intraday mover newly qualify as primed
@@ -133,10 +134,18 @@ def shortlist_primed_live(tickers, live_bars, cutoff_ist=LIVE_CUTOFF_DEFAULT):
     stage2_trend_template's RS-rating gate — see relative_strength.py's
     _universe_returns_live() docstring for why this is needed at all: without it,
     the coiled_spring/VCP path can never fire live, no matter how live-augmented
-    the row itself is."""
+    the row itself is.
+
+    progress=True prints a line every 50 tickers (count, primed so far, elapsed) —
+    this loop runs silently for minutes otherwise (2026-10-01: an 11-minute refresh
+    with no output at all)."""
     live_closes = {t: bar["Close"] for t, bar in live_bars.items()} if live_bars else None
     primed = set()
-    for t in tickers:
+    t0 = time.monotonic()
+    for k, t in enumerate(tickers, 1):
+        if progress and (k % 50 == 0 or k == len(tickers)):
+            print(f"  gate check {k}/{len(tickers)}  primed so far={len(primed)}  "
+                  f"elapsed={time.monotonic() - t0:.0f}s", flush=True)
         try:
             if t in live_bars:
                 df = load_with_extra_row(t, live_bars[t], daily_pivots, cutoff_ist=cutoff_ist)
@@ -153,13 +162,24 @@ def shortlist_primed_live(tickers, live_bars, cutoff_ist=LIVE_CUTOFF_DEFAULT):
     return sorted(primed)
 
 
-def refresh_primed_cache(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT):
+def refresh_primed_cache(tickers, cutoff_ist=LIVE_CUTOFF_DEFAULT, progress=False):
     """The expensive half of --refresh-primed: fetch live bars for the WHOLE
     universe, recompute the primed list against today's data, write it out with
     enough metadata (date, refresh time) for --live to know whether it's still
-    fresh. Returns the payload written, so the CLI can print a summary."""
+    fresh. Returns the payload written, so the CLI can print a summary.
+    progress=True prints per-phase timing plus the gate loop's running count."""
+    t0 = time.monotonic()
+    if progress:
+        print(f"[1/2] fetching live 5-min bars for {len(tickers)} tickers (one batched call)...", flush=True)
     live_bars = fetch_live_bars(tickers, cutoff_ist)
-    primed = shortlist_primed_live(tickers, live_bars, cutoff_ist)
+    if progress:
+        print(f"[1/2] done: {len(live_bars)} live bars in {time.monotonic() - t0:.0f}s", flush=True)
+        print(f"[2/2] re-running primed gate on today's live-augmented rows...", flush=True)
+    t1 = time.monotonic()
+    primed = shortlist_primed_live(tickers, live_bars, cutoff_ist, progress=progress)
+    if progress:
+        print(f"[2/2] done: {len(primed)} primed in {time.monotonic() - t1:.0f}s "
+              f"(total {time.monotonic() - t0:.0f}s)", flush=True)
     payload = dict(
         date=str(pd.Timestamp.now().date()),
         refreshed_at=pd.Timestamp.now().strftime("%H:%M:%S"),
@@ -412,7 +432,7 @@ if __name__ == "__main__":
 
     if args.refresh_primed:
         old = _load_primed_cache_if_fresh() or []
-        payload = refresh_primed_cache(tickers, args.cutoff)
+        payload = refresh_primed_cache(tickers, args.cutoff, progress=True)
         new = payload["tickers"]
         added = sorted(set(new) - set(old))
         dropped = sorted(set(old) - set(new))
