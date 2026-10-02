@@ -3182,3 +3182,65 @@ regeneratable).
 **Open, unresolved, sent to critic**: does this call for (a) a materially different filter that lifts mean R by multiples (not fractions) before this is worth pursuing further, (b) restricting to the most liquid names to see if costs shrink enough to matter (edge itself doesn't change), or (c) banking S-as-a-standalone-product as closed and moving to a different research-board item.
 
 **Files**: `32_s_bt1_rr_simulation.py`, `s_bt1_rr_simulation.csv` (gitignored); `33_s_round_rr_simulation.py`, `s_round_rr_simulation.csv` (gitignored).
+
+## RQ-QS-07A-BT1-S — FINAL CLOSURE, product-closure not phenomenon-closure (2026-10-02, critic's verdict)
+
+**Critic's exact verdict, banked verbatim**:
+
+> (c) — bank plain S as a standalone 3-day stop/target product and move on. More
+> precisely: close the current S→3-day trade-product branch, but do not close S
+> as a research observation. S has demonstrated that it identifies an unusually
+> strong opportunity state. It has not demonstrated that the state, by itself,
+> can be monetized into a cost-surviving 3-day stop/target product. I would not
+> do (a) now, and I would not do (b) as a rescue attempt.
+>
+> The important result is not the 37-45% win rate. It is this: across six
+> materially different stop/target geometries, mean R stays only +0.047 to
+> +0.092, while median R remains negative. That is remarkably consistent
+> evidence about the shape of the opportunity.
+>
+> BT1 was the obvious first attempt at finding the missing state transition.
+> BT1 itself is real. BT1 predicts more upside opportunity. But within S, it
+> predicts worse sustained outcomes. That survives both close-based analysis
+> and actual High/Low path simulation. Therefore the first natural "make S
+> better" direction has already failed. That is exactly the kind of evidence
+> where our harvest, don't polish rule should bite.
+
+**Three separate statements, not one** (critic's framing, adopted as standing project discipline for this closure):
+
+| Question | Current evidence |
+|---|---|
+| Does S identify an unusual market state? | Yes |
+| Does S identify larger short-term opportunity? | Yes, robustly (CG2, 19_, today's own confirmation) |
+| Does static S >= P90 produce a viable 3-day stop/target trade after costs? | Not demonstrated; current evidence says no |
+
+**Recorded as**: S standalone / 3-day / T0-close entry / tested stop-target family → **CLOSED NEGATIVE AS A TRADE PRODUCT**. NOT "S closed." S as a research observation (unusual opportunity state) stays BANKED, available for a differently-shaped future product.
+
+**Explicitly rejected, with reasoning, not just vibes**:
+- **Liquidity restriction as a rescue** — rejected. Liquidity filtering could improve execution feasibility, but cannot turn ~0.2-0.25% gross expected return into a tradeable product unless low-liquidity names are disproportionately destroying the measured edge — not established, and 07A's own work already shows the signal exists across liquidity strata, so this would be an execution/capacity study, not a signal discovery, and isn't worth a research-board slot now.
+- **Searching for a filter to deliver "multiples" of improvement** — rejected. This would silently convert outcome-first discovery into optimization around a known result, inviting exactly the threshold/combo hunting this project has repeatedly caught and stopped. BT1 was a GOOD test specifically because it wasn't arbitrary TA seasoning — a genuinely different behavioural dimension with independently demonstrated predictive power — and it still failed as an S monetization supplement. That's strong enough to bank, not grounds to keep hunting.
+
+**Preserved as a standing cross-track insight (not a new RQ)**: the Primed Gate/stall reconciliation from BT1-S-H1 is judged by the critic as more valuable than the S trade-product result itself — independent confirmation, arrived at through outcome-first discovery (not retrofitted to defend existing architecture), that "the act of crossing resistance" and "the state after having successfully crossed it" are NOT interchangeable, supporting the existing Primed(intraday-touch)/Confirmed(closed-above) design split.
+
+**Decision, verbatim**:
+- S standalone 3-day product: **CLOSED**.
+- S as a research observation: **BANKED**.
+- BT1 as S supplement: **CLOSED NEGATIVE**.
+- Liquidity restriction: **PARKED**, not a rescue.
+- Another S stop/filter sweep: **NO**.
+- Next research-board item: **Strong-State Transition**.
+
+## Strong-State Transition — next RQ, pre-registered scope (critic-specified, 2026-10-02)
+
+**The question, stated precisely**: S asks "is the stock strong?" (a static, persistent-state detector — CG2 already showed ~91.9% of S events occur in 4+ day runs, 85% of S tickers appear on 20+ dates — meaning by the time S is detected, the stock is often already in an established state, not transitioning). Strong-State Transition asks **"is the stock BECOMING strong, right now, before the static condition has already saturated?"** — genuinely new information, not a rephrasing of S.
+
+**Not allowed on this first pass** (critic's explicit list, carried forward as a hard constraint): S threshold tuning, BT1 combinations, generic TA combinations, exit optimization, liquidity rescue, BC/QS-A overlay, "best" threshold selection. **First pass characterizes the state CHANGE, not a trading rule.**
+
+**Candidate transition families to look at** (examples, not a checklist to exhaust — pick one, per breadth-before-depth):
+- change in composite trend-strength percentile (the rate of climb, not the level)
+- acceleration in the underlying trend-strength components
+- crossing INTO the strong regime vs. already being there
+- duration/age of the strong-state run (fresh entrant vs. long-tenured)
+- expansion from neutral/intermediate -> strong, rather than strong -> stronger
+
+**Outcome stays the same** (07A's existing exceptional-3-day-mover definition, Cohort A/B) — only the PRECURSOR CHARACTERIZATION changes.
