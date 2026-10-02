@@ -1,0 +1,2 @@
+date,ticker,side,setup,rule_trigger_time,rule_entry,user_entry,user_fill_time_approx,stop,target,exit,exit_reason,gross_pct,risk_pct,R,notes
+2026-10-01,BPCL,short,1H34 held rejection (18 rule),11:35,304.00,304.50,12:08,305.05,301.46,301.46,target (user booked 1%),1.00,0.18,5.5,"limit above market; stop = wick high 305.05 (user chart, Yahoo quote agrees); weekly S1 303.47 held once at 12:31 then broke 12:40 on rising volume; Nifty ~flat; entry after 11:30; gap -0.26%"

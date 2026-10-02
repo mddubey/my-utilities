@@ -1,0 +1,9 @@
+# Derived / downloaded data -- regeneratable from the scripts here + the project caches
+h1_cache/
+index_1h/
+rechecks/
+*.csv
+*.pkl
+*.npy
+# Hand-maintained live record -- NOT regeneratable, keep it tracked
+!live_watch_log.csv
