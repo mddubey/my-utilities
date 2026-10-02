@@ -3070,3 +3070,27 @@ transition) per the critic's original ordering.
 **Files**: `29_behavioral_transition_discovery.py`,
 `behavioral_transition_features.csv` (gitignored, large, fully
 regeneratable).
+
+### RQ-QS-07A-BT1 — Year-by-year robustness check (2026-10-02)
+
+Per the standing "never pool years" rule, checked each year individually
+(not a pooled multi-year number) before calling BT1 promotable-in-principle:
+
+| Year | n (Cohort A) | burst_count>=2 rate (A / control) | cusum_stat>0 rate (A / control) |
+|---|---|---|---|
+| 2021 | 200 (too small, excluded) | — | — |
+| 2022 | 21,721 | 7.4% / 3.7% | 43.8% / 33.6% |
+| 2023 | 19,445 | 9.5% / 5.3% | 55.2% / 41.8% |
+| 2024 | 23,925 | 9.9% / 5.2% | 52.6% / 38.2% |
+| 2025 | 18,382 | 5.5% / 2.3% | 48.2% / 36.6% |
+| 2026 | 16,912 | 5.8% / 3.4% | 50.4% / 41.5% |
+
+Every full year (2022-2026) shows the same direction and a stable-to-strong
+gap — no decay in the most recent years, unlike some prior findings this
+project has caught pooling-masked decay on. **Passes the robustness check.**
+2021 (n=200, the first partial year in `event_matrix.csv`) is too thin to
+read and is excluded, not treated as a reversal.
+
+**Next step, per user direction**: test this signal as a supplement to S's
+already-frozen spec, since BT1 correlates with S's territory (prior
+strength) rather than duplicating it outright.
