@@ -3339,3 +3339,25 @@ Stop rate (~17.5%) is roughly HALF plain S's (~36-37%), median R (-0.05) is much
 **Verdict: a real, meaningfully better construct than plain S on the full-history pool, but with a live-relevance problem the pooled number hides — unresolved, sent to critic.** Does NOT automatically repeat plain S's rejection (the mechanism and historical edge are real), but does NOT yet clear the bar for "ready to trade now" either, given how thin the two most recent years are.
 
 **Files**: `36_sst1_fresh_entry_construct.py`, `sst1_fresh_entry_simulation.csv` (gitignored).
+
+## RQ-QS-07A-SST1-E1-R1 — Frozen-Path Regime Diagnosis: regime-wide, not candidate-specific (2026-10-02)
+
+**Question** (critic's exact framing): did the trades become harder to monetize in 2025-26 even though the underlying opportunity remained intact, or did the fresh-transition idea itself quietly stop working? Everything frozen (same population, T0-close entry, 1.5x ATR stop, 3-day horizon, 3x-risk target) — only the period split (2022-2024 vs 2025-2026) and diagnostic lens change. Compared against `established` (run_age>=8) under the IDENTICAL frozen mechanics as a control.
+
+**Result — both fresh and the established control degrade by a similar shape and magnitude, under identical rules**:
+
+| Metric | Fresh 2022-24 → 2025-26 | Established 2022-24 → 2025-26 |
+|---|---|---|
+| MFE (median) | +4.25% → +3.87% (−9% rel.) | +3.70% → +3.35% (−9% rel.) |
+| MAE (median) | −3.00% → −3.42% | −3.29% → −3.48% |
+| Target-hit rate | 3.6% → 2.3% (−36% rel.) | 1.6% → 0.9% (−44% rel.) |
+| Stop rate | 17.0% → 19.3% | 19.0% → 19.6% |
+| Mean R | +0.134 → +0.026 | +0.081 → **−0.004** |
+
+**Hand-verified (Rule #22)**: 3 real stop-out trades (ARVIND, MAPMYINDIA, KESORAMIND) traced by hand for `gap_through`/`was_green_before_stop` — all matched the script's computed values exactly.
+
+**Interpretation**: the established control — a different population, same frozen stop/target mechanics — degraded by almost the same relative amount as fresh (MFE -9% in both, target-hit rate roughly halved in both), and actually FLIPPED NEGATIVE while fresh stayed barely positive. If freshness itself had quietly broken, established (unrelated to the freshness mechanism) should not have degraded in lockstep. Instead, moves got modestly smaller, dips modestly deeper, and the fixed target got reached much less often — a broad, shared monetization difficulty, not a fresh-specific one. **Freshness's edge OVER established was preserved through the weak period** (fresh stayed ahead of established in both 2022-24 and 2025-26), even as the absolute edge shrank for both.
+
+**Verdict, per critic's pre-registered decision tree: mechanics genuinely changed in a way that affected a control population too → BANK as a regime-dependent candidate, do not close, do not modify.** Not promoted to "universal standalone product" — the honest characterization is "a real phenomenon and a viable trade under favorable conditions, not yet shown to be a universal, all-regime product." Revisit when conditions turn, or treat as a candidate for the project's separate future regime-adaptive-exit research bucket (not pursued now — would require new design work, out of scope for a diagnostic pass).
+
+**Files**: `37_sst1_e1_regime_diagnosis.py`, `sst1_e1_regime_diagnosis.csv` (gitignored).
