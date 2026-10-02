@@ -3344,7 +3344,7 @@ Stop rate (~17.5%) is roughly HALF plain S's (~36-37%), median R (-0.05) is much
 
 **Question** (critic's exact framing): did the trades become harder to monetize in 2025-26 even though the underlying opportunity remained intact, or did the fresh-transition idea itself quietly stop working? Everything frozen (same population, T0-close entry, 1.5x ATR stop, 3-day horizon, 3x-risk target) — only the period split (2022-2024 vs 2025-2026) and diagnostic lens change. Compared against `established` (run_age>=8) under the IDENTICAL frozen mechanics as a control.
 
-**Result — both fresh and the established control degrade by a similar shape and magnitude, under identical rules**:
+**Result — both fresh and the established control degrade by a similar shape and magnitude, under identical rules (strong, not proof — see critic's wording correction below)**:
 
 | Metric | Fresh 2022-24 → 2025-26 | Established 2022-24 → 2025-26 |
 |---|---|---|
@@ -3361,3 +3361,68 @@ Stop rate (~17.5%) is roughly HALF plain S's (~36-37%), median R (-0.05) is much
 **Verdict, per critic's pre-registered decision tree: mechanics genuinely changed in a way that affected a control population too → BANK as a regime-dependent candidate, do not close, do not modify.** Not promoted to "universal standalone product" — the honest characterization is "a real phenomenon and a viable trade under favorable conditions, not yet shown to be a universal, all-regime product." Revisit when conditions turn, or treat as a candidate for the project's separate future regime-adaptive-exit research bucket (not pursued now — would require new design work, out of scope for a diagnostic pass).
 
 **Files**: `37_sst1_e1_regime_diagnosis.py`, `sst1_e1_regime_diagnosis.csv` (gitignored).
+
+## RQ-QS-07A-SST1 family — FINAL CLOSURE (2026-10-02, critic's verdict)
+
+**Critic's exact verdict, banked verbatim**:
+
+> Yes — the BANKED verdict is correct. I would close SST1 as an active
+> research thread. I don't think another diagnostic is warranted right now.
+> The control comparison is the key piece. You didn't merely show that the
+> fresh group got worse. You showed that a different, established population
+> deteriorated in almost the same direction under the exact same frozen trade
+> mechanics. That makes "the fresh-transition idea itself stopped working" a
+> much weaker explanation.
+>
+> The honest state is: we found a real precursor and a trade construction
+> that historically monetizes it. Its edge survives the recent weak period
+> relative to its control, but the absolute monetization deteriorates because
+> the broader long-side environment became harder.
+
+**Wording correction, explicitly requested — softened from "decisive"**: the
+diagnostic is decisive enough for the RESEARCH-MANAGEMENT decision (stop
+investigating this branch), but NOT scientific proof that "2025-26 weakness
+was CAUSED by the market regime" — there could be other causes underneath.
+Correct standing wording: **"Regime-dependent monetization is the best-
+supported interpretation of the evidence so far"** — strong enough to bank,
+not strong enough to claim as proven causation.
+
+**Decision, verbatim**:
+- SST1 (discovery) → **BANKED**.
+- SST1-E1 (entry construct) → **BANKED as a regime-dependent candidate**.
+- No more SST1 work now — explicitly resisting the temptation to immediately
+  build a regime-switch/adaptive-exit version ("That's a future research
+  question, not unfinished business from this one").
+
+## 07A discovery line — PAUSED, not abandoned (2026-10-02, critic's verdict)
+
+**Full breadth cycle completed this session, critic's own summary**:
+1. Weak/recovery state → genuine opportunity, but trade construction failed (W, E1/E1-S, closed).
+2. Compression → expansion → didn't produce a sufficiently useful product (C1, closed negative).
+3. Static strong state → opportunity, but standalone monetization too thin (S, BT1-S-RR, closed as a product).
+4. Behavioural acceleration (BT1) → didn't improve the strong-state trade (closed negative, confirmed twice).
+5. Strong-state transition → real candidate; **banked as regime-dependent** (SST1 family).
+
+**Critic's explicit call**: this is a natural pause point for the FAMILY
+(static/transition-strength precursors), not for the whole 07A program.
+Do NOT reopen peer/sector relative strength (infrastructure-blocked — no
+point-in-time sector mapping exists), generic TA combinations, QS-A
+overlays, another stop sweep, or another S/BT1 combination just to keep
+producing scripts. **"If there isn't another genuinely distinct,
+infrastructure-ready hypothesis on the board, stopping here is better
+research discipline than manufacturing RQ #whatever."**
+
+**What this session extracted, worth preserving explicitly**: a real
+separation between SIGNAL QUALITY and MARKET MONETIZATION — a precursor can
+remain genuinely informative (freshness kept its edge over established
+through the weak period) while the PAYOFF available from acting on it
+changes with the environment. This is a structural finding for the
+project's eventual research architecture, not just a footnote on one RQ —
+preserve it, don't try to "fix" it with increasingly complicated filters.
+
+**Standing status going forward**: 07A discovery is PAUSED pending either
+(a) a genuinely new, infrastructure-ready precursor hypothesis, or (b) the
+user's separately-stated interest in exploring a short-side options
+strategy (not started, explicit future direction, see project memory
+`project_long_strategy_regime_2025_2026.md`), or (c) revisiting SST1-E1 if
+the long-side regime turns favorable again.
