@@ -3094,3 +3094,63 @@ read and is excluded, not treated as a reversal.
 **Next step, per user direction**: test this signal as a supplement to S's
 already-frozen spec, since BT1 correlates with S's territory (prior
 strength) rather than duplicating it outright.
+
+## RQ-QS-07A-BT1-S — Does BT1 improve S? Mixed result, not a clean win (2026-10-02)
+
+**Question**: among days already classified as S (strong-state, composite
+trend-score >= P90, frozen spec from CG1/17_), does a higher BT1 reading
+(volume acceleration / burst clustering / CUSUM regime-shift) mark a subset
+with a BETTER forward outcome than low-BT1 S days?
+
+**Method**: full NSE universe (2,327 tickers), S classified on T0's own row
+(same historical-characterization clock CG2 already used for S's own
+coverage/incidence findings — NOT a live-decision clock; flagged, not
+glossed over). Composite/S-cutoff logic verified bit-for-bit identical to
+`19_forward_validation_cg3.py` on 10 random RELIANCE dates before running at
+scale. 166,668 S-classified rows found across history.
+
+**Baseline (all S, before any BT1 split)**: max_return_d3 median +3.74%,
+close_ret_d3 median -0.26% — consistent with this project's repeated
+finding that S has real opportunity (MFE) but weak-to-negative sustained
+close-based return on its own.
+
+**Result — BT1 trades MORE opportunity for WORSE sustained outcome, the
+same giveback pattern this project has now seen before, not a clean win**:
+
+| Split | Opportunity (max_return_d3 median) | Sustained (close_ret_d3 median) |
+|---|---|---|
+| burst_count = 0 | +3.56% | -0.13% |
+| burst_count >= 1 | **+3.93%** | **-0.39%** |
+| cusum_stat = 0 | +3.41% | 0.00% |
+| cusum_stat > 0 | **+3.87%** | **-0.35%** |
+| vol_accel Q1 (lowest) | +3.58% | -0.25% |
+| vol_accel Q4 (highest) | **+4.24%** | **-0.46%** |
+
+Every single split agrees: higher BT1 → bigger forward opportunity AND a
+worse close-to-close outcome. BT1 does NOT simply make S "better" — it
+marks faster, choppier, more-given-back moves, not cleaner continuations.
+This is the same shape of result this project found repeatedly with W
+(MFE stays large, realized/close return doesn't follow it) — not
+disqualifying, but it means a naive "hold S+BT1 to D3's close" construct
+is not obviously an improvement over plain S.
+
+**Important caveat, not a dismissal**: `close_ret_d3` is a FIXED 3-day-hold
+proxy, not a real exit engine (none exists yet for a standalone S
+construct — Rule #5 doesn't apply here only because there's genuinely
+nothing to use instead yet). A real strategy wouldn't necessarily hold to
+D3's close — it might trail a stop to capture more of the larger MFE that
+high-BT1 days demonstrably have. This result says "don't build a hold-to-
+close S+BT1 product"; it does NOT say "BT1 has no use inside a trailing-
+exit S product" — that would require actually building an exit engine
+first, a materially bigger step (Research Preflight: stop/exit definition
+needed before any R-based claim, per Rule #20).
+
+**Verdict: BT1 is not a free improvement to S under a simple outcome
+metric.** Decision point, not resolved here: build a real trailing-stop
+exit construct for S+BT1 (bigger commitment, needs its own stop-loss
+discussion per this project's own precedent with W/E1), or bank BT1+S as
+"related but not simply additive" and move to research-board item #3
+(strong-state transition — the shift INTO S, not static S).
+
+**Files**: `30_s_bt1_combo.py`, `s_bt1_combo.csv` (gitignored, large, fully
+regeneratable).
