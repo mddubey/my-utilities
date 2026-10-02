@@ -3276,3 +3276,34 @@ Monotonic on the opportunity side (fresh > 2-3 > 4-7 ≈ established). **Year-by
 **Verdict: real signal found on BOTH pre-declared transition mechanisms, with freshness passing robustness more cleanly than any other feature tested in this entire BT1/SST chain.** Per the critic's explicit constraint, this stays a discovery-pass result — no entry construct, no stop, no filter promotion yet. Sent to critic for the phase-2 call (robustness/decompose vs. proceed to a candidate construct).
 
 **Files**: `34_strong_state_transition_discovery.py`, `sst1_acceleration_features.csv`, `sst1_freshness_features.csv` (gitignored).
+
+## RQ-QS-07A-SST1-R1 — Freshness Mechanism/Overlap Audit: freshness SURVIVES, not a W rediscovery (2026-10-02)
+
+**Question** (critic's exact framing): is "freshly entering the strong state" (run_age=1) a genuinely new precursor, or mostly a disguised version of the already-discovered weak-state/recovery phenomenon (W)? A stock going weak→recovering→strong would be classified "freshly strong" today, which would mean SST1's result is a rediscovery, not new information.
+
+**Method**: for every fresh (run_age=1, n=26,536) and established (run_age>=8, n=71,484) event, checked whether the ticker was classified W (exact frozen-spec formula, reused unchanged from 19_/30_) at ANY point in the 20 trading days strictly before the event (10-day lookback checked alongside as a cross-check, not a tuned choice).
+
+**Result — overlap is tiny, freshness survives as a distinct phenomenon**:
+
+| Lookback | Fresh overlap rate | Established overlap rate |
+|---|---|---|
+| 20 days | 1.2% | 0.2% |
+| 10 days | 0.3% | 0.0% |
+
+| Group | n | max_return_d3 (median) | close_ret_d3 (median) |
+|---|---|---|---|
+| Established (baseline) | 71,484 | +3.62% | −0.18% |
+| Fresh — OVERLAP w/ W | 321 | +5.09% | −1.15% |
+| **Fresh — NO overlap w/ W** | **26,215** | **+4.13%** | **−0.19%** |
+
+**98.8% of all fresh events have no W overlap at all**, and that non-overlap subgroup retains essentially the FULL freshness advantage (+4.13% vs. the overall fresh population's +4.14% reported in SST1) — the freshness effect is NOT being carried by a hidden W-recovery subset. **Freshness is a genuinely distinct precursor, not a rediscovery of W.**
+
+**Side observation, too small to draw conclusions from on its own (n=321, 1.2% of fresh)**: the tiny W-overlap subgroup shows an even bigger opportunity (+5.09%) but a much worse realized outcome (−1.15%) — the same opportunity-vs-giveback shape already seen with W/BT1. Noted, not pursued — sample too small for a year-level check (only 2026 had enough events in both overlap and non-overlap to compare, +4.61% vs +3.95%, consistent direction but not independently conclusive).
+
+**Hand-verified (Rule #22)**: 2 real overlap examples (SHAREINDIA, LPDC) show genuine sharp-decline-then-recovery price action; 2 real non-overlap examples (PSB, ASTRAMICRO) show steady climbs with no prior decline — confirms the detection logic is working correctly, not a near-zero artifact from a bug.
+
+**Acceleration relationship, descriptive only (not optimized)**: fresh entrants (both overlap and non-overlap) show much higher `delta_5d` (+30.7 and +14.1) than established (+0.01) — expected, since a fresh S entrant has by definition climbed recently; not treated as a new combined filter, per critic's explicit instruction.
+
+**Verdict, per critic's pre-registered decision tree: freshness SURVIVES as a distinct phenomenon → proceed to the first actual entry construct around the transition.** Stop-loss discussion comes next, per this project's standing Risk Unit Integrity rule — not skipped ahead of it.
+
+**Files**: `35_sst1_freshness_overlap_audit.py`, `sst1_freshness_overlap.csv` (gitignored).
