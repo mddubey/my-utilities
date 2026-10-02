@@ -2991,3 +2991,82 @@ closed.
 **Files**: `28_compression_expansion_discovery.py`,
 `compression_expansion_features.csv` (gitignored, 17.8MB, fully
 regeneratable).
+
+## RQ-QS-07A-BT1 — Behavioural/State-Transition Discovery, complete (2026-10-02)
+
+**Question**: distinct from 07A-3's already-closed static volume/volatility
+LEVEL tests (vol_zscore, vol_ratio_10d, atr_expansion — all weak/null), does
+a multi-day TRANSITION/acceleration/clustering/regime-shift pattern precede
+an exceptional 3-day move?
+
+**Literature checked first**: three mechanically distinct, published
+conventions, pre-declared together (Rule #19) — (1) short-window volume
+ACCELERATION (3d-avg vs. the prior non-overlapping 3d-avg, not a ratio to a
+long static baseline), (2) RETURN-BURST FREQUENCY (count of days in a
+trailing 10d window with `|1d return| >= 1.5x that day's own ATR%` —
+clustering, not magnitude), (3) one-sided CUSUM of standardized volume vs. a
+stale (non-overlapping) 60-day baseline — a standard published change-point/
+regime-shift statistic, genuinely different mechanics from a rolling ratio.
+
+**Population**: Cohort A (102,837) vs. matched control (same construction as
+03_/05_/07_/08_/28_). Decision-time-safe — all features use T0 close/volume
+only; T0's own bar never enters `max_return_d3`/`close_ret_d3` (confirmed
+via `01_event_matrix.py`'s roll/shift logic), so this is not circular.
+
+**Result — real, consistent separation across all 3 metrics, unlike C1**:
+
+| Feature | Cohort A | Control | Gap |
+|---|---|---|---|
+| vol_accel (median) | 1.060 | 0.980 | +0.081 |
+| vol_accel (mean) | 2.070 | 1.568 | +0.502 |
+| burst_count >=1 (rate) | 27.93% | 19.77% | **+8.2pp (+41% rel.)** |
+| burst_count >=2 (rate) | 7.74% | 4.06% | +3.7pp (+90% rel.) |
+| burst_count >=3 (rate) | 2.22% | 0.88% | +1.3pp (+150% rel.) |
+| cusum_stat >0 (rate) | 49.91% | 38.04% | +11.9pp |
+| cusum_stat (mean) | 13.291 | 7.273 | +6.0 |
+
+All three mechanically distinct metrics agree on direction and show a
+materially larger, cleaner separation than 07A-3's static-level volume
+features ever did — confirming the board's premise that TRANSITION, not
+LEVEL, is where volume carries information for this outcome.
+
+**Hand-verification (Rule #22)**: recomputed all 3 features by hand from raw
+OHLCV for 5 random Cohort A events (GOYALALUM, ENTERO, UFLEX, TOKYOPLAST,
+BSL) — all matched stored values exactly. BSL's example surfaced a real,
+legitimate circuit-lock-driven burst cluster (five ~5%-exact daily moves in
+a row) — consistent with the already-known circuit-lock stratification
+caveat from 07A-6R, not a new bug.
+
+**Important overlap check, done before writing this up (per Rule #7's
+spirit — don't treat a feature as new information without checking it
+against what's already known)**: UFLEX's example (-17.4% crash on T0, then
+a big bounce) raised the concern that "behavioural transition" might just
+be re-detecting the already-closed W (decline→recovery) phenomenon through
+a volume lens. Checked directly: within Cohort A, all 3 transition features
+correlate POSITIVELY with the prior 3-day return (Spearman 0.16–0.26, not
+negative), and the fraction of events with a real prior decline
+(`ret_3d_prior < -3%`) is flat-to-slightly-lower in the highest-transition
+buckets (25.4% at burst_count=0 vs. 20.4% at burst_count>=2). **This signal
+is NOT a rediscovery of W** — if anything it leans toward prior STRENGTH
+(median `ret_3d_prior` +1.78% in the top cusum quartile vs. -0.27% in the
+bottom), which is directionally closer to the already-validated S
+(strong-state) characterization than to W. Correlations are modest (0.16-
+0.26), so this is related-but-distinct information, not a duplicate of S
+either.
+
+**Verdict: real signal found, genuinely distinct from both the already-
+closed static-volume tests and from W — and moderately correlated with
+already-known S/momentum characteristics, not a clean independent axis.**
+Per Rule #21 (Signal ≠ Intervention), this is not yet a candidate filter or
+entry construct — effect sizes, while real, still show wide overlap (e.g.
+even at burst_count>=2, 92% of control events ALSO don't show it, but the
+rate itself is only ~8% in cohort A). Next step is a user/critic decision,
+not an automatic continuation: (a) a robustness pass (year-stability, per
+Rule #19) before calling this promotable, (b) explicitly test it as a
+supplement to S's frozen spec given the correlation just found, or (c) bank
+as a discovery-only result and move to research-board item #3 (strong-state
+transition) per the critic's original ordering.
+
+**Files**: `29_behavioral_transition_discovery.py`,
+`behavioral_transition_features.csv` (gitignored, large, fully
+regeneratable).
