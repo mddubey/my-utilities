@@ -41,6 +41,7 @@ widened ticker starts at zero and only builds comparable depth by being fetched
 daily from here forward. There is no way to backfill further than 60 days for a
 ticker not already being tracked."""
 import argparse
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -85,26 +86,31 @@ def refresh(tickers=None, progress=False):
 
     n_new = n_updated = n_failed = 0
 
-    if new_tickers:
-        if progress:
-            print(f"backfilling {len(new_tickers)} new tickers (60d)...", flush=True)
-        dfs = _chunked_download([f"{t}.NS" for t in new_tickers], period="60d",
-                                  interval="5m", group_by="ticker", progress=progress)
-        for t in new_tickers:
+    def _save_new(dfs, batch):
+        """Write fresh backfills; return the tickers that came back empty."""
+        nonlocal n_new
+        empty = []
+        for t in batch:
             df = _extract(dfs, t)
             if df.empty:
-                n_failed += 1
+                empty.append(t)
                 continue
             df.to_csv(_cache_path(t))
             n_new += 1
+        return empty
 
-    if existing_tickers:
-        if progress:
-            print(f"topping up {len(existing_tickers)} existing tickers ({TOPUP_PERIOD})...", flush=True)
-        dfs = _chunked_download([f"{t}.NS" for t in existing_tickers], period=TOPUP_PERIOD,
-                                  interval="5m", group_by="ticker", progress=progress)
-        for t in existing_tickers:
+    def _merge_topups(dfs, batch):
+        """Merge top-ups into existing files; return the tickers whose top-up came back empty.
+        An empty top-up is NOT counted as updated (2026-10-02): under Yahoo throttling every
+        ticker in a chunk can come back empty with no error, which used to be silently
+        rewritten as-is and reported as 'updated'."""
+        nonlocal n_updated, n_failed
+        empty = []
+        for t in batch:
             fresh = _extract(dfs, t)
+            if fresh.empty:
+                empty.append(t)
+                continue
             path = _cache_path(t)
             try:
                 existing = pd.read_csv(path, index_col="Datetime", parse_dates=True)
@@ -112,18 +118,54 @@ def refresh(tickers=None, progress=False):
                 print(f"{t}: failed to read existing cache ({e})")
                 n_failed += 1
                 continue
-            combined = pd.concat([existing, fresh]) if not fresh.empty else existing
+            combined = pd.concat([existing, fresh])
             combined = combined[~combined.index.duplicated(keep="last")].sort_index()
-            if not combined.empty:
-                combined.to_csv(path)
-                n_updated += 1
-            else:
-                n_failed += 1
+            combined.to_csv(path)
+            n_updated += 1
+        return empty
+
+    retry_new, retry_topup = [], []
+    if new_tickers:
+        if progress:
+            print(f"backfilling {len(new_tickers)} new tickers (60d)...", flush=True)
+        dfs = _chunked_download([f"{t}.NS" for t in new_tickers], period="60d",
+                                  interval="5m", group_by="ticker", progress=progress)
+        retry_new = _save_new(dfs, new_tickers)
+
+    if existing_tickers:
+        if progress:
+            print(f"topping up {len(existing_tickers)} existing tickers ({TOPUP_PERIOD})...", flush=True)
+        dfs = _chunked_download([f"{t}.NS" for t in existing_tickers], period=TOPUP_PERIOD,
+                                  interval="5m", group_by="ticker", progress=progress)
+        retry_topup = _merge_topups(dfs, existing_tickers)
+
+    # One retry pass for anything that came back empty, slower and in smaller chunks.
+    # Many empties at once looks like Yahoo throttling, so back off longer first.
+    # Genuinely suspended/delisted names stay empty after the retry -- that's normal.
+    n_retry = len(retry_new) + len(retry_topup)
+    if n_retry:
+        wait = 90 if n_retry > 0.25 * len(tickers) else 20
+        if progress:
+            print(f"{n_retry} came back empty; waiting {wait}s, then retrying in chunks of 10...", flush=True)
+        time.sleep(wait)
+        if retry_new:
+            dfs = _chunked_download([f"{t}.NS" for t in retry_new], chunk_size=10, pause=5,
+                                      period="60d", interval="5m", group_by="ticker", progress=progress)
+            retry_new = _save_new(dfs, retry_new)
+        if retry_topup:
+            dfs = _chunked_download([f"{t}.NS" for t in retry_topup], chunk_size=10, pause=5,
+                                      period=TOPUP_PERIOD, interval="5m", group_by="ticker", progress=progress)
+            retry_topup = _merge_topups(dfs, retry_topup)
+    still_empty = retry_new + retry_topup
+    n_failed += len(still_empty)
 
     if progress:
-        print(f"done: {n_new} new, {n_updated} updated, {n_failed} failed/empty "
+        print(f"done: {n_new} new, {n_updated} updated, {n_failed} failed/empty after retry "
               f"(of {len(tickers)} requested)", flush=True)
-    return dict(new=n_new, updated=n_updated, failed=n_failed, total=len(tickers))
+        if still_empty:
+            print(f"still empty after retry ({len(still_empty)}): "
+                  f"{', '.join(still_empty[:30])}{' ...' if len(still_empty) > 30 else ''}", flush=True)
+    return dict(new=n_new, updated=n_updated, failed=n_failed, total=len(tickers), still_empty=still_empty)
 
 
 def load(ticker):
