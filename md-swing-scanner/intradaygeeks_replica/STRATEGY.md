@@ -1,6 +1,6 @@
 # Intraday 34-EMA rejection (shorts): living strategy doc
 
-Last updated: 2026-10-02 (IST), 34-EMA thread closed out (market-direction tests added). Scratch research only, nothing in production uses it.
+Last updated: 2026-10-03 (IST): 1H 8-EMA thread tested (scripts 62-66, not a rule), stop-rate filters queued (5.8a), data moved to ../data/. Scratch research only, nothing in production uses it.
 Detailed test-by-test log: `TELEGRAM_CALLS.md`. Literature notes: `INTRADAY_RESEARCH.md`.
 All returns are % per trade, gross of costs, unless stated.
 
@@ -150,7 +150,7 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 | His 15m VOLUME STRATEGY sell (54) | All setups with 2:1 +0.085% (ours +0.074% same months); one/day -0.037% vs ours +0.095%. Not adopted | 54 |
 | Shorts-only intraday, longs multi-day? | Supported as a strong default for these setups (overnight/intraday research + our data in up and down years), not a law | (research) |
 | Daily range filter (ATR >= 2.56% of price) | ADOPTED: low-range stocks ~0 in both sets; 30m +0.089 -> +0.129%, 1H +0.069 -> +0.102% | (2026-10-03) |
-| 1H 8-EMA below the entry as "support in the path" (user's chart read) | No: Rs133 vs Rs123 (30m), Rs99 vs Rs95 (1H); matched 5 hand-picked trades by chance | 62 |
+| 1H 8-EMA under the short (user's chart read: RAILTEL, AARTIIND, GOLDIAM) | Not a rule. Tested 4 ways, none passes both sets: distance gradient (62); placebo support test -- lows stop at the 8-EMA no more than chance, 26.4% vs 24.1% / 22.3% vs 23.6% (63); "rising 8-EMA reaches my 1% zone" -- with the fresh EMA it is already there in 98-99% of trades (65); 8-EMA holding vs rejecting in the last 2/3/4 hours -- holding is average, REJECTING is best on 30m (Rs184-200 vs Rs129, 51% stopped vs 57%) but mixed on 3-yr 1H (66). A pick ranking by 8-EMA position lost on 1H (Rs90 vs Rs117/trade, script inline). RAILTEL was a 09:15 spike, not a support bounce | 62-66 |
 | Breadth at entry (clean data) | Inconsistent: 3-yr bullish days weakest on average, Jun-Sep 2026 bullish days best -> info only | 61 |
 | The channel's own calls by side | 68% longs; longs +0.031% vs shorts +0.002% at target 1; the edge is counter-trend on both sides; most calls match none of his public scanners | 50 |
 
@@ -191,6 +191,9 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    Deleting them won't remove them from git history; a real cleanup means a deliberate history rewrite or an archive move
    (scripts read each other's outputs from this folder, so paths need fixing). Held local, not committed (public repo):
    TELEGRAM_CALLS.md, SOURCE_TRANSCRIPT.md, CHARTINK_QUERIES.md, OPEN_QUESTIONS.md, the chartink JSON.
+8a. **Lower the stop rate (user, 2026-10-03, next research):** ~56% of trades stop out (67% in the 17 Sep - 1 Oct practice list; stops cluster by day, e.g. 18 Sep 10/10 stopped; 14 of 38 stops hit within 30 min). Two pre-declared filters to test, both sets, with baseline + kept + removed: (a) stop inside the noise -- stop distance vs the stock's typical 30-min candle range, cut-off 1.0; (b) rejection strength -- where the 30-min candle closed within its range (bottom half / bottom third). Goal: fewer stops without lowering profit per trade.
+8b. **Telemetry to add to the live log:** 1H 8-EMA rejecting / holding in the last 3 hours (script 66), to re-test on fresh trades.
+8c. **Loose ends:** (i) one-trade-a-day figure: Rs+120/trade (65 days, script-65 data) vs the earlier ~Rs+94 -- not reconciled; (ii) the 1H 34-EMA used for the 11:15 and 12:15 alarms is one hour older than the broker chart (backtest and scan agree; fixing means re-running the main backtest); (iii) Yahoo's real 60m history limit (a 730d request returned data from 2023-10).
 8. **When automating, revisit:** (a) half the position at 1% with the rest trailed on 30-min candles (untested);
    (b) the "steadily below VWAP" filter (script 44) using the research's definition: at least 10 of the last 12
    5-min closes below VWAP, at most 1 cross, VWAP falling, with 6- and 24-candle versions as checks.
