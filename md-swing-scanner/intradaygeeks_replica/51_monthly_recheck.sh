@@ -8,7 +8,7 @@ M=$(date +%Y-%m)
 {
   echo "== recheck $M ($(date)) =="
   echo "-- topping up 1H cache (30d) --"
-  python3 11_fetch_1h.py 0 1 30d --topup 2>&1 | grep -v -i "warn\|delisted\|failed download" | tail -2
+  python3 ../data/fetch_intraday_60m.py 0 1 30d --topup 2>&1 | grep -v -i "warn\|delisted\|failed download" | tail -2
   echo "-- 30-min alarm-time test over all available 5m data --"
   python3 43_alarm_times_30m.py 2>&1 | grep -v -i warn
   echo "-- live log so far --"

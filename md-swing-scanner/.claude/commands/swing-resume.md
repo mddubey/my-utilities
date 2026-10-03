@@ -1,6 +1,6 @@
 ---
-allowed-tools: Bash(git log:*), Bash(git status:*), Bash(git diff:*), Bash(cat:*), Read, Grep
-description: Resume MD Swing Scanner work in a fresh session — reconstructs exactly where things left off from memory, FINDINGS.md, and git state before doing anything else
+allowed-tools: Bash(git log:*), Bash(git status:*), Bash(git diff:*), Bash(cat:*), Bash(tail:*), Bash(head:*), Bash(date:*), Read, Grep
+description: Resume the Primed BC live swing system (and its swing research) in a fresh session — live state first (positions, primed list, data freshness, next dashboard step), then where research left off from memory, FINDINGS.md, and git state
 ---
 
 ## Your task
@@ -9,6 +9,16 @@ Reconstruct the current state of the MD Swing Scanner project
 (`/Users/mdubey/workspace/personal/my-utilities/md-swing-scanner`) before responding to
 anything else the user says this session. Do the reads below quietly — don't narrate each
 file as you go — then give ONE consolidated orientation summary.
+
+Scope (2026-10-03): this skill is for **Primed BC — the live swing system** (`daily_scan.py`,
+`primed_engine.py`, `trader_dashboard.py`, `eod_checklist.sh`) and the swing research around it.
+Other folders have their own threads and are only mentioned here if git shows uncommitted work in
+them: `intradaygeeks_replica/` (intraday shorts — its own resume skill is planned),
+`short_discovery/`, `pre_breach/`.
+
+Data: all base market data and fetchers are being consolidated into the root `data/` folder
+(2026-10-03, copy → verify → delete). `data/README.md` is the map of every dataset — where it lives,
+how it is fetched, coverage, known gaps. If a path below has moved, follow `data/README.md`.
 
 ### Step 1: Read the project memory
 
@@ -32,11 +42,20 @@ In the project directory, run:
 - `git status`
 - `git diff --stat` (only if `git status` shows uncommitted changes)
 
-### Step 4: Check real open positions
+### Step 4: Check the live BC state
 
-Read `open_positions.csv` in the project directory — these are real, currently-held
-trades, not research artifacts. Treat them accordingly (see the project's own standing
-data-handling caution around live position/trade data).
+These are real trades and real live inputs, not research artifacts. Treat them accordingly (see
+the project's own standing data-handling caution around live position/trade data).
+- `open_positions.csv` — currently-held trades.
+- `trade_journal.csv` — the last ~10 rows (what was actually traded or decided recently,
+  including discretionary holds past a system exit).
+- `primed_cache.json` — its `date` and ticker count: is today's primed list fresh or stale?
+- Data freshness: the last date in the daily cache's `_NIFTY.csv` (`data_cache/`, or its
+  `data/` location once moved). If it is older than the last NSE trading day, the end-of-day run
+  (`./eod_checklist.sh`) has not been done.
+- `date` (IST): which step of the daily workflow is due next — before/during market hours
+  `python3 trader_dashboard.py morning`; after the close `./eod_checklist.sh`, then
+  `trader_dashboard.py evening` and `night` (README "Daily usage" is the source of truth).
 
 ### Step 5: Check the Parking Lot
 
@@ -48,6 +67,8 @@ what's already done. It's short enough to read in full each time.
 ### Step 6: Give ONE consolidated orientation summary, then stop
 
 Structure it as:
+- **Live BC status** — open positions, primed list date/size, data freshness, and the next
+  workflow step due now (one line each).
 - **Last closed/decided** — the most recent research conclusion or implementation
   change, 1-3 sentences, specific (exact numbers/thresholds, not vague gestures).
 - **Open item(s)** — what was explicitly flagged as next/pending. Quote the exact

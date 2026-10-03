@@ -28,6 +28,9 @@ Your broker must allow intraday (MIS) shorting of the name.
 - close below the daily 8-EMA;
 - the day's high so far has pierced the live daily 8-EMA;
 - daily ADX(14) as of yesterday is 25 or below;
+- **the stock normally moves enough to reach 1%:** daily ATR(14) at least 2.56% of price, as of yesterday (added
+  2026-10-03: low-range stocks made ~0 in both the 30m and the 3-year 1H data; skipping them lifts the 30m average from
+  +0.089% to +0.129% and the 1H from +0.069% to +0.102% per trade, keeping two-thirds of setups);
 - close below the session VWAP.
 
 **Risk and exit:**
@@ -39,8 +42,10 @@ Your broker must allow intraday (MIS) shorting of the name.
   whichever comes first. An exit after 2.5 hours tested the same.
 - **Exit decision (user, 2026-10-02):** a fixed 1% target and a fixed stop, with no trailing while trading by hand.
   A prior-candle trail did worse (script 45). Revisit when automating.
-- One trade at a time, one a day preferred: take the first setup you see. If several show up at once,
-  take the one closest to the EMA.
+- **One trade a day, first come:** the first alarm with a setup, and at the same alarm the one closest to the EMA.
+  No further filter reliably separates better from worse setups once the checklist and the 2:1 rule pass (script 56),
+  so the scan lists **every** qualifying setup (user: equal quality -> watch them all on the chart, it's where the next
+  improvement will come from) and marks the first-come one as the one-trade-a-day choice.
 
 **Backtest, 5-minute data, Jun 10 - Sep 30 2026, one trade a day:**
 
@@ -54,11 +59,17 @@ Your broker must allow intraday (MIS) shorting of the name.
 | Where the trade comes from | 10:45 alarm 81%, 11:15 alarm 13% |
 
 This is **exploratory**. It covers 4 months of a falling market, September dominates the result,
-and it was the best of several variants tested.
+and it was the best of several variants tested. **The one-trade-a-day number is fragile:** with ~65 trades it moved
+to +0.095% with a different tie-break and window (Jul-Sep, smallest stop first). The all-setups average (~+0.07-0.09%
+per trade with 2:1) is the more reliable figure.
 
 **Fallback version with 3 years of evidence (1H trigger):** the same rules, but with the 1H candle close
-as the trigger, at 11:15 and 12:15. With the 2:1 rule and one trade a day it averaged +0.106%
-(+0.117% on the unseen Jul 2025 - Sep 2026 period), with a trade on about 59% of days.
+as the trigger, at 11:15 and 12:15. **Corrected 2026-10-03 (script 60):** earlier figures (+0.106% one/day, +0.108%
+all setups) were inflated by a position-blocking bias in script 15. Clean: 3.7 setups/day, **+0.069% per trade**
+(2024 +0.06, 2025 +0.06, 2026 +0.09); +0.074% at one per stock per day. Other 3-year 1H figures below that came from
+script 15's set are overstated by ~0.03-0.04% and should be re-checked on clean data.
+**Filters re-checked (script 60):** all six still earn their place in the live 30-min version; "below daily 8-EMA" and
+"below VWAP" overlap -- either alone looks removable, both together cost ~0.027%/trade and add 70% more setups.
 
 **Costs:** about 0.06-0.15% per MIS round trip including slippage. The edge sits close to the cost line,
 so your actual brokerage and fills decide whether it pays.
@@ -75,10 +86,26 @@ python3 38_alarm_scan_1h_close.py --rr 0          # show setups that fail the 2:
 python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past alarm
 ```
 
-- The fetch takes a minute or two, so start it a couple of minutes after the alarm time.
-- Each run saves `alarm_scan_[30m_]YYYYMMDD_HHMM.csv`.
-- **Breadth telemetry** (not a filter): each run prints the share of liquid stocks above yesterday's close. Above 65%
-  it says "BULLISH breadth -> be cautious with shorts". The value is also saved in the CSV.
+- **Data comes from the end-of-day run.** `eod_checklist.sh` refreshes the daily and 5-min caches for all ~2,300 NSE
+  stocks after the close; the scan builds its 1H candles and 34-EMA from that 5-min cache (identical to Yahoo's hourly
+  bars, checked). If a stock's cache is behind the previous session the scan excludes it and prints "STALE DATA -- run
+  eod_checklist.sh". (Stale daily data once wrongly excluded TANLA on 2026-10-01: ADX read 25.7 instead of 24.0.)
+- **Prep (optional, ~6 s, local only):** `python3 38_alarm_scan_1h_close.py --prep` builds the day's candidate list from
+  the previous close: 1H trend down, within 3% of the 1H EMA34, daily ADX <= 25 (keeps 98% of real setups, script 59),
+  plus a 150-stock breadth sample. Alarm runs build it themselves if it's missing.
+- **Alarm runs** fetch live 5-min bars only for those ~400-450 stocks. Replays (`--replay DATE HH:MM`) read the cache
+  and take ~13 s. Run 1-2 minutes after each alarm: Yahoo publishes each 5-min bar with a short lag; if many stocks
+  are missing the alarm candle's last bar, the scan says "DATA NOT READY -- run again in a minute".
+- **Running late is fine (script 57):** up to 20 minutes late costs ~nothing per trade (+0.065-0.075% vs +0.075% on
+  time). The scan shows each setup's `status` NOW: **ENTER** (stop not touched and the 2:1 rule still holds from the
+  current price), **SKIP** (2:1 gone at this price -- don't chase), or **DEAD** (stop already touched). Target = your
+  fill - 1%; the stop stays the candle high. FIRST COME = the first ENTER. Beyond 20 minutes the candle isn't shown.
+- **Confirmed candles only (user, 2026-10-03):** running before the candle closes was tested (script 58: ~1 in 3 setups
+  judged at 25 min fail by the close, mostly the bounce resuming) and rejected -- it invites confusion and overtrading.
+  Run after the alarm; up to 20 minutes late is free (script 57).
+- **Breadth** (info only): each run prints the share of the most liquid stocks above yesterday's close. The earlier
+  "bullish breadth -> be cautious" warning was dropped (script 61): on clean data the effect flips between periods
+  (3-yr 1H: bullish-breadth days weakest on average, not every year; Jun-Sep 2026: bullish-breadth days were the best).
 - **Monthly re-check:** `./51_monthly_recheck.sh` tops up the 1H cache, re-runs the 30-min alarm test over all 5m data,
   and writes `rechecks/recheck_YYYY-MM.txt`. To schedule it on the 1st of each month at 18:37:
   `(crontab -l 2>/dev/null; echo "37 18 1 * * $PWD/51_monthly_recheck.sh") | crontab -`
@@ -117,6 +144,14 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 | Switch to longs on bullish days? | No. Longs on bullish days -0.021. Every switching rule (breadth or SMA) is worse than shorts-only | 48, 49 |
 | Market internals at entry (advance/decline, up-volume, 30-min breadth), 5-min data | No consistent effect; 30-min breadth conflicts with Nifty's own 30-min move | 46 |
 | Why shorts and not longs? | Theory with peer-reviewed support: market gains come overnight and fade during the session (Berkman et al. 2012; Lou, Polk & Skouras 2019; Zerodha's Nifty data); individual traders are long-biased, dip buyers (Barber & Odean 2008). Swing longs held overnight do work: +0.171% vs shorts 0.000% on the daily version | (research) |
+| His SWING 1H scanner as a trade (52) | Shorts on a red candle with 2:1: +0.091% (every year +), 3.7/day. Longs negative | 52 |
+| His RSI reversal scanner as a trade (53) | Shorts with 2:1: RSI>80 +0.102% (0.3/day), RSI>70 +0.093% (2.3/day). Longs ~0 | 53 |
+| Combined, one trade/day (34-EMA + SWING + RSI shorts, 2:1) | 96% of days with a trade, +0.112%; 34-EMA alone 59% of days +0.124%; SWING alone 83% +0.120% | (inline, 2026-10-02) |
+| His 15m VOLUME STRATEGY sell (54) | All setups with 2:1 +0.085% (ours +0.074% same months); one/day -0.037% vs ours +0.095%. Not adopted | 54 |
+| Shorts-only intraday, longs multi-day? | Supported as a strong default for these setups (overnight/intraday research + our data in up and down years), not a law | (research) |
+| Daily range filter (ATR >= 2.56% of price) | ADOPTED: low-range stocks ~0 in both sets; 30m +0.089 -> +0.129%, 1H +0.069 -> +0.102% | (2026-10-03) |
+| 1H 8-EMA below the entry as "support in the path" (user's chart read) | No: Rs133 vs Rs123 (30m), Rs99 vs Rs95 (1H); matched 5 hand-picked trades by chance | 62 |
+| Breadth at entry (clean data) | Inconsistent: 3-yr bullish days weakest on average, Jun-Sep 2026 bullish days best -> info only | 61 |
 | The channel's own calls by side | 68% longs; longs +0.031% vs shorts +0.002% at target 1; the edge is counter-trend on both sides; most calls match none of his public scanners | 50 |
 
 ---
@@ -152,6 +187,10 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 6b. Leads, not findings: gap-up of more than 0.5% leading to a Nifty up-drift (t 2.7, n=73); stock-level
    end-of-day continuation (+0.065%/day, too small for costs alone).
 7. A longer intraday Nifty history (from the broker) would make it possible to test Nifty-direction ideas properly.
+7b. **Folder cleanup (someday):** 50 numbered scripts are the research trail; only 38, 51 (+11, 43) and 15 are live.
+   Deleting them won't remove them from git history; a real cleanup means a deliberate history rewrite or an archive move
+   (scripts read each other's outputs from this folder, so paths need fixing). Held local, not committed (public repo):
+   TELEGRAM_CALLS.md, SOURCE_TRANSCRIPT.md, CHARTINK_QUERIES.md, OPEN_QUESTIONS.md, the chartink JSON.
 8. **When automating, revisit:** (a) half the position at 1% with the rest trailed on 30-min candles (untested);
    (b) the "steadily below VWAP" filter (script 44) using the research's definition: at least 10 of the last 12
    5-min closes below VWAP, at most 1 cross, VWAP falling, with 6- and 24-candle versions as checks.
@@ -167,6 +206,6 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 | `15_intraday_1h34_daily8.py` | 3-year 1H backtest engine |
 | `41_confirmation_length.py`, `43_alarm_times_30m.py` | 30-min trigger tests and alarm timing |
 | `live_watch_log.csv`, `channel_calls_live.csv` | Live trade log, graded channel calls |
-| `h1_cache/`, `index_1h/` | Yahoo 1H stock and index history |
+| `h1_cache/`, `index_1h/` | Symlinks (2026-10-03) to `../data/intraday_60m/` and `../data/index_intraday/`: Yahoo 1H stock and index history. Fetchers: `../data/fetch_intraday_60m.py`, `../data/fetch_index_intraday.py`. See `../data/README.md` |
 | `TELEGRAM_CALLS.md` | Full research log |
 | `INTRADAY_RESEARCH.md` | Literature and cue research |

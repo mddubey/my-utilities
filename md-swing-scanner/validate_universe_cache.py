@@ -22,6 +22,7 @@ import sys, os
 sys.path.insert(0, '/Users/mdubey/workspace/personal/my-utilities/md-swing-scanner')
 os.chdir('/Users/mdubey/workspace/personal/my-utilities/md-swing-scanner')
 import pandas as pd
+from data.paths import DAILY_DIR
 
 MIN_ROWS_FLOOR = 200  # far below a real ~1,240-day 5y history, but well above what a
                        # genuinely thin/illiquid (but real) stock would still show
@@ -34,7 +35,7 @@ def validate(universe_file="nse_equity_universe.csv", cutoff_days=5 * 365):
 
     rows = []
     for t in old_enough.ticker:
-        p = f"data_cache/{t}.csv"
+        p = DAILY_DIR / f"{t}.csv"
         n = (sum(1 for _ in open(p)) - 1) if os.path.exists(p) else None
         rows.append((t, n))
     df = pd.DataFrame(rows, columns=["ticker", "n_rows"])

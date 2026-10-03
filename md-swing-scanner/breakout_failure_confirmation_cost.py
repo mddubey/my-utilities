@@ -32,12 +32,13 @@ import signals
 from pivots import daily_pivots
 from daily_scan import _fo_tickers
 from research.metrics import win_rate, expectancy
+from data.paths import INTRADAY_5M_DIR
 
 TRIGGER_CLEARANCE = 1.005
 SIGNAL_DROP = 0.005      # critic's proposed FAILURE_THRESHOLD: close back below trigger by >=0.5%
 CONFIRM_BARS = 2          # 2 consecutive 5-min closes below FAILURE_THRESHOLD before "confirmed"
 
-INTRADAY_CACHE_DIR = Path(__file__).parent / "intraday_cache"
+INTRADAY_CACHE_DIR = INTRADAY_5M_DIR
 
 
 def _load_intraday(ticker):

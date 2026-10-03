@@ -8,8 +8,9 @@ from signals import build_indicators, entry_signal, breakout_continuation
 from pivots import daily_pivots
 from market_regime import market_trending
 from vcp import stage2_trend_template, vcp_breakout
+from data.paths import DAILY_DIR
 
-CACHE_DIR = Path(__file__).parent / "data_cache"
+CACHE_DIR = DAILY_DIR
 TEST_ADX_RISING = False  # tested True (2026-08-30): halved the sample (69->33), win rate and median
                           # pnl both got WORSE for both patterns, concentration blew past 100%
                           # (75.3%->113.1%) — rejected, reverted to the plain threshold (v18 baseline)

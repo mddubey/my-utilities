@@ -4,8 +4,9 @@ from pathlib import Path
 import pandas as pd
 
 import breadth
+from data.paths import DAILY_DIR
 
-CACHE_DIR = Path(__file__).parent / "data_cache"
+CACHE_DIR = DAILY_DIR
 NIFTY_FILE = CACHE_DIR / "_NIFTY.csv"
 
 # verified directly (2026-08-30) against trades_v5.csv: Breakout Continuation shows

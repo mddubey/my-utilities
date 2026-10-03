@@ -6,10 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+from data.paths import NSE_FO_BHAV_DIR
 
 URL_TMPL = "https://nsearchives.nseindia.com/content/fo/BhavCopy_NSE_FO_0_0_0_{ymd}_F_0000.csv.zip"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
-CACHE_DIR = Path(__file__).parent / "options_cache"
+CACHE_DIR = NSE_FO_BHAV_DIR
 
 
 def fetch_day(day):

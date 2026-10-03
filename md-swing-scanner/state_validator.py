@@ -22,8 +22,9 @@ import json
 from pathlib import Path
 
 import pandas as pd
+from data.paths import DAILY_DIR
 
-CACHE_DIR = Path(__file__).parent / "data_cache"
+CACHE_DIR = DAILY_DIR
 PRIMED_CACHE_FILE = Path(__file__).parent / "primed_cache.json"
 MAX_STALENESS_DAYS = 4  # comfortably covers a long weekend + one holiday
 

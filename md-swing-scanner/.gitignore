@@ -47,3 +47,12 @@ swing_qs_07a/sst1_freshness_features.csv
 swing_qs_07a/sst1_freshness_overlap.csv
 swing_qs_07a/sst1_fresh_entry_simulation.csv
 swing_qs_07a/sst1_e1_regime_diagnosis.csv
+# RQ-S01 short-side outcome panel -- derived / re-downloadable, 100% regeneratable
+short_discovery/*.pkl
+short_discovery/nse_bhav_full/
+short_discovery/nse_bands/
+short_discovery/*.log
+# 2026-10-03: data/ holds all base market data (see data/README.md). Caches are ignored; fetchers + README are tracked.
+data/*
+!data/*.py
+!data/README.md

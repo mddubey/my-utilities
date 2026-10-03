@@ -254,3 +254,12 @@ telemetry-only conclusions are still fine, just say so explicitly.
   entries) vs "Primed Population" (`detect_primed_entry`, live-IOC entries) are
   intentionally different, coexisting populations — know which one a given research
   question is actually about before running anything.
+
+## Data map (adopted 2026-10-03)
+
+All base market data (caches) and their fetchers are being consolidated into the root `data/` folder
+(copy → verify → delete, old paths left as symlinks). `data/README.md` is the single map of every
+dataset: where it lives, how it is fetched and refreshed, coverage by date and universe, and known
+gaps (e.g. the 5m cache is Nifty-500-only before ~2026-07-02). Read it before building any research
+population on a dataset you haven't used in this session. Fetchers fetch the full NSE equity universe;
+each project picks its own universe at read time.

@@ -47,8 +47,9 @@ from pathlib import Path
 import pandas as pd
 
 from fetch_prices import _chunked_download
+from data.paths import INTRADAY_5M_DIR
 
-CACHE_DIR = Path(__file__).parent / "intraday_cache"
+CACHE_DIR = INTRADAY_5M_DIR
 TOPUP_PERIOD = "10d"  # comfortably more than any realistic gap between refresh() runs
 
 UNIVERSE_FILES = {
@@ -71,7 +72,7 @@ def _cache_path(ticker):
 def refresh(tickers=None, progress=False):
     CACHE_DIR.mkdir(exist_ok=True)
     if tickers is None:
-        tickers = _load_universe("nifty500")
+        tickers = _load_universe("nse_equity")  # 2026-10-03: fetch everything by default (data/README.md)
 
     new_tickers = [t for t in tickers if not _cache_path(t).exists()]
     existing_tickers = [t for t in tickers if _cache_path(t).exists()]
@@ -177,9 +178,8 @@ def load(ticker):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--universe", choices=list(UNIVERSE_FILES), default="nifty500",
-                         help="nifty500 (default, 500 tickers, matches every existing caller's "
-                              "scope) or nse_equity (2,327 tickers, RQ-QS-07U's full NSE-listed "
-                              "equity universe)")
+    parser.add_argument("--universe", choices=list(UNIVERSE_FILES), default="nse_equity",
+                         help="nse_equity (default since 2026-10-03: fetch everything, ~2,300 NSE-listed "
+                              "equity names) or nifty500 (500 tickers, the pre-2026-10-03 default)")
     args = parser.parse_args()
     refresh(tickers=_load_universe(args.universe), progress=True)

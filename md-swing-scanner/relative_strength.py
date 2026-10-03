@@ -2,8 +2,9 @@ import functools
 from pathlib import Path
 
 import pandas as pd
+from data.paths import DAILY_DIR
 
-CACHE_DIR = Path(__file__).parent / "data_cache"
+CACHE_DIR = DAILY_DIR
 RS_LOOKBACK = 126  # ~6 months of trading days — IBD/Minervini-style RS window
 RS_RATING_MIN = 70  # percentile vs the universe; Minervini's published minimum bar
 UNIVERSE_FILE = "nifty500_universe.csv"  # ADOPTED (2026-08-30) as the pure-swing default —

@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 import fetch_cash_bhav
+from data.paths import DAILY_DIR, NSE_FO_BHAV_DIR
 
 # 2026-09-03: real bug found and fixed — data_cache (yfinance) retroactively
 # rescales ALL historical prices for every stock split/bonus after the fact,
@@ -29,7 +30,7 @@ def _real_spot(ticker, date, fallback):
         return fallback
     return real
 
-OPT_CACHE_DIR = Path(__file__).parent / "options_cache"
+OPT_CACHE_DIR = NSE_FO_BHAV_DIR
 COLS = ["TradDt", "TckrSymb", "XpryDt", "StrkPric", "OptnTp", "OpnPric", "HghPric",
         "LwPric", "ClsPric", "OpnIntrst", "TtlTradgVol", "NewBrdLotQty"]
 MIN_EXPIRY_RUNWAY_DAYS = 5  # trading days; less than this is pure theta bleed, no room for the thesis to play out
@@ -239,7 +240,7 @@ def option_row(ticker, date, expiry, strike):
 
 @functools.lru_cache(maxsize=None)
 def _stock_closes(ticker):
-    path = Path(__file__).parent / "data_cache" / f"{ticker}.csv"
+    path = DAILY_DIR / f"{ticker}.csv"
     if not path.exists():
         return None
     return pd.read_csv(path, index_col="Date", parse_dates=True).Close

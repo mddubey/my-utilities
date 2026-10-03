@@ -1,18 +1,18 @@
-"""Fetch ~730 days of Yahoo 60-minute bars for the full NSE EQ universe into this scratch folder
-(h1_cache/). Read-only against production: uses fetch_prices._chunked_download, writes nothing outside
-this folder. Usage: python3 11_fetch_1h.py <slice_index> <n_slices> [period] [--topup]
+"""Yahoo native 60-minute bars for the full NSE equity universe -> data/intraday_60m/ (moved 2026-10-03 from
+intradaygeeks_replica/11_fetch_1h.py + h1_cache/; the old paths are symlinks). Uses fetch_prices._chunked_download.
+See data/README.md for coverage and caveats. Usage: python3 data/fetch_intraday_60m.py <slice_index> <n_slices> [period] [--topup]
 --topup: only existing files, merge the last <period> (e.g. 30d) of 60m bars into them."""
 import sys, warnings
 warnings.filterwarnings("ignore")
 from pathlib import Path
 import pandas as pd
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 from fetch_prices import _chunked_download
 
-HERE = Path(__file__).parent
-OUT = HERE / "h1_cache"; OUT.mkdir(exist_ok=True)
+OUT = ROOT / "data" / "intraday_60m"; OUT.mkdir(exist_ok=True)
 k, n = int(sys.argv[1]), int(sys.argv[2])
-uni = pd.read_csv(HERE.parent / "nse_equity_universe.csv").ticker.tolist()
+uni = pd.read_csv(ROOT / "nse_equity_universe.csv").ticker.tolist()
 TOPUP = "--topup" in sys.argv
 todo = [t for t in uni[k::n] if TOPUP == (OUT / f"{t}.csv").exists()]   # topup: existing files only; else: missing only
 print(f"slice {k}/{n}: {len(todo)} to fetch", flush=True)

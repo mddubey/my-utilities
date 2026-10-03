@@ -5,8 +5,9 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import yfinance as yf
+from data.paths import DAILY_DIR
 
-CACHE_DIR = Path(__file__).parent / "data_cache"
+CACHE_DIR = DAILY_DIR
 PERIOD = "5y"  # only used for a ticker with no cache yet — everything else fetches
                 # incrementally (see fetch_all), since re-pulling 5 years daily for the
                 # whole universe was wasteful and fetch_stock_options.py already proved
@@ -246,10 +247,18 @@ def fetch_all(tickers, progress=False):
 
 
 if __name__ == "__main__":
-    # NIFTY 500 — the pure-swing universe (superset of fo_universe.csv's 210 F&O names,
-    # so this single refresh covers both the swing scanner and the options layer's needs)
-    tickers = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
-    result = fetch_all(tickers)
+    # 2026-10-03: fetchers fetch EVERYTHING by default -- the full NSE equity universe
+    # (nse_equity_universe.csv, ~2,300 names, plus any Nifty 500 name not in it). Each strategy
+    # picks its own universe at read time (daily_scan.py still scans nifty500_universe.csv).
+    # `--universe nifty500` restores the old Nifty-500-only pull. See data/README.md.
+    import sys
+    n500 = pd.read_csv("nifty500_universe.csv", header=None)[0].tolist()
+    if "--universe" in sys.argv and sys.argv[sys.argv.index("--universe") + 1] == "nifty500":
+        tickers = n500
+    else:
+        rest = pd.read_csv("nse_equity_universe.csv")["ticker"].tolist()
+        tickers = n500 + [t for t in rest if t not in set(n500)]
+    result = fetch_all(tickers, progress="--progress" in sys.argv)
     print(f"{len(result['new'])} new, {len(result['updated'])} updated, "
           f"{len(result['current'])} already current, "
           f"{len(result['stale'])} stale (retried, still failed): {result['stale']}, "

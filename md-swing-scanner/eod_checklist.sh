@@ -15,28 +15,16 @@
 set -e
 cd "$(dirname "$0")"
 
-echo "== 1/6: refreshing daily cache (full universe) =="
-python3 fetch_prices.py
+# 2026-10-03: fetch_prices.py now defaults to the full NSE equity universe (~2,300 names) and all caches live
+# under data/ (data/README.md). This replaced the separate step 1c that topped up the non-Nifty-500 names.
+echo "== 1/6: refreshing daily cache (full NSE equity universe) =="
+python3 fetch_prices.py --progress
 
 echo
 echo "== 1b/6: refreshing Nifty regime cache =="
 python3 market_regime.py
 
-# 2026-10-02: the intraday research scan (intradaygeeks_replica/38_alarm_scan_1h_close.py) reads daily data
-# for all ~2,300 NSE equity names, but step 1 only refreshes the Nifty 500 -- the other ~1,800 were going
-# stale. Step 1c tops them up through fetch_prices.fetch_all() (same chunked download + retry, incremental,
-# so only missing days are fetched). Nothing in daily_scan.py's own scope changes.
-echo
-echo "== 1c/6: refreshing daily cache for the rest of the NSE equity universe =="
-python3 -c "
-import pandas as pd, fetch_prices
-n500 = set(pd.read_csv('nifty500_universe.csv', header=None)[0])
-rest = [t for t in pd.read_csv('nse_equity_universe.csv').ticker if t not in n500]
-r = fetch_prices.fetch_all(rest, progress=True)
-print(f\"{len(r['new'])} new, {len(r['updated'])} updated, {len(r['current'])} current, {len(r['stale'])} stale, {len(r['empty'])} empty\")
-"
-
-# Space out the two big Yahoo pulls (daily ~1,800 + 5m ~2,300 tickers) instead of hitting it back to back.
+# Space out the two big Yahoo pulls (daily + 5m, ~2,300 tickers each) instead of hitting it back to back.
 sleep 60
 
 echo

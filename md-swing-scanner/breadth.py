@@ -8,8 +8,9 @@ import functools
 from pathlib import Path
 
 import pandas as pd
+from data.paths import DAILY_DIR
 
-CACHE_DIR = Path(__file__).parent / "data_cache"
+CACHE_DIR = DAILY_DIR
 BREADTH_FILE = CACHE_DIR / "_BREADTH.csv"
 
 

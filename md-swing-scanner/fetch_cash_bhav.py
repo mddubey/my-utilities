@@ -34,8 +34,9 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+from data.paths import NSE_CASH_CLOSE_DIR
 
-CACHE_DIR = Path(__file__).parent / "cash_bhav_cache"
+CACHE_DIR = NSE_CASH_CLOSE_DIR
 CACHE_DIR.mkdir(exist_ok=True)
 
 LEGACY_URL_TMPL = ("https://nsearchives.nseindia.com/content/historical/EQUITIES/"
