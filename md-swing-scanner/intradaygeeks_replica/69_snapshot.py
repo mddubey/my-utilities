@@ -2,7 +2,7 @@
 (half-formed at :45, finished at :15), the 1H 34-EMA / 8-EMA the scan uses (EMA of finished hourly closes), and the
 entry / stop / target / 2:1-limit lines, with the candle-rule verdict. Display only.
   python3 69_snapshot.py KNACK 2026-09-30 10:45 [11:15 ...]   text + chart drawn inline in iTerm2 (nothing saved)
-  add --save to also write snapshots/KNACK_20260930_1045.png
+  add --save to also write snapshots/KNACK_20260930_1045.png; --text = no image (use this from Claude)
 Checks shown: red, high >= EMA34, close < EMA34 within 0.5%, EMA8 < EMA34, stop <= 0.5% (2:1). The daily checks
 (daily 8-EMA, ADX, VWAP, ATR, traded value) are NOT re-checked here -- the scan does those."""
 import sys, warnings
@@ -75,12 +75,12 @@ def snapshot(t, day, hhmm):
     print(f"bar so far {hs:%H:%M}: O {cur.O:.2f} H {cur.H:.2f} L {cur.L:.2f} C {cur.C:.2f} | EMA34 used {E:.2f}, EMA8 used {E8:.2f}")
     print(f"entry {entry:.2f}  stop {stop:.2f} ({risk:.2f}%)  target {tgt:.2f}  2:1 limit for stop {lim:.2f}")
     print(txt)
-    if os.environ.get("LC_TERMINAL") == "iTerm2" or os.environ.get("TERM_PROGRAM") == "iTerm.app":
+    if "--text" not in sys.argv and (os.environ.get("LC_TERMINAL") == "iTerm2" or os.environ.get("TERM_PROGRAM") == "iTerm.app"):
         sys.stdout.write(f"\033]1337;File=inline=1;width=100%;preserveAspectRatio=1:{base64.b64encode(png).decode()}\a\n"); sys.stdout.flush()
     if "--save" in sys.argv:
         OUT.mkdir(exist_ok=True); p = OUT / f"{t}_{day.replace('-', '')}_{hhmm.replace(':', '')}.png"; p.write_bytes(png); print(f"saved {p}")
 
 
 if __name__ == "__main__":
-    t, day, *times = [a for a in sys.argv[1:] if a != "--save"]
+    t, day, *times = [a for a in sys.argv[1:] if a not in ("--save", "--text")]
     for hhmm in times: snapshot(t, day, hhmm)

@@ -55,9 +55,8 @@ chartink JSON must stay uncommitted.
 Structure it as:
 - **Live status**, one line each:
   - data freshness (daily and 5-min);
-  - the next alarm due, with the command (`python3 38_alarm_scan_1h_close.py` from `intradaygeeks_replica/`, run
-    1-2 minutes after 10:45 / 11:15 / 11:45 / 12:15 IST; the user's plan is 11:15 first, else 11:45, one trade a
-    day), or `./eod_checklist.sh` after the close;
+  - the next step due from the trading-day playbook below (11:15 first, else 11:45, one trade a day; the 10:45 and
+    12:15 alarms exist but the user doesn't trade them), or `./eod_checklist.sh` after the close;
   - the last scan result;
   - the live log so far: trades, results.
 - **Current rules**: a 2-3 line recap of STRATEGY.md section 1.
@@ -65,8 +64,35 @@ Structure it as:
 - **Open items**: quote STRATEGY.md section 5's exact wording for the next research step and the loose ends.
 - **Uncommitted work / loose ends** from git and memory.
 
-Do NOT start new research, write code, run the scan, or change anything yet. Wait for the user's direction. If the
-user's first message already says what they want, fold this orientation into answering it directly.
+Do NOT start new research, write code, or change anything yet. If the user's first message already says what they
+want, fold this orientation into answering it directly. On a trading day, end the summary with the playbook step that
+is due now (below) and offer to run it -- the user does not run commands; they ask you to.
+
+### Trading-day playbook (the user asks, you run; plan = one trade a day, 11:15 first, else 11:45)
+
+All commands from `intradaygeeks_replica/`. Times IST.
+
+| When | Run | Notes |
+|---|---|---|
+| any time before 11:15 | `python3 38_alarm_scan_1h_close.py --prep` | builds today's candidate list; also flags STALE data (then the EOD run was missed) |
+| 11:16-11:20 | `python3 38_alarm_scan_1h_close.py` | 11:15 check = the FULL 10:15-11:15 hourly bar, stop = hour high |
+| 11:46-11:50, only if no trade at 11:15 | `python3 38_alarm_scan_1h_close.py` | half-hour check; skips a shallow pullback after a strong green 10:15 hour (printed as "skipped, would otherwise qualify") |
+| after 15:30 | `./eod_checklist.sh` (from the repo root) | shared with Primed BC: Part A data + health check, Part B trading |
+
+- If the scan prints DATA NOT READY, Yahoo is lagging: wait a minute and run again.
+- How to report a scan:
+  - summary first: the FIRST COME pick (ticker, entry, stop, stop %, target) and its status;
+  - then the full table;
+  - then "no setups" plainly if empty.
+- Status column: only ENTER is tradeable. DEAD = the stop was already touched. SKIP = 2:1 is gone at the current price.
+  Target = the user's fill minus 1%.
+- To check a setup on the chart, use `python3 69_snapshot.py TICKER YYYY-MM-DD HH:MM --text`. That's the hourly bars
+  plus the checklist, as text. Never open image windows: the user is at work during market hours.
+- After a trade:
+  - ask the user for fill price/time and exit;
+  - append a row to `live_watch_log.csv` (same columns as the existing rows);
+  - do not guess fills.
+- Keep it simple. Lead with what to do, not statistics. The user is trading live.
 
 Standing rules for this thread:
 - A filter is adopted only if it helps in BOTH the 30-min (Jun 2026 on) and the 3-year 1H datasets.
