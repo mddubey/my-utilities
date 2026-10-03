@@ -49,10 +49,13 @@ the project's own standing data-handling caution around live position/trade data
 - `open_positions.csv` — currently-held trades.
 - `trade_journal.csv` — the last ~10 rows (what was actually traded or decided recently,
   including discretionary holds past a system exit).
-- `primed_cache.json` — its `date` and ticker count: is today's primed list fresh or stale?
-- Data freshness: the last date in the daily cache's `_NIFTY.csv` (`data_cache/`, or its
-  `data/` location once moved). If it is older than the last NSE trading day, the end-of-day run
-  (`./eod_checklist.sh`) has not been done.
+- `primed_cache.json` — its `date` and ticker count = the last intraday `daily_scan.py
+  --refresh-primed` run. Only meaningful during market hours: a previous-day date outside them is
+  normal, and `morning` rebuilds the list itself when the cache isn't from today. The real primed
+  universe size is the "primed universe: n=..." line `trader_dashboard.py evening` prints.
+- Data freshness: the last date in `data/daily/_NIFTY.csv` (production reads `data/daily/` since
+  2026-10-03; the old `data_cache/` folder is stale from 2026-10-05 on — never check it). If it is
+  older than the last NSE trading day, the end-of-day run (`./eod_checklist.sh`) has not been done.
 - `date` (IST): which step of the daily workflow is due next — before/during market hours
   `python3 trader_dashboard.py morning`; after the close `./eod_checklist.sh`, then
   `trader_dashboard.py evening` and `night` (README "Daily usage" is the source of truth).
