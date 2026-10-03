@@ -52,6 +52,23 @@ def _safe_today():
     return today if now.hour >= SAME_DAY_SAFE_HOUR else today - timedelta(days=1)
 
 
+def _latest_nifty_session(safe_today):
+    """Latest real NSE session on or before safe_today, read from Nifty's 60-minute bars (2026-10-03).
+    Hourly bars exist as soon as a session trades, so unlike a daily bar they can't lag a 16:00 run.
+    Lets weekends and holidays skip the download instead of asking Yahoo twice per ticker for a
+    session that never happened (a Saturday full-universe run spent 12+ min on two empty passes).
+    Returns None if unknown (network error, empty reply) -- the caller then keeps the clock rule."""
+    try:
+        df = yf.download("^NSEI", period="7d", interval="60m", progress=False, auto_adjust=False)
+        if df is None or df.empty:
+            return None
+        idx = df.index if df.index.tz is not None else df.index.tz_localize("UTC")
+        days = sorted({d.date() for d in idx.tz_convert(IST) if d.date() <= safe_today.date()})
+        return pd.Timestamp(days[-1]) if days else None
+    except Exception:
+        return None
+
+
 def _last_cached_date(ticker):
     path = CACHE_DIR / f"{ticker}.csv"
     if not path.exists():
@@ -189,10 +206,17 @@ def fetch_all(tickers, progress=False):
 def _fetch_all(tickers, progress):
     CACHE_DIR.mkdir(exist_ok=True)
     safe_today = pd.Timestamp(_safe_today())
+    latest_session = _latest_nifty_session(safe_today)
+    if latest_session is not None and latest_session < safe_today:
+        safe_today = latest_session  # weekend/holiday: no NSE session after this, so nothing newer can exist
     last_dates = {t: _last_cached_date(t) for t in tickers}
     new_tickers = [t for t in tickers if last_dates[t] is None]
     existing_tickers = [t for t in tickers if last_dates[t] is not None]
     result = {"new": [], "updated": [], "current": [], "empty": [], "stale": []}
+    if latest_session is not None:
+        # tickers already holding the latest real session need no download at all
+        result["current"].extend(t for t in existing_tickers if last_dates[t] >= safe_today)
+        existing_tickers = [t for t in existing_tickers if last_dates[t] < safe_today]
 
     if new_tickers:
         written = {}  # ticker -> last date written this run

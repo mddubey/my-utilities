@@ -7,6 +7,16 @@ import fetch_prices
 from fetch_prices import IST
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_nifty_session_lookup(monkeypatch):
+    """Existing tests pin the clock and fake yf.download for stock tickers; keep the 2026-10-03 Nifty
+    session lookup out of them (None = fall back to the clock rule). Tests below opt back in."""
+    monkeypatch.setattr(fetch_prices, "_latest_nifty_session", lambda safe_today: None)
+
+
 def _multi_index_df(tickers, dates):
     """Mimics yfinance's actual group_by='ticker' return shape — a MultiIndex-columned
     frame (Ticker, Price) even for a single ticker (verified directly against the real
@@ -302,3 +312,42 @@ def test_fetch_all_new_ticker_files_are_written_atomically(tmp_path, monkeypatch
     monkeypatch.setattr(fetch_prices.yf, "download", lambda yf_tickers, **kw: _multi_index_df(yf_tickers, dates))
     fetch_prices.fetch_all(["NEWA", "NEWB"])
     assert sorted(p.name for p in tmp_path.iterdir()) == [".fetch_prices.lock", "NEWA.csv", "NEWB.csv"]
+
+
+def _cached(tmp_path, ticker, dates):
+    df = pd.DataFrame({"Open": 1.0, "High": 1.0, "Low": 1.0, "Close": 1.0, "Volume": 1},
+                      index=pd.DatetimeIndex(dates, name="Date"))
+    df.to_csv(tmp_path / f"{ticker}.csv")
+
+
+def test_fetch_all_skips_download_when_no_new_nse_session(tmp_path, monkeypatch):
+    """Saturday 17:00, last session Thursday (Friday a holiday): every ticker already holds it -> no download."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(fetch_prices, "_now_ist", lambda: datetime(2026, 10, 3, 17, 0, tzinfo=IST))
+    monkeypatch.setattr(fetch_prices, "_latest_nifty_session", lambda safe_today: pd.Timestamp("2026-10-01"))
+    _cached(tmp_path, "A", ["2026-09-30", "2026-10-01"]); _cached(tmp_path, "B", ["2026-09-30", "2026-10-01"])
+
+    def fake_download(*a, **k):
+        raise AssertionError("no download expected when nobody is behind the latest session")
+
+    monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
+    result = fetch_prices.fetch_all(["A", "B"])
+    assert result == {"new": [], "updated": [], "current": ["A", "B"], "empty": [], "stale": []}
+
+
+def test_fetch_all_holiday_fetches_only_tickers_behind_latest_session(tmp_path, monkeypatch):
+    """Only the straggler is requested, and only up to the latest real session."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(fetch_prices, "_now_ist", lambda: datetime(2026, 10, 3, 17, 0, tzinfo=IST))
+    monkeypatch.setattr(fetch_prices, "_latest_nifty_session", lambda safe_today: pd.Timestamp("2026-10-01"))
+    _cached(tmp_path, "A", ["2026-09-30", "2026-10-01"]); _cached(tmp_path, "OLD", ["2026-09-29", "2026-09-30"])
+    calls = []
+
+    def fake_download(yf_tickers, **kwargs):
+        calls.append(list(yf_tickers))
+        return _multi_index_df(yf_tickers, pd.to_datetime(["2026-10-01"]))
+
+    monkeypatch.setattr(fetch_prices.yf, "download", fake_download)
+    result = fetch_prices.fetch_all(["A", "OLD"])
+    assert calls == [["OLD.NS"]]
+    assert result == {"new": [], "updated": ["OLD"], "current": ["A"], "empty": [], "stale": []}
