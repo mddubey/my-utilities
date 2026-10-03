@@ -56,3 +56,4 @@ short_discovery/*.log
 data/*
 !data/*.py
 !data/README.md
+!data/*.sh

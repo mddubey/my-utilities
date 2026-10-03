@@ -46,8 +46,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from fetch_prices import _chunked_download
-from data.paths import INTRADAY_5M_DIR
+from fetch_prices import _chunked_download, _latest_nifty_session, _safe_today
+from data.paths import INTRADAY_5M_DIR, holds_full_session
 
 CACHE_DIR = INTRADAY_5M_DIR
 TOPUP_PERIOD = "10d"  # comfortably more than any realistic gap between refresh() runs
@@ -76,6 +76,17 @@ def refresh(tickers=None, progress=False):
 
     new_tickers = [t for t in tickers if not _cache_path(t).exists()]
     existing_tickers = [t for t in tickers if _cache_path(t).exists()]
+    # 2026-10-03: skip stocks that already hold the latest real NSE session (Nifty check, see
+    # fetch_prices._latest_nifty_session) -- weekend/holiday runs no longer re-download ~2,300 stocks.
+    # Lookup failure -> session None -> nothing skipped (old behaviour).
+    session = _latest_nifty_session(pd.Timestamp(_safe_today()))
+    n_current = 0
+    if session is not None:
+        behind = [t for t in existing_tickers if not holds_full_session(_cache_path(t), session)]
+        n_current = len(existing_tickers) - len(behind)
+        existing_tickers = behind
+        if progress:
+            print(f"latest NSE session {session.date()}: {n_current} stocks already hold it, skipped", flush=True)
 
     def _extract(dfs, t):
         df = dfs.get(t, pd.DataFrame())
@@ -161,12 +172,12 @@ def refresh(tickers=None, progress=False):
     n_failed += len(still_empty)
 
     if progress:
-        print(f"done: {n_new} new, {n_updated} updated, {n_failed} failed/empty after retry "
+        print(f"done: {n_new} new, {n_updated} updated, {n_current} already current, {n_failed} failed/empty after retry "
               f"(of {len(tickers)} requested)", flush=True)
         if still_empty:
             print(f"still empty after retry ({len(still_empty)}): "
                   f"{', '.join(still_empty[:30])}{' ...' if len(still_empty) > 30 else ''}", flush=True)
-    return dict(new=n_new, updated=n_updated, failed=n_failed, total=len(tickers), still_empty=still_empty)
+    return dict(new=n_new, updated=n_updated, current=n_current, failed=n_failed, total=len(tickers), still_empty=still_empty)
 
 
 def load(ticker):

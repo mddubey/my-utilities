@@ -16,6 +16,31 @@
 Coverage below was measured 2026-10-03 IST. Owner = the session or track that maintains the
 fetcher.
 
+## Daily refresh (EOD checklist, Part A)
+
+`./eod_checklist.sh` after the close runs **Part A, data** (`data/refresh.sh`, also runnable on its own), then
+**Part B, trading** (each live system's EOD routine). Part B runs only if Part A's critical datasets are current.
+
+| step | dataset | fetcher | notes |
+|---|---|---|---|
+| 1 | `daily/` all NSE equity | `fetch_prices.py --progress` | saves each batch as it arrives; lock file |
+| 2 | `daily/_NIFTY.csv` + regime indicators | `market_regime.py` | merges, refuses an empty/short reply |
+| 3 | `intraday_5m/` all | `intraday_cache.py` | top-up last 10 days, one retry pass |
+| 4 | `index_intraday/` | `data/fetch_index_intraday.py` | merges; Nifty 5m kept beyond Yahoo's 60 days |
+| 5 | `intraday_60m/` all | `data/fetch_intraday_60m.py 0 1 10d --topup` | merges last 10 days |
+| 6 | health check | `data/check.py` | PASS/WARN/FAIL per dataset vs the latest real NSE session |
+
+- **Session skip:** every step first asks Nifty's 60-min bars for the latest real NSE session
+  (`fetch_prices._latest_nifty_session`) and skips stocks that already hold it, so weekend/holiday runs take
+  about a minute. A stock counts as current only with the full session (5-min last bar >= 15:10 IST; 60-min >= 14:15,
+  since F&O names have no 15:15 stub after the closing auction began 2026-08-03). If the lookup fails, nothing is
+  skipped.
+- **Critical** (Part B stops if they fail): daily prices for >= 98% of the Nifty 500, and the Nifty regime file.
+  The rest are WARN only.
+- **Logs:** `data/logs/refresh_YYYYMMDD_HHMM.log` per run; `data/logs/last_check.json` = latest health check.
+- **Not refreshed here (by hand):** `nse_fo_bhav/`, `nse_cash_close/`, `nse_bhav/`, `nse_bands/`,
+  `nse_corp_actions.csv`. The health check prints their latest file date.
+
 ## Quick map
 
 | path constant | folder / file | source | coverage | prices |

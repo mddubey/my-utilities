@@ -1,52 +1,40 @@
 #!/usr/bin/env bash
-# End-of-day checklist (2026-09-03): sequences the existing standalone refresh/scan
-# scripts — no logic duplicated here, this is just the order to run them in after
-# market close. fetch_prices.py, intraday_cache.py, and daily_scan.py already default
-# to the full nifty500_universe.csv when run with no args.
+# End-of-day checklist -- ONE command after the close, two separate parts (restructured 2026-10-03):
 #
-# 2026-09-08: added step 1b (market_regime.py) after state_validator.py's first
-# real run caught _NIFTY.csv silently 8 calendar days stale -- market_regime.py's
-# refresh() was always a standalone "run when stale" script, never wired into this
-# checklist, so nothing was ever reminding anyone to run it. Today's regime-gate
-# answer happened to come out the same either way (Nifty's been under its 200-SMA
-# since Feb 26 regardless), but the ADX sub-check alone flipped 15.4->21.7 across
-# the same stale/fresh gap -- a real risk on any day closer to a flip, not just a
-# theoretical one.
-set -e
+#   PART A -- DATA     data/refresh.sh: refresh every dataset that must stay current, then a health check
+#                      (data/check.py) that says per dataset whether it holds the latest real NSE session.
+#                      Shared by every system; can also be run on its own.
+#   PART B -- TRADING  the trading routines that read that data. Runs only if Part A's critical datasets
+#                      (daily Nifty 500 prices, Nifty regime file) are current -- a stale scan is worse than none.
+#                      Add a new system's EOD routine as its own block here (e.g. intraday shorts prep).
+#
+# History: 2026-09-03 first version (sequenced standalone scripts); 2026-09-08 added the Nifty regime refresh after
+# state_validator.py caught _NIFTY.csv 8 days stale; 2026-10-02 full NSE equity universe; 2026-10-03 data moved to
+# data/ (data/README.md), split into the two parts above, and the open-positions step fixed (it looked for
+# positions.csv / monitor_position.py, which don't exist, so it silently never ran).
 cd "$(dirname "$0")"
 
-# 2026-10-03: fetch_prices.py now defaults to the full NSE equity universe (~2,300 names) and all caches live
-# under data/ (data/README.md). This replaced the separate step 1c that topped up the non-Nifty-500 names.
-echo "== 1/6: refreshing daily cache (full NSE equity universe) =="
-python3 fetch_prices.py --progress
+echo "################ PART A -- DATA ################"
+./data/refresh.sh
+if [ $? -ne 0 ]; then
+    echo
+    echo "PART A FAILED: a critical dataset is not current (see the DATA HEALTH table above and data/logs/)."
+    echo "PART B (trading) skipped -- fix the data and re-run ./eod_checklist.sh (fetchers skip what's already current)."
+    exit 1
+fi
+
+set -e
+echo
+echo "################ PART B -- TRADING ################"
 
 echo
-echo "== 1b/6: refreshing Nifty regime cache =="
-python3 market_regime.py
-
-# Space out the two big Yahoo pulls (daily + 5m, ~2,300 tickers each) instead of hitting it back to back.
-sleep 60
-
-echo
-echo "== 2/6: refreshing intraday 5m cache (full NSE equity universe, ~2,300 tickers) =="
-python3 intraday_cache.py --universe nse_equity
-
-echo
-echo "== 3/6: pattern scan =="
+echo "== Primed BC 1/3: pattern scan =="
 python3 daily_scan.py
 
 echo
-echo "== 4/6: open positions — fresh stop/target =="
-if [ -f positions.csv ]; then
-    tail -n +2 positions.csv | while IFS=, read -r ticker pattern entry_date entry_price; do
-        [ -z "$ticker" ] && continue
-        python3 monitor_position.py "$ticker" "$pattern" "$entry_date" "$entry_price"
-        echo
-    done
-else
-    echo "  no positions.csv yet — add rows as ticker,pattern,entry_date,entry_price"
-fi
+echo "== Primed BC 2/3: open positions -- fresh stop/target (open_positions.csv) =="
+python3 trader_dashboard.py night
 
 echo
-echo "== 5/6: tomorrow's candidates (+1% trigger watchlist) =="
+echo "== Primed BC 3/3: tomorrow's candidates (+1% trigger watchlist) =="
 python3 tomorrow_candidates.py

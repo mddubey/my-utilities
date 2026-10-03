@@ -15,6 +15,13 @@ k, n = int(sys.argv[1]), int(sys.argv[2])
 uni = pd.read_csv(ROOT / "nse_equity_universe.csv").ticker.tolist()
 TOPUP = "--topup" in sys.argv
 todo = [t for t in uni[k::n] if TOPUP == (OUT / f"{t}.csv").exists()]   # topup: existing files only; else: missing only
+if TOPUP:   # 2026-10-03: skip stocks already holding the latest real NSE session (last 60m bar starts 15:15 IST, or 14:15 for F&O names after the closing auction began 2026-08-03)
+    from fetch_prices import _latest_nifty_session, _safe_today
+    from data.paths import holds_full_session
+    session = _latest_nifty_session(pd.Timestamp(_safe_today()))
+    if session is not None:
+        n0 = len(todo); todo = [t for t in todo if not holds_full_session(OUT / f"{t}.csv", session, "14:15")]
+        print(f"latest NSE session {session.date()}: {n0 - len(todo)} already hold it, skipped", flush=True)
 print(f"slice {k}/{n}: {len(todo)} to fetch", flush=True)
 for i in range(0, len(todo), 50):
     part = todo[i:i + 50]
@@ -22,6 +29,7 @@ for i in range(0, len(todo), 50):
     for t, d in dfs.items():
         d = d.dropna(subset=["Close"]) if not d.empty else d
         if not d.empty:
+            d.index = pd.to_datetime(d.index, utc=True)
             if TOPUP:
                 old = pd.read_csv(OUT / f"{t}.csv", index_col=0)
                 old.index = pd.to_datetime(old.index, utc=True); d.index = pd.to_datetime(d.index, utc=True)

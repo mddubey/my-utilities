@@ -47,15 +47,38 @@ def _compute_adx(df, period=14):
 
 
 def refresh():
-    """Re-fetch Nifty daily OHLC and recompute ADX14 + DI14 + SMA200 — run standalone
-    when the cached file is stale, not on every backtest."""
+    """Fetch Nifty daily OHLC and recompute ADX14 + DI14 + SMA50/200. Run by the EOD data refresh.
+
+    2026-10-03: merges into the existing file instead of overwriting it with whatever Yahoo returned, and
+    refuses a bad reply. Before, an empty or short download silently replaced the file every project
+    uses as its regime gate and session calendar, and the rolling 5-year window dropped older history.
+    Indicators are recomputed over the whole merged history (ADX's start-up effect is gone after a few
+    hundred bars, so values match the old 5-year computation). Returns True if the file was written."""
     import yfinance as yf
-    df = yf.download("^NSEI", period="5y", interval="1d", auto_adjust=True)
+    base = ["Close", "High", "Low", "Open", "Volume"]
+    df = yf.download("^NSEI", period="5y", interval="1d", auto_adjust=True, progress=False)
+    if df is None or df.empty:
+        print("market_regime.refresh: Yahoo returned nothing for ^NSEI -- kept the existing file")
+        return False
     df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+    df = df[base].dropna(subset=["Close"])
+    df.index = pd.to_datetime(df.index).tz_localize(None) if getattr(df.index, "tz", None) else pd.to_datetime(df.index)
+    df.index.name = "Date"
+    if NIFTY_FILE.exists():
+        old = pd.read_csv(NIFTY_FILE, index_col="Date", parse_dates=True)[base]
+        if df.index.max() < old.index.max() or len(df) < 200:
+            print(f"market_regime.refresh: suspicious reply ({len(df)} rows, last {df.index.max().date()} vs "
+                  f"cached {old.index.max().date()}) -- kept the existing file")
+            return False
+        df = pd.concat([old, df])
+        df = df[~df.index.duplicated(keep="last")].sort_index()
     df["adx14"], df["plus_di14"], df["minus_di14"] = _compute_adx(df)
     df["sma50"] = df.Close.rolling(50).mean()
     df["sma200"] = df.Close.rolling(200).mean()
-    df.to_csv(NIFTY_FILE)
+    tmp = NIFTY_FILE.with_suffix(".tmp")
+    df.to_csv(tmp)
+    tmp.replace(NIFTY_FILE)
+    return True
 
 
 @functools.lru_cache(maxsize=None)
@@ -170,4 +193,5 @@ def market_trending(date, require_rising=False, require_uptrend=False, require_a
 
 
 if __name__ == "__main__":
-    refresh()
+    import sys
+    sys.exit(0 if refresh() else 1)
