@@ -8,3 +8,4 @@ rechecks/
 # Hand-maintained live record -- NOT regeneratable, keep it tracked
 !live_watch_log.csv
 prep/
+snapshots/

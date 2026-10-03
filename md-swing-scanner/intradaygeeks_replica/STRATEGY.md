@@ -1,6 +1,6 @@
 # Intraday 34-EMA rejection (shorts): living strategy doc
 
-Last updated: 2026-10-03 (IST): 1H 8-EMA thread tested (scripts 62-66, not a rule), stop-rate filters queued (5.8a), data moved to ../data/. Scratch research only, nothing in production uses it.
+Last updated: 2026-10-04 (IST): full-hour candle at 11:15 / 12:15 and the strong-green-hour skip adopted (scripts 68, 70); stop-rate filters, candle shape, prev-hour side, regime split and dropping 2:1 tested and closed (67-71). Scratch research only, nothing in production uses it.
 Detailed test-by-test log: `TELEGRAM_CALLS.md`. Literature notes: `INTRADAY_RESEARCH.md`.
 All returns are % per trade, gross of costs, unless stated.
 
@@ -19,10 +19,20 @@ Your broker must allow intraday (MIS) shorting of the name.
 - 1H trend: 1H 8-EMA below the 1H 34-EMA.
 - Higher timeframe: the daily 8-EMA as the chart shows it live, which is 2/9 × current price + 7/9 × yesterday's EMA8.
 
-**Trigger: a 30-minute rejection candle** on a 09:15-aligned grid, closing at **10:45, 11:15, 11:45 or 12:15**:
-- the candle is red (close below open);
-- its high touches or crosses the 1H 34-EMA;
-- it closes back below the 1H 34-EMA, and no more than 0.5% below it.
+**Trigger: an hourly rejection, checked at the half hour and at the hour close.** Hourly bars are 09:15-aligned.
+- **10:45 / 11:45 (half-way):** the hourly bar so far, i.e. the first 30-min candle of the hour.
+- **11:15 / 12:15 (hour close): the full hourly bar** (open, high, low of the whole hour). Adopted 2026-10-04 (script 68):
+  the rejection is hourly, so the stop must sit above the whole hour, not just its last 30 minutes (KNACK 30 Sep:
+  30-min high 179.97 vs hourly high 180.76). 30m set: all setups +0.128% (unchanged); plan 11:15-else-11:45
+  +0.120% -> +0.171% per trade. At the hour close this is the same trade as the 3-year 1H set.
+- The bar is red (close below open); its high touches or crosses the 1H 34-EMA; it closes back below the 1H 34-EMA,
+  no more than 0.5% below it.
+- **At 11:45 / 12:15 only: skip a shallow pullback right after a strong green 10:15 hour** (adopted 2026-10-04, user's
+  chart logic, script 70): the 10:15 bar green AND closed above the 1H 34-EMA AND our close still above that green bar's
+  midpoint = buyers took the level back and are still in charge. Not after the 09:15 opening bar: that bar is gap /
+  covering noise that fades, and those setups are fine (30m +Rs179, 1H +Rs93 per trade) vs after a 10:15 bar (30m -17,
+  1H -40, 71-83% stopped; small: 6 / 51 trades). A DEEP pullback (below the green bar's midpoint) is the best group
+  (failed reclaim: 30m +256, 1H +149) -- keep those. Plan 11:15-else-11:45: +171 -> +179 per trade; 1H 3-yr +117 -> +117.
 
 **Checks at the moment of entry:**
 - close below the daily 8-EMA;
@@ -152,6 +162,9 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 | Daily range filter (ATR >= 2.56% of price) | ADOPTED: low-range stocks ~0 in both sets; 30m +0.089 -> +0.129%, 1H +0.069 -> +0.102% | (2026-10-03) |
 | 1H 8-EMA under the short (user's chart read: RAILTEL, AARTIIND, GOLDIAM) | Not a rule. Tested 4 ways, none passes both sets: distance gradient (62); placebo support test -- lows stop at the 8-EMA no more than chance, 26.4% vs 24.1% / 22.3% vs 23.6% (63); "rising 8-EMA reaches my 1% zone" -- with the fresh EMA it is already there in 98-99% of trades (65); 8-EMA holding vs rejecting in the last 2/3/4 hours -- holding is average, REJECTING is best on 30m (Rs184-200 vs Rs129, 51% stopped vs 57%) but mixed on 3-yr 1H (66). A pick ranking by 8-EMA position lost on 1H (Rs90 vs Rs117/trade, script inline). RAILTEL was a 09:15 spike, not a support bounce | 62-66 |
 | Breadth at entry (clean data) | Inconsistent: 3-yr bullish days weakest on average, Jun-Sep 2026 bullish days best -> info only | 61 |
+| Full hourly bar at the hour-close alarms (11:15 / 12:15) | Adopted. All setups flat (+0.128%); plan 11:15-else-11:45 +0.120 -> +0.171%, stops 58.5 -> 54.7%; 11:15 alone worse, 12:15 better | 68 |
+| Strong green hour before, shallow pullback | Adopted as a skip at 11:45 / 12:15 only (after the 10:15 bar); after the 09:15 opening bar those setups are fine. Skipping 'any green' or 'any green above EMA' throws away the best group (deep pullback = failed reclaim) | 70 |
+| Stop-rate filters (noise ratio, close position, candle shape) | Closed: they only pick wider stops; stop width doesn't change profit within the 2:1 band | 67 |
 | The channel's own calls by side | 68% longs; longs +0.031% vs shorts +0.002% at target 1; the edge is counter-trend on both sides; most calls match none of his public scanners | 50 |
 
 ---
@@ -168,6 +181,18 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 - The full 30m-EMA / 4H-EMA structure. The 10:15 30-minute alarm. Alarms from 13:15 on.
 - Prior-candle trailing stops for manual trading (5 / 15 / 30 min). VWAP breadth as a Nifty-bias call.
 - Daily-chart or 1H-chart entries with a ~1% target and no extra filters (about 0 gross).
+- (2026-10-04, scripts 67-71) **Stop-rate filters:** "stop inside the noise" (stop / typical candle range >= 1; the 2:1 cap
+  makes this nearly impossible) and "close in the bottom third of the candle" -- both only select wider stops; with a
+  fixed 1% target, tight stops get hit more but lose less, so ~56% stopped is built into the setup.
+- Favouring the tightest stop as the one-trade pick (closest-to-EMA wins in both sets: 30m Rs+267 vs +204, 1H +117 vs +102).
+- Candle shape (body-led / mixed / shooting star) as a rule: skip-mixed helped 30m, not 1H; shooting star best on 30m,
+  worst on 1H. Not a rule.
+- "Previous hour must close below the EMA" (true rejection only): no better; hurts one-trade-a-day on 1H (+117 -> +74).
+- Strong-green-hour setups by Nifty regime (below 50-day avg): looked like a flip, but on 14 / 47 trades -- noise. The
+  skip applies always, on logic.
+- "Wait for the second signal on the same stock": later setups on the same stock the same day do worse than the first
+  in both sets.
+- Dropping the 2:1 rule: more trades, fewer stops, less per trade (30m +0.128 -> +0.083%, 1H +0.102 -> +0.090%). Keep 2:1.
 
 ---
 
@@ -191,9 +216,10 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    Deleting them won't remove them from git history; a real cleanup means a deliberate history rewrite or an archive move
    (scripts read each other's outputs from this folder, so paths need fixing). Held local, not committed (public repo):
    TELEGRAM_CALLS.md, SOURCE_TRANSCRIPT.md, CHARTINK_QUERIES.md, OPEN_QUESTIONS.md, the chartink JSON.
-8a. **Lower the stop rate (user, 2026-10-03, next research):** ~56% of trades stop out (67% in the 17 Sep - 1 Oct practice list; stops cluster by day, e.g. 18 Sep 10/10 stopped; 14 of 38 stops hit within 30 min). Two pre-declared filters to test, both sets, with baseline + kept + removed: (a) stop inside the noise -- stop distance vs the stock's typical 30-min candle range, cut-off 1.0; (b) rejection strength -- where the 30-min candle closed within its range (bottom half / bottom third). Goal: fewer stops without lowering profit per trade.
+8a. **DONE 2026-10-04 (closed, see section 4).** Lower the stop rate (user, 2026-10-03): ~56% of trades stop out (67% in the 17 Sep - 1 Oct practice list; stops cluster by day, e.g. 18 Sep 10/10 stopped; 14 of 38 stops hit within 30 min). Two pre-declared filters to test, both sets, with baseline + kept + removed: (a) stop inside the noise -- stop distance vs the stock's typical 30-min candle range, cut-off 1.0; (b) rejection strength -- where the 30-min candle closed within its range (bottom half / bottom third). Goal: fewer stops without lowering profit per trade.
 8b. **Telemetry to add to the live log:** 1H 8-EMA rejecting / holding in the last 3 hours (script 66), to re-test on fresh trades.
-8c. **Loose ends:** (i) one-trade-a-day figure: Rs+120/trade (65 days, script-65 data) vs the earlier ~Rs+94 -- not reconciled; (ii) the 1H 34-EMA used for the 11:15 and 12:15 alarms is one hour older than the broker chart (backtest and scan agree; fixing means re-running the main backtest); (iii) Yahoo's real 60m history limit (a 730d request returned data from 2023-10).
+8d. **Watch in the live log:** volume of the pullback bar vs the green bar before it (break-and-retest literature: low-volume pullback = pause, heavy = real rejection) -- untested.
+8c. **Loose ends:** (i) RECONCILED 2026-10-04: Rs+120 = plan '11:15 else 11:45' (65 days); Rs+267 = 'first alarm from 10:45'; different plans, not a bug; (ii) the 1H 34-EMA used for the 11:15 and 12:15 alarms is one hour older than the broker chart (backtest and scan agree; fixing means re-running the main backtest); (iii) Yahoo's real 60m history limit (a 730d request returned data from 2023-10).
 8. **When automating, revisit:** (a) half the position at 1% with the rest trailed on 30-min candles (untested);
    (b) the "steadily below VWAP" filter (script 44) using the research's definition: at least 10 of the last 12
    5-min closes below VWAP, at most 1 cross, VWAP falling, with 6- and 24-candle versions as checks.
@@ -204,7 +230,8 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 
 | File | What |
 |---|---|
-| `38_alarm_scan_1h_close.py` | Live / replay alarm scan (default: 30-min trigger) |
+| `38_alarm_scan_1h_close.py` | Live / replay alarm scan (half-hour check at 10:45 / 11:45, full hour at 11:15 / 12:15, strong-green-hour skip) |
+| `69_snapshot.py` | The 1H chart as it looked at an alarm, text + inline iTerm2 image (`python3 69_snapshot.py KNACK 2026-09-30 11:15`, `--save` for a PNG) |
 | `21_live_bearish_scan.py` | Older 5-min held-rejection scan (superseded) |
 | `15_intraday_1h34_daily8.py` | 3-year 1H backtest engine |
 | `41_confirmation_length.py`, `43_alarm_times_30m.py` | 30-min trigger tests and alarm timing |

@@ -1,4 +1,5 @@
-"""DEFAULT (2026-10-02, user's choice): 30-min rejection candle as the trigger at the strong levels (1H 34-EMA + live
+"""2026-10-04: at 11:15 / 12:15 the trigger is the FULL hourly bar (10:45 / 11:45 = the hour so far); at 11:45 / 12:15, setups right after a strong green 10:15 hour that closed above the 1H EMA34 (shallow pullback) are skipped.
+DEFAULT (2026-10-02, user's choice): 30-min rejection candle as the trigger at the strong levels (1H 34-EMA + live
 daily 8-EMA). Alarms 10:45 / 11:15 / 11:45 / 12:15 IST (43: 10:15 and 13:15+ are flat/negative). `--tf 60` = old 1H mode.
 Alarm-time scan for the current best SHORT setup (watch/scratch only; nothing in production touched).
 Run just after 10:15, 11:15 or 12:15 IST (1H trigger), or with `--tf 30` just after 10:45 / 11:15 / 11:45 / 12:15
@@ -132,7 +133,7 @@ if __name__ == "__main__":
     tag = "bullish" if BREADTH > 0.65 else ("bearish" if BREADTH < 0.35 else "mixed")
     print(f"BREADTH (info only, no consistent effect on this setup): {BREADTH*100:.0f}% of {len(up)} most liquid stocks above "
           f"yesterday's close -> {tag}", flush=True)
-    rows = []; not_ready = 0
+    rows = []; not_ready = 0; skipped_green = []
     for t in C.index:
         g = today_bars(t)
         if len(g) < 12: continue
@@ -155,22 +156,44 @@ if __name__ == "__main__":
             if cend.strftime("%H:%M") not in ("10:45", "11:15", "11:45", "12:15"): continue
             hour0 = hour_key(pd.DatetimeIndex([last]))[0]
             o, hi, lo, cl = c30.loc[last, ["Open", "High", "Low", "Close"]]
+            if cend == hour0 + pd.Timedelta("60min"):
+                # 2026-10-04 (68): at the hour-close alarms (11:15 / 12:15) the setup is the FULL hourly bar -- the
+                # rejection is hourly, the 10:45 / 11:45 check is only an early look at the hour so far. Open / high
+                # (= stop) / low from the whole hour, so the stop sits above the whole rejection (KNACK 30 Sep: 30-min
+                # high 179.97 vs hourly high 180.76). 30m set: all setups +0.128% (same), plan 11:15-else-11:45 +0.120 -> +0.171%.
+                seg = g[(g.index >= hour0) & (g.index < cend)]
+                o, hi, lo = seg.Open.iloc[0], seg.High.max(), seg.Low.min(); last = hour0
         if cend < ASOF - pd.Timedelta("20min"): continue
         if not (g.index == cend - pd.Timedelta("5min")).any():
             not_ready += 1; continue
         closes = pd.concat([h, c1.Close[c1.index < hour0]])
         E = closes.ewm(span=34, adjust=False).mean().iloc[-1]; E8 = closes.ewm(span=8, adjust=False).mean().iloc[-1]
+        # 2026-10-04 (70): don't short the first shallow pullback after a strong green hour. Previous finished hourly
+        # bar green AND closed above the 1H EMA34 (E includes that bar) AND our close still above its midpoint = buyers
+        # in charge, the EMA is acting as support (KNACK 30 Sep 10:15). Price-action convention; ~1 in 10 setups.
+        hO = pd.concat([hist.Open.groupby(hour_key(hist.index)).first(), c1.Open[c1.index < hour0]])
+        pO, pC = hO.iloc[-1], closes.iloc[-1]
+        # Not after the 09:15 opening bar (gap / covering noise that tends to fade): those setups are fine (30m +Rs179,
+        # 1H +Rs93 per trade); after a strong green 10:15 bar they fail (30m -17, 1H -40, 71-83% stopped). So the skip
+        # applies only to the 11:45 / 12:15 checks. Plan 11:15-else-11:45: no skip +171 -> narrowed +179; 1H +117 -> +117.
+        strong_green_before = hour0.strftime("%H:%M") not in ("09:15", "10:15") and pC > pO and pC > E and cl > (pO + pC) / 2
         upto = g[g.index < cend]
         vwap = ((upto.High + upto.Low + upto.Close) / 3 * upto.Volume).sum() / max(upto.Volume.sum(), 1)
         d8y = P.at[t, "d8y"]; live = A8 * cl + (1 - A8) * d8y; day_hi = upto.High.max()
         dist = (E - cl) / E * 100
         checks = dict(red=cl < o, wick_through_ema=hi >= E, close_below_ema=cl < E, within_0_5=0 < dist <= 0.5,
                       trend_1h=E8 < E, below_daily8=cl < d8y, wick_through_live_d8=day_hi >= live, below_vwap=cl < vwap)
+        if all(checks.values()) and strong_green_before:
+            skipped_green.append(f"{t} (stop {(hi - cl) / cl * 100:.2f}%)"); continue
         if all(checks.values()):
-            rows.append(dict(ticker=t, candle=f"{last:%H:%M}-{cend:%H:%M}", entry=round(cl, 2), stop=round(hi, 2), stop_pct=round((hi - cl) / cl * 100, 2),
+            rows.append(dict(ticker=t, candle=f"{last:%H:%M}-{cend:%H:%M}" + (" (full hour)" if cend - last == pd.Timedelta("60min") else ""), entry=round(cl, 2), stop=round(hi, 2), stop_pct=round((hi - cl) / cl * 100, 2),
                              target=round(cl * 0.99, 2), ema34_1h=round(E, 2), below_ema_pct=round(dist, 2), live_d8=round(live, 2),
                              day_high=round(day_hi, 2), adx=round(P.at[t, "adx"], 1), **late_status(g, cend, hi)))
     R = pd.DataFrame(rows)
+    if skipped_green:
+        _rr = float(sys.argv[sys.argv.index("--rr") + 1]) if "--rr" in sys.argv else 2.0
+        _real = [x for x in skipped_green if _rr <= 0 or float(x.split("stop ")[1].rstrip("%)")) <= 1.0 / _rr]
+        if _real: print(f"skipped, would otherwise qualify (shallow pullback right after a strong green hour): {', '.join(_real)}")
     if not_ready:
         many = not_ready > 0.2 * max(len(C), 1)
         print(f"{'DATA NOT READY' if many else 'note'}: {not_ready} stocks have no last 5-min bar for the alarm candle yet "
