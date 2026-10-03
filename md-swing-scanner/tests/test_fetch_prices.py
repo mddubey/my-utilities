@@ -1,3 +1,4 @@
+import functools
 from datetime import date, datetime
 
 import pandas as pd
@@ -247,3 +248,57 @@ def test_fetch_all_new_ticker_before_safe_hour_drops_todays_row(tmp_path, monkey
     written = pd.read_csv(tmp_path / "NEWCO.csv", index_col="Date", parse_dates=True)
     assert len(written) == 4  # 5 fetched, today (08-31) dropped as unsafe
     assert written.index.max() == pd.Timestamp("2026-08-30")
+
+
+def test_fetch_all_saves_each_chunk_so_a_crash_keeps_earlier_chunks_and_rerun_has_no_duplicates(tmp_path, monkeypatch):
+    """2026-10-03: with the full ~2,300-name universe in one call, a hang or Ctrl-C late
+    in the run used to lose EVERYTHING (nothing was written until every chunk came back).
+    Now each chunk is saved as it arrives. A re-run must pick up only what's missing —
+    no duplicate rows for the chunks that were already saved."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(fetch_prices, "_chunked_download",
+                        functools.partial(fetch_prices._chunked_download, chunk_size=2, pause=0))
+    monkeypatch.setattr(fetch_prices, "_now_ist", lambda: datetime(2026, 9, 2, 16, 0, tzinfo=IST))
+    tickers = ["A", "B", "C", "D", "E", "F"]
+    old_dates = pd.date_range(end="2026-08-28", periods=4, freq="D")
+    for t in tickers:
+        _multi_index_df([f"{t}.NS"], old_dates)[f"{t}.NS"].to_csv(tmp_path / f"{t}.csv")
+    new_dates = pd.date_range("2026-08-29", periods=5, freq="D")  # 08-29..09-02
+
+    calls = []
+
+    def crashing_download(yf_tickers, **kwargs):
+        calls.append(list(yf_tickers))
+        if len(calls) == 3:  # third chunk: Yahoo "hangs", user hits Ctrl-C
+            raise KeyboardInterrupt
+        return _multi_index_df(yf_tickers, new_dates)
+
+    monkeypatch.setattr(fetch_prices.yf, "download", crashing_download)
+    try:
+        fetch_prices.fetch_all(tickers)
+    except KeyboardInterrupt:
+        pass
+    for t in ("A", "B", "C", "D"):  # first two chunks were saved
+        assert pd.read_csv(tmp_path / f"{t}.csv", index_col="Date").index.max() == "2026-09-02"
+    for t in ("E", "F"):  # crashed chunk untouched
+        assert pd.read_csv(tmp_path / f"{t}.csv", index_col="Date").index.max() == "2026-08-28"
+
+    # re-run: Yahoo returns the same wide range for everyone (shared start date = E/F's)
+    monkeypatch.setattr(fetch_prices.yf, "download", lambda yf_tickers, **kw: _multi_index_df(yf_tickers, new_dates))
+    result = fetch_prices.fetch_all(tickers)
+    assert result["updated"] == ["E", "F"] and result["current"] == ["A", "B", "C", "D"] and not result["stale"]
+    for t in tickers:
+        written = pd.read_csv(tmp_path / f"{t}.csv", index_col="Date", parse_dates=True)
+        assert len(written) == 9 and not written.index.duplicated().any()
+        assert written.index.is_monotonic_increasing
+
+
+def test_fetch_all_new_ticker_files_are_written_atomically(tmp_path, monkeypatch):
+    """New-ticker files go through a temp file + rename — no .tmp left behind, and a
+    lock file is the only other thing in the cache dir."""
+    monkeypatch.setattr(fetch_prices, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(fetch_prices, "_now_ist", lambda: datetime(2024, 1, 5, 16, 0, tzinfo=IST))
+    dates = pd.date_range("2024-01-01", periods=5, freq="D")
+    monkeypatch.setattr(fetch_prices.yf, "download", lambda yf_tickers, **kw: _multi_index_df(yf_tickers, dates))
+    fetch_prices.fetch_all(["NEWA", "NEWB"])
+    assert sorted(p.name for p in tmp_path.iterdir()) == [".fetch_prices.lock", "NEWA.csv", "NEWB.csv"]

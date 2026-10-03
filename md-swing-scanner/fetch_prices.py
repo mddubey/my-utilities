@@ -1,4 +1,7 @@
+import fcntl
+import os
 import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -57,7 +60,8 @@ def _last_cached_date(ticker):
     return df.index.max() if len(df) else None
 
 
-def _chunked_download(yf_tickers, chunk_size=CHUNK_SIZE, pause=CHUNK_PAUSE_SEC, progress=False, **dl_kwargs):
+def _chunked_download(yf_tickers, chunk_size=CHUNK_SIZE, pause=CHUNK_PAUSE_SEC, progress=False, on_chunk=None,
+                      **dl_kwargs):
     """yf.download in sequential chunks, not one call across the whole batch — see
     CHUNK_SIZE's comment for why. Returns {ticker_without_.NS_suffix: per-ticker
     DataFrame}, using an empty DataFrame for any ticker missing from a chunk's
@@ -68,7 +72,12 @@ def _chunked_download(yf_tickers, chunk_size=CHUNK_SIZE, pause=CHUNK_PAUSE_SEC, 
     progress=True prints a chunk-by-chunk line — for a large one-off fetch (e.g.
     RQ-QS-07U's ~1,600-ticker net-new universe pull) this call runs silently for
     20-40+ minutes otherwise, violating this project's own standing convention that
-    any background run over ~30s needs live, unbuffered progress output."""
+    any background run over ~30s needs live, unbuffered progress output.
+
+    on_chunk (2026-10-03): optional callback, called with each chunk's
+    {ticker: DataFrame} as soon as that chunk arrives — fetch_all() uses it to save
+    every chunk to disk immediately, so a hang or Ctrl-C late in a ~2,300-ticker run
+    no longer throws away the chunks that already succeeded."""
     out = {}
     total = len(yf_tickers)
     for i in range(0, len(yf_tickers), chunk_size):
@@ -77,15 +86,19 @@ def _chunked_download(yf_tickers, chunk_size=CHUNK_SIZE, pause=CHUNK_PAUSE_SEC, 
         chunk = yf_tickers[i:i + chunk_size]
         data = yf.download(chunk, threads=True, progress=False, auto_adjust=False, **dl_kwargs)
         is_multi = isinstance(data.columns, pd.MultiIndex)
+        got = {}
         for yft in chunk:
             t = yft[:-3]  # strip ".NS"
             if is_multi:
-                out[t] = data[yft] if yft in data.columns.get_level_values(0) else pd.DataFrame()
+                got[t] = data[yft] if yft in data.columns.get_level_values(0) else pd.DataFrame()
             else:
                 # single-ticker chunk (only possible on the final, shorter chunk) —
                 # yfinance doesn't build a MultiIndex for a length-1 request even
                 # with group_by="ticker"
-                out[t] = data if len(chunk) == 1 else pd.DataFrame()
+                got[t] = data if len(chunk) == 1 else pd.DataFrame()
+        out.update(got)
+        if on_chunk is not None:
+            on_chunk(got)
         if i + chunk_size < len(yf_tickers):
             time.sleep(pause)
     return out
@@ -118,6 +131,38 @@ def _recover_safe_today(tickers, safe_today):
     return recovered
 
 
+def _write_new(ticker, df):
+    """Brand-new ticker file: write to a temp file, then rename, so a kill mid-write
+    can never leave a half-written CSV that the next run would mistake for a real
+    (truncated) history."""
+    path = CACHE_DIR / f"{ticker}.csv"
+    tmp = path.with_name(path.name + ".tmp")
+    df.to_csv(tmp)
+    os.replace(tmp, path)
+
+
+def _append_rows(ticker, df):
+    df.to_csv(CACHE_DIR / f"{ticker}.csv", mode="a", header=False)
+
+
+@contextmanager
+def _fetch_lock():
+    """2026-10-03: one fetch at a time per cache. Appends are only duplicate-safe for a
+    single writer — two concurrent runs (e.g. the EOD run and another session's fetch)
+    would both read the same last date and both append the same new days."""
+    CACHE_DIR.mkdir(exist_ok=True)
+    with open(CACHE_DIR / ".fetch_prices.lock", "w") as f:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print("  another fetch_prices run holds the daily-cache lock -- waiting for it to finish", flush=True)
+            fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
 def fetch_all(tickers, progress=False):
     """Returns {'new': [...], 'updated': [...], 'current': [...], 'empty': [...],
     'stale': [...]} — 5 distinct buckets. 'stale' (2026-09-29, PARKING_LOT #10) is
@@ -126,7 +171,22 @@ def fetch_all(tickers, progress=False):
     'current' (nothing NEW exists because it's already caught up), which a silent
     per-ticker fetch failure used to be indistinguishable from. A caller that wants
     the old, simpler behavior can still just check `not result['stale']` for "did
-    everything actually succeed."""
+    everything actually succeed."
+
+    2026-10-03: the main download saves each chunk to disk as soon as it arrives
+    (previously nothing was written until every chunk of the whole universe had
+    come back, so a hang late in a ~2,300-ticker run lost everything, Nifty 500
+    included). Safe to re-run after an interrupted run: existing files are only
+    ever appended to, with rows strictly after the last date already in the file
+    (re-read at the start of every run), and new-ticker files are written
+    atomically. The recovery and retry passes still run once, over the whole run,
+    after the main download — so the 'stale' judgement (did ANYONE in the run get
+    real data?) is unchanged."""
+    with _fetch_lock():
+        return _fetch_all(tickers, progress)
+
+
+def _fetch_all(tickers, progress):
     CACHE_DIR.mkdir(exist_ok=True)
     safe_today = pd.Timestamp(_safe_today())
     last_dates = {t: _last_cached_date(t) for t in tickers}
@@ -135,10 +195,9 @@ def fetch_all(tickers, progress=False):
     result = {"new": [], "updated": [], "current": [], "empty": [], "stale": []}
 
     if new_tickers:
-        yf_tickers = [f"{t}.NS" for t in new_tickers]
-        dfs = _chunked_download(yf_tickers, period=PERIOD, interval="1d", group_by="ticker", progress=progress)
-        need_recovery = []
-        for t in new_tickers:
+        written = {}  # ticker -> last date written this run
+
+        def clean(df):
             # dropna(subset=["Close"]), not how="all" — a row fetched while the market's
             # still open (or right at close, before yfinance settles the final print)
             # can have real Open/High/Low/Volume but a still-null Close; how="all" let
@@ -147,31 +206,36 @@ def fetch_all(tickers, progress=False):
             # 2026-08-31: 184/500 tickers had exactly this on 2026-08-28, silently
             # breaking that day's RS-rating calc (relative_strength.py) and any pattern
             # check depending on Close for those tickers, with zero visible error.
-            df = dfs.get(t, pd.DataFrame())
-            df = df.dropna(subset=["Close"]) if not df.empty else df
-            df = df[df.index <= safe_today] if not df.empty else df  # today isn't safe pre-SAME_DAY_SAFE_HOUR
-            dfs[t] = df
-            if df.empty or df.index.max() < safe_today:
-                need_recovery.append(t)  # see _recover_safe_today — a chunk boundary or a
-                                          # dropped ticker within a chunk is exactly this shape
+            if df.empty:
+                return df
+            df = df.dropna(subset=["Close"])
+            return df[df.index <= safe_today]  # today isn't safe pre-SAME_DAY_SAFE_HOUR
+
+        def save_new(chunk_dfs):
+            for t, df in chunk_dfs.items():
+                df = clean(df)
+                if not df.empty:
+                    _write_new(t, df)
+                    written[t] = df.index.max()
+
+        _chunked_download([f"{t}.NS" for t in new_tickers], period=PERIOD, interval="1d", group_by="ticker",
+                          progress=progress, on_chunk=save_new)
+        # see _recover_safe_today — a chunk boundary or a dropped ticker within a chunk is exactly this shape
+        need_recovery = [t for t in new_tickers if t not in written or written[t] < safe_today]
         for t, extra in _recover_safe_today(need_recovery, safe_today).items():
-            dfs[t] = pd.concat([dfs[t], extra]) if not dfs[t].empty else extra
+            if t in written:
+                _append_rows(t, extra)
+            else:
+                _write_new(t, extra)
+            written[t] = extra.index.max()
         # one full retry pass for any NEW ticker still completely empty (a chunk-level
         # drop, not "genuinely no data yet") before accepting it as empty/failed
-        still_empty = [t for t in new_tickers if dfs[t].empty]
+        still_empty = [t for t in new_tickers if t not in written]
         if still_empty:
-            retry_dfs = _chunked_download([f"{t}.NS" for t in still_empty], period=PERIOD,
-                                            interval="1d", group_by="ticker")
-            for t in still_empty:
-                df = retry_dfs.get(t, pd.DataFrame())
-                dfs[t] = df.dropna(subset=["Close"])[lambda d: d.index <= safe_today] if not df.empty else df
+            _chunked_download([f"{t}.NS" for t in still_empty], period=PERIOD, interval="1d", group_by="ticker",
+                              on_chunk=save_new)
         for t in new_tickers:
-            df = dfs[t]
-            if df.empty:
-                result["empty"].append(t)
-                continue
-            df.to_csv(CACHE_DIR / f"{t}.csv")
-            result["new"].append(t)
+            result["new" if t in written else "empty"].append(t)
 
     if existing_tickers:
         start = min(last_dates[t] for t in existing_tickers) + timedelta(days=1)
@@ -185,63 +249,62 @@ def fetch_all(tickers, progress=False):
             # calendar, which isn't worth building just to save one wasted API call.
             result["current"].extend(existing_tickers)
         else:
-            yf_tickers = [f"{t}.NS" for t in existing_tickers]
-            dfs = _chunked_download(yf_tickers, start=start.strftime("%Y-%m-%d"), interval="1d",
-                                      group_by="ticker", progress=progress)
-            need_recovery = []
-            for t in existing_tickers:
-                df = dfs.get(t, pd.DataFrame())
-                new_df = df.dropna(subset=["Close"]) if not df.empty else df  # see new_tickers branch above
-                new_df = new_df[(new_df.index > last_dates[t]) & (new_df.index <= safe_today)] if not new_df.empty else new_df
-                dfs[t] = new_df
-                # only chase a recovery if this ticker is actually behind safe_today AND
-                # didn't already get it — a shared batch start date (the minimum across
-                # the whole existing_tickers batch) means even ONE stale ticker widens
-                # the request for everyone, so this can affect tickers that were only
-                # one day behind too, not just the straggler that caused the wide range
-                if last_dates[t] < safe_today and (new_df.empty or new_df.index.max() < safe_today):
-                    need_recovery.append(t)
-            for t, extra in _recover_safe_today(need_recovery, safe_today).items():
-                dfs[t] = pd.concat([dfs[t], extra]) if not dfs[t].empty else extra
+            appended = {}  # ticker -> last date appended this run
+
+            def save_existing(chunk_dfs):
+                for t, df in chunk_dfs.items():
+                    if df.empty:
+                        continue
+                    # only rows strictly after what the file already holds (incl. anything
+                    # appended earlier THIS run), never past the safe date — this is what
+                    # makes a re-run after an interrupted run duplicate-free
+                    after = appended.get(t, last_dates[t])
+                    df = df.dropna(subset=["Close"])  # see the new-tickers branch above
+                    df = df[(df.index > after) & (df.index <= safe_today)]
+                    if not df.empty:
+                        _append_rows(t, df)
+                        appended[t] = df.index.max()
+
+            _chunked_download([f"{t}.NS" for t in existing_tickers], start=start.strftime("%Y-%m-%d"),
+                              interval="1d", group_by="ticker", progress=progress, on_chunk=save_existing)
+            # only chase a recovery if this ticker is actually behind safe_today AND
+            # didn't already get it — a shared batch start date (the minimum across
+            # the whole existing_tickers batch) means even ONE stale ticker widens
+            # the request for everyone, so this can affect tickers that were only
+            # one day behind too, not just the straggler that caused the wide range
+            need_recovery = [t for t in existing_tickers
+                             if last_dates[t] < safe_today and appended.get(t, last_dates[t]) < safe_today]
+            save_existing(_recover_safe_today(need_recovery, safe_today))
 
             # honest retry pass: a ticker that's genuinely behind safe_today but still came
             # back empty gets ONE more chunked attempt before being called 'stale' rather
             # than silently folded into 'current' — this is the exact bug that hid 198
             # stragglers earlier tonight, fixed at the source instead of worked around again.
             #
-            # GATED on any_real_update in this SAME batch, not attempted unconditionally —
+            # GATED on any_real_update in this SAME run, not attempted unconditionally —
             # caught in testing (2026-09-29): a genuine weekend/holiday means EVERY ticker
             # in the batch legitimately has nothing new, and retrying would just relabel
             # correct 'current' results as false-positive 'stale'. The real failure this
             # project hit was a MIXED result (501/702 tickers updated, 198 silently didn't,
             # same batch, same date range) — implausible for a real market-wide non-trading
             # day, since stock-specific halts affecting 28% of the universe at once don't
-            # happen. Only chase 'stale' when at least one ticker in this batch DID get
+            # happen. Only chase 'stale' when at least one ticker in this run DID get
             # real data, which rules out "nobody traded" as the explanation for the rest.
-            any_real_update = any(not dfs[t].empty for t in existing_tickers)
-            suspect = [t for t in existing_tickers if last_dates[t] < safe_today and dfs[t].empty] if any_real_update else []
+            any_real_update = bool(appended)
+            suspect = [t for t in existing_tickers if last_dates[t] < safe_today and t not in appended] \
+                if any_real_update else []
             if suspect:
                 retry_start = min(last_dates[t] for t in suspect) + timedelta(days=1)
-                retry_dfs = _chunked_download([f"{t}.NS" for t in suspect], start=retry_start.strftime("%Y-%m-%d"),
-                                                interval="1d", group_by="ticker")
-                for t in suspect:
-                    df = retry_dfs.get(t, pd.DataFrame())
-                    if df.empty:
-                        continue
-                    df = df.dropna(subset=["Close"])
-                    df = df[(df.index > last_dates[t]) & (df.index <= safe_today)]
-                    if not df.empty:
-                        dfs[t] = df
+                _chunked_download([f"{t}.NS" for t in suspect], start=retry_start.strftime("%Y-%m-%d"),
+                                  interval="1d", group_by="ticker", on_chunk=save_existing)
 
             for t in existing_tickers:
-                new_df = dfs[t]
-                if not new_df.empty:
-                    new_df.to_csv(CACHE_DIR / f"{t}.csv", mode="a", header=False)
+                if t in appended:
                     result["updated"].append(t)
                 elif last_dates[t] < safe_today and any_real_update:
-                    result["stale"].append(t)  # behind, others in this batch DID get real data, still nothing — real failure
+                    result["stale"].append(t)  # behind, others in this run DID get real data, still nothing — real failure
                 else:
-                    result["current"].append(t)  # already caught up, or nobody in the batch had anything new (weekend/holiday)
+                    result["current"].append(t)  # already caught up, or nobody in the run had anything new (weekend/holiday)
 
     return result
 
