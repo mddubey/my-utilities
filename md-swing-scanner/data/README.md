@@ -60,7 +60,15 @@ fetcher.
   Yahoo keeps only about 60 days of 5-min history, so anything not cached is gone.
 - **Note:** `resample_1h()` in `resample_1h.py` rebuilds hourly bars from these on demand;
   the old `intraday_cache_1h/` is retired.
-- *(Owner to extend: holes and completeness flags, CAS session handling from 2026-08-03.)*
+- **Timestamps** are tz-aware UTC (03:45 UTC = 09:15 IST). Columns: Open, High, Low, Close, Volume.
+- **Refresh:** `eod_checklist.sh` step 2 tops up the last 10 days for every cached stock, with one slower retry pass
+  for any that come back empty (Yahoo throttling returns empty frames with no error).
+- **Holes:** Yahoo drops some 5-min bars. A full session is 75 bars (09:15-15:25). Count bars per stock-day before
+  trusting a day; `resample_1h()` reports `n_bars` / `complete` per hour.
+- **Extremes:** Yahoo misses NSE's true day high/low on about 72% of stock-days (median 0.056%, checked against NSE
+  bhavcopy, intradaygeeks_replica scripts 22-23). Matters for tight stops; take stop levels from the broker chart.
+- **Closing auction (CAS), F&O names from 2026-08-03:** continuous trading ends 15:15; bars at/after 15:15 are
+  auction residue. `resample_1h()` drops them for F&O names; raw reads here do not.
 
 ## intraday_60m/ — Yahoo native 60-minute bars (owner: intradaygeeks_replica)
 
@@ -71,12 +79,28 @@ fetcher.
   irreplaceable.
 - **Caveats:** split-adjusted at fetch time, with holes. Check completeness per stock-day
   before using a day.
-- *(Owner to extend.)*
+- **Timestamps** UTC (03:45 UTC = 09:15 IST); the last bar of a day is the 15:15 IST stub. Columns: Open, High,
+  Low, Close, Adj Close, Volume.
+- **Matches the 5-min cache:** hourly bars rebuilt from `intraday_5m/` were identical to these on the overlap
+  (intradaygeeks_replica, 2026-10-03). Use these for history before 2026-06, `intraday_5m/` + `resample_1h()` after.
+- **Start dates:** 1,622 stocks from Oct 2023 (mostly 2023-10-23); the rest start later (listing date or first Yahoo data; about 200
+  only from Aug 2026, same late-start group as `daily/`).
+- **Not refreshed by the EOD run.** Top-up is manual or monthly via `intradaygeeks_replica/51_monthly_recheck.sh`
+  (`--topup` merges the last 30 days). Last top-up was uneven: 1,296 files end 2026-09-30, 962 end 2026-10-01.
+- **CAS:** after 2026-08-03 the 15:15 bar of F&O names may include closing-auction prints (unverified).
+- **Moved 2026-10-03** from `intradaygeeks_replica/h1_cache/` (now a symlink).
 
 ## index_intraday/ — NIFTY / BANKNIFTY intraday (owner: intradaygeeks_replica)
 
 - **Fetcher:** `data/fetch_index_intraday.py`.
-- *(Owner to extend: coverage per file.)*
+- **Files** (timestamps UTC; measured 2026-10-03):
+  - `_NIFTY_1h.csv`, `_BANKNIFTY_1h.csv`: 5,050 bars each, 2023-10-25 → 2026-10-01.
+  - `_NIFTY_5m_60d.csv`: 4,423 bars, 2026-07-10 → 2026-10-01. The name is historical: the fetcher now merges into
+    it, so it keeps growing past Yahoo's 60-day window. History older than 60 days cannot be re-fetched.
+- **Merge, never overwrite:** each run adds new bars to the existing file, so history Yahoo no longer serves is kept.
+- **Not refreshed by the EOD run;** run the fetcher when index intraday data is needed.
+- **Moved 2026-10-03** from `intradaygeeks_replica/index_1h/` (now a symlink). Daily Nifty/BankNifty live in
+  `daily/` (`_NIFTY.csv`, `_BANKNIFTY.csv`).
 
 ## nse_fo_bhav/ — NSE F&O bhavcopy (owner: production)
 
