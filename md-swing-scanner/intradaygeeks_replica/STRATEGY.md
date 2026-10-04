@@ -1,6 +1,6 @@
 # Intraday 34-EMA rejection (shorts): living strategy doc
 
-Last updated: 2026-10-04 (IST): full-hour candle at 11:15 / 12:15 and the strong-green-hour skip adopted (scripts 68, 70); stop-rate filters, candle shape, prev-hour side, regime split and dropping 2:1 tested and closed (67-71). Scratch research only, nothing in production uses it.
+Last updated: 2026-10-04 (IST, evening): chart-review session -- pivots (daily/weekly/monthly), pivot x market, candle shape, lower-wick sweep, daily 8-EMA above the stop, rolling-over-after-a-top tested (scripts 72-75); no rule changed, two watch items added (5.8e). Research PAUSED after this; Monday 2026-10-05 goes live on the rules below unchanged. Earlier same day: full-hour candle at 11:15 / 12:15 and the strong-green-hour skip adopted (scripts 68, 70).
 Detailed test-by-test log: `TELEGRAM_CALLS.md`. Literature notes: `INTRADAY_RESEARCH.md`.
 All returns are % per trade, gross of costs, unless stated.
 
@@ -165,6 +165,10 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 | Full hourly bar at the hour-close alarms (11:15 / 12:15) | Adopted. All setups flat (+0.128%); plan 11:15-else-11:45 +0.120 -> +0.171%, stops 58.5 -> 54.7%; 11:15 alone worse, 12:15 better | 68 |
 | Strong green hour before, shallow pullback | Adopted as a skip at 11:45 / 12:15 only (after the 10:15 bar); after the 09:15 opening bar those setups are fine. Skipping 'any green' or 'any green above EMA' throws away the best group (deep pullback = failed reclaim) | 70 |
 | Stop-rate filters (noise ratio, close position, candle shape) | Closed: they only pick wider stops; stop width doesn't change profit within the 2:1 band | 67 |
+| Pivots on the current rules (daily / weekly / monthly: support in path, pivot at the stop, side of PP) | Closed as filters: daily and weekly flip between sets; above monthly PP is better in both but cuts total profit and is not significant on 30m | 72 |
+| Skip only if a pivot blocks the target AND the market is up at the alarm (script 73) | Closed: headline points the wrong way in both sets; no version passes both | 73 |
+| Daily 8-EMA above our stop (script 74) | Closed: 30m better, 1H worse | 74 |
+| Allow EMA8 > EMA34 when the EMA8 is rolling over (T2) | Closed: below average on 1H, hurts the 1H plan | 75 |
 | The channel's own calls by side | 68% longs; longs +0.031% vs shorts +0.002% at target 1; the edge is counter-trend on both sides; most calls match none of his public scanners | 50 |
 
 ---
@@ -192,6 +196,39 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
   skip applies always, on logic.
 - "Wait for the second signal on the same stock": later setups on the same stock the same day do worse than the first
   in both sets.
+- (2026-10-04, script 72) **Pivots, re-tested on the current rules** (old test was on script 15's biased set): daily and
+  weekly classic pivots -- S1/S2 in the target path, PP/R1/R2 at the stop (rejection at a pivot), entry above/below PP.
+  None helps in both sets; P3, P5, P6 flip direction between 30m and 1H (e.g. above weekly PP: 30m Rs+218 vs +112,
+  1H Rs+69 vs +116). Rejection at a pivot stops less (52.7 vs 55.9% / 51.8 vs 57.3%) but reaches the target less too:
+  Rs109 vs 159 (30m), 105 vs 110 (1H). Not a quality label. Chart context only.
+  Monthly pivots (TradingView Auto shows them on the daily chart; weekly on 1H): entry above last month's PP is better
+  in both sets, every month/year (30m Rs159 vs 121, 1H 169 vs 85) but NOT a filter: 30m shuffle p=0.26, 1H p=0.005
+  (within-day shuffle p=0.09); keeping only those trades cuts days traded to 52-62% and total profit (30m plan
+  Rs11.3k -> 6.5k, 1H Rs57k -> 40k); preferring them as the pick is worse. Candidate quality label for the
+  quality x market test only.
+- (2026-10-04, script 73) **"Pivot in the way of the target AND market not helping -> skip"** (user's rule; trade by
+  default). Obstacle = any weekly (headline) / daily / monthly pivot between entry and the 1% target; market up = Nifty
+  above its open (M1) or breadth > 50% (M2) at the alarm. Headline (weekly x Nifty) points the WRONG way in both sets:
+  obstacle + market up is the BEST cell on 30m (Rs+330, n=44) and average on 1H (+103, vs obstacle + market down +46).
+  Weekly x breadth helps 1H (removed +72 vs kept +114) but not 30m (removed +194). No version passes both sets.
+  Likely reason: the market's state AT the alarm doesn't tell you what it does DURING the trade (same as the closed
+  Nifty-direction tests).
+- (2026-10-04, chart review, inline on obstacle_x_market.csv) **Trigger-candle shape, user's chart reads:** opened above
+  the EMA34 (body cross) is NOT worse (30m Rs129 vs 131, 1H 118 vs 94) -- keep body crosses. Major lower wick (> 1/3 of
+  range) = more stops in both sets (59 vs 51%, 59 vs 50%) but Rs gap small and months/years disagree (30m: lower-wick
+  better in Jun/Aug/Sep). Low pierced the 1H EMA8 and closed above (8-EMA support): no (30m +136 vs +128, 1H +77 vs
+  +115). No upper wick looked better in both (+180 vs +119, +159 vs +99) but not every month/year -- watch, not a rule.
+- (2026-10-04, script 74) **Live daily 8-EMA sitting above our stop** (user: RELIGARE 24 Aug, VERANDA 19 Sep 2025 rose to
+  touch it, took the stop, then fell hard): 30m better (Rs145 vs 109), 1H worse (85 vs 129; 2024/25 worse, 2026 better)
+  -> no rule. "Stopped, then fell 1% from entry later that day" is 5-6% of trades whether or not the daily 8-EMA is
+  above the stop -- that's the bad-luck share, not explained by the daily 8-EMA.
+  Lower-wick sweep (inline): candle closing AT its low lost in both sets (30m n=32 Rs-103, 1H n=70 Rs-32, shuffle
+  p 0.007/0.02) but 0-10% wick is the best bucket -> cliff at zero with no logic; watch item, not a rule. Not a cheap-
+  stock / tiny-candle artifact (still worse inside every price and candle-range bucket). Effect on the one-a-day plan is
+  tiny (30m Rs179 -> 183, 1H 117 -> 123; 1-6 picks change) because the closest-to-EMA pick is rarely one of them.
+- (2026-10-04, script 75) **T2 "rolling over after a top"** (EMA8 still above EMA34 but falling 3 hours, SUNDARMFIN 19
+  Aug type): 30m Rs126 vs 130 (Sep -38), 1H Rs74 vs 107 (2025 +7); adding it to the plan: 30m +179 -> +186, 1H +117 ->
+  +101. Closed: the trend rule stays as is.
 - Dropping the 2:1 rule: more trades, fewer stops, less per trade (30m +0.128 -> +0.083%, 1H +0.102 -> +0.090%). Keep 2:1.
 
 ---
@@ -219,6 +256,12 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 8a. **DONE 2026-10-04 (closed, see section 4).** Lower the stop rate (user, 2026-10-03): ~56% of trades stop out (67% in the 17 Sep - 1 Oct practice list; stops cluster by day, e.g. 18 Sep 10/10 stopped; 14 of 38 stops hit within 30 min). Two pre-declared filters to test, both sets, with baseline + kept + removed: (a) stop inside the noise -- stop distance vs the stock's typical 30-min candle range, cut-off 1.0; (b) rejection strength -- where the 30-min candle closed within its range (bottom half / bottom third). Goal: fewer stops without lowering profit per trade.
 8b. **Telemetry to add to the live log:** 1H 8-EMA rejecting / holding in the last 3 hours (script 66), to re-test on fresh trades.
 8d. **Watch in the live log:** volume of the pullback bar vs the green bar before it (break-and-retest literature: low-volume pullback = pause, heavy = real rejection) -- untested.
+8e. **Watch in the live log (2026-10-04 chart review, not rules):** (i) "big red box" trigger candle with no upper wick
+   looked better in both sets (30m Rs180 vs 119, 1H 159 vs 99) but not every month/year; (ii) trigger candle closing
+   exactly at its low looked worse in both sets (shuffle p 0.007 / 0.02, holds inside price and range buckets) but has
+   no logic for why 0% is bad and 5% is the best bucket, and barely changes the one-a-day pick -> yellow flag only;
+   (iii) the user's discretionary skips ("looks like support") -- log the reason, compare after 1-2 months.
+   **Chart-reading trap:** TradingView/Dhan label candles by START time; the 12:15 alarm judges the candle labeled 11:15.
 8c. **Loose ends:** (i) RECONCILED 2026-10-04: Rs+120 = plan '11:15 else 11:45' (65 days); Rs+267 = 'first alarm from 10:45'; different plans, not a bug; (ii) the 1H 34-EMA used for the 11:15 and 12:15 alarms is one hour older than the broker chart (backtest and scan agree; fixing means re-running the main backtest); (iii) Yahoo's real 60m history limit (a 730d request returned data from 2023-10).
 8. **When automating, revisit:** (a) half the position at 1% with the rest trailed on 30-min candles (untested);
    (b) the "steadily below VWAP" filter (script 44) using the research's definition: at least 10 of the last 12
