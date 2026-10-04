@@ -55,8 +55,8 @@ chartink JSON must stay uncommitted.
 Structure it as:
 - **Live status**, one line each:
   - data freshness (daily and 5-min);
-  - the next step due from the trading-day playbook below (11:15 first, else 11:45, one trade a day; the 10:45 and
-    12:15 alarms exist but the user doesn't trade them), or `./eod_checklist.sh` after the close;
+  - the next step due from the trading-day playbook below (plan B: the 10:45 signal taken when standup ends, else
+    11:15, else 11:45, one trade a day; never the 10:15 alarm; 12:15 not traded), or `./eod_checklist.sh` after the close;
   - the last scan result;
   - the live log so far: trades, results.
 - **Current rules**: a 2-3 line recap of STRATEGY.md section 1.
@@ -68,15 +68,20 @@ Do NOT start new research, write code, or change anything yet. If the user's fir
 want, fold this orientation into answering it directly. On a trading day, end the summary with the playbook step that
 is due now (below) and offer to run it -- the user does not run commands; they ask you to.
 
-### Trading-day playbook (the user asks, you run; plan = one trade a day, 11:15 first, else 11:45)
+### Trading-day playbook (the user asks, you run; plan B adopted 2026-10-04 = one trade a day: the 10:45 signal when standup ends, else 11:15, else 11:45)
+
+The user's day: free 10:15-10:20, standup ~10:20-10:50. Plan B on the 30m backtest (STRATEGY section 1 plan table):
+target / stall / stop 40 / 13 / 47, net ~Rs+220 per trade vs Rs+94 for the old 11:15-first plan. The sooner after
+10:45 the scan runs, the better (10:50 best; 11:00 still good).
 
 All commands from `intradaygeeks_replica/`. Times IST.
 
 | When | Run | Notes |
 |---|---|---|
-| any time before 11:15 | `python3 38_alarm_scan_1h_close.py --prep` | builds today's candidate list; also flags STALE data (then the EOD run was missed) |
-| 11:16-11:20 | `python3 38_alarm_scan_1h_close.py` | 11:15 check = the FULL 10:15-11:15 hourly bar, stop = hour high |
-| 11:46-11:50, only if no trade at 11:15 | `python3 38_alarm_scan_1h_close.py` | half-hour check; skips a shallow pullback after a strong green 10:15 hour (printed as "skipped, would otherwise qualify") |
+| 10:15-10:20 (user free), or any time before standup | `python3 38_alarm_scan_1h_close.py --prep` | builds today's candidate list; also flags STALE data (then the EOD run was missed). NEVER trade the 10:15 alarm (script 87: opening noise, turns the plan negative) |
+| as soon as standup ends (~10:50, up to ~11:10) | `python3 38_alarm_scan_1h_close.py` | judges the 10:45 candle (10:15-10:45 half-hour). ENTER = short now at market. SKIP / DEAD = no 10:45 trade, wait for 11:15. Do NOT rest a limit at the signal close (script 86: worse) |
+| 11:16-11:20, only if no trade yet | `python3 38_alarm_scan_1h_close.py` | 11:15 check = the FULL 10:15-11:15 hourly bar, stop = hour high |
+| 11:46-11:50, only if still no trade | `python3 38_alarm_scan_1h_close.py` | half-hour check; skips a shallow pullback after a strong green 10:15 hour (printed as "skipped, would otherwise qualify"). Last trade window of the day |
 | after 15:30 | `./eod_checklist.sh` (from the repo root) | shared with Primed BC: Part A data + health check, Part B trading |
 
 - If the scan prints DATA NOT READY, Yahoo is lagging: wait a minute and run again.
@@ -88,13 +93,19 @@ All commands from `intradaygeeks_replica/`. Times IST.
   Target = the user's fill minus 1%.
 - To check a setup on the chart, use `python3 69_snapshot.py TICKER YYYY-MM-DD HH:MM --text`. That's the hourly bars
   plus the checklist, as text. Never open image windows: the user is at work during market hours.
+- Pick = FIRST COME (the scan marks it): the setup closest to the 1H EMA34 at the first alarm with an ENTER. Do not
+  re-order by ATR, volatility, wick or candle shape (all tested worse or not robust).
+- Being underwater soon after entry is normal: 73% of eventual target trades come back to the entry price first.
 - After a trade:
   - ask the user for fill price/time and exit;
+  - log the outcome as target / stall (out at 15:15 or 5h) / stop, plus the stock's daily ATR, so the live target-hit
+    rate can be compared with the backtest (30m plan B: 40% target; 3-yr 1H: ~25%);
   - append a row to `live_watch_log.csv` (same columns as the existing rows);
   - do not guess fills.
 - Keep it simple. Lead with what to do, not statistics. The user is trading live.
 
 Standing rules for this thread:
+- Judge everything NET of charges (~Rs85 per Rs 1 lakh MIS round trip until real contract notes replace it).
 - A filter is adopted only if it helps in BOTH the 30-min (Jun 2026 on) and the 3-year 1H datasets.
 - Thresholds are declared before running.
 - Always show baseline, kept and removed side by side, with each month or year.

@@ -1,6 +1,6 @@
 # Intraday 34-EMA rejection (shorts): living strategy doc
 
-Last updated: 2026-10-04 (IST, late night): target / stall / stop studies, entry variants and alarm timing (scripts 76-87). No checklist rule changed; 1% target kept; plan option B (10:45 signal taken when standup ends) is the leading candidate -- see the plan table in section 1. Earlier same day: full-hour candle at 11:15 / 12:15 and the strong-green-hour skip adopted (scripts 68, 70); chart-review tests 72-75 closed.
+Last updated: 2026-10-04 (IST, late night): target / stall / stop studies, entry variants and alarm timing (scripts 76-87). No checklist rule changed; 1% target kept; plan B (10:45 signal taken when standup ends, else 11:15, else 11:45) ADOPTED for live -- see the plan table in section 1. Earlier same day: full-hour candle at 11:15 / 12:15 and the strong-green-hour skip adopted (scripts 68, 70); chart-review tests 72-75 closed.
 Detailed test-by-test log: `TELEGRAM_CALLS.md`. Literature notes: `INTRADAY_RESEARCH.md`.
 All returns are % per trade, gross of costs, unless stated.
 
@@ -52,7 +52,7 @@ Your broker must allow intraday (MIS) shorting of the name.
   whichever comes first. An exit after 2.5 hours tested the same.
 - **Exit decision (user, 2026-10-02):** a fixed 1% target and a fixed stop, with no trailing while trading by hand.
   A prior-candle trail did worse (script 45). Revisit when automating.
-- **One trade a day, first come:** the first alarm with a setup, and at the same alarm the one closest to the EMA.
+- **One trade a day, first come (plan B, adopted 2026-10-04):** the 10:45 signal when standup ends if the scan says ENTER, else 11:15, else 11:45 -- the first alarm with a setup, and at the same alarm the one closest to the EMA.
   No further filter reliably separates better from worse setups once the checklist and the 2:1 rule pass (script 56),
   so the scan lists **every** qualifying setup (user: equal quality -> watch them all on the chart, it's where the next
   improvement will come from) and marks the first-come one as the one-trade-a-day choice.
@@ -78,7 +78,7 @@ charges per Rs 1 lakh; scripts 83, 86, 87):**
 | B, looked at 11:00 | 67 | 34 / 13 / 52 | Rs+172 | Rs11,529 | 5 | -1,561 |
 | 10:15 first, then B | 69 | 23 / 9 / 68 | Rs-49 | -3,357 | | |
 
-B is the leading candidate (user's standup runs ~10:20-10:50): run the scan as soon as standup ends; ENTER = short at
+**B ADOPTED (user, 2026-10-04) for live from 2026-10-05** (standup runs ~10:20-10:50): run the scan as soon as standup ends; ENTER = short at
 market (target = fill - 1%, stop = candle high); SKIP / DEAD = wait for 11:15. A limit at the signal close is worse
 (script 86). 30m data only -- the 3-year 1H set has no 10:45 alarm; it was the original plan, moved to 11:15 for
 logistics only. Use 10:15-10:20 for `--prep`, never the 10:15 alarm (script 87). 3-year 1H plan (11:15 else 12:15):
