@@ -34,6 +34,11 @@ Your broker must allow intraday (MIS) shorting of the name.
   1H -40, 71-83% stopped; small: 6 / 51 trades). A DEEP pullback (below the green bar's midpoint) is the best group
   (failed reclaim: 30m +256, 1H +149) -- keep those. Plan 11:15-else-11:45: +171 -> +179 per trade; 1H 3-yr +117 -> +117.
 
+**User's hard skip (2026-10-04, telemetry -- not backtest-proven):** skip a setup whose 1H EMA8 sits 0.4-0.6% below the
+candle close (on all setups this zone lost in both sets: 1H net Rs-20 / -99 per trade, stops 57-66%; on the one-a-day
+plan the effect is within noise). The scan marks it `SKIP (EMA8 0.4-0.6% below)` and FIRST COME passes to the next
+ENTER; skipped setups are logged with their would-be outcome. Review after ~20 cases.
+
 **Checks at the moment of entry:**
 - close below the daily 8-EMA;
 - the day's high so far has pierced the live daily 8-EMA;

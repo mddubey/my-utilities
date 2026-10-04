@@ -79,7 +79,7 @@ All commands from `intradaygeeks_replica/`. Times IST.
 | When | Run | Notes |
 |---|---|---|
 | 10:15-10:20 (user free), or any time before standup | `python3 38_alarm_scan_1h_close.py --prep` | builds today's candidate list; also flags STALE data (then the EOD run was missed). NEVER trade the 10:15 alarm (script 87: opening noise, turns the plan negative) |
-| as soon as standup ends (~10:50, up to ~11:10) | `python3 38_alarm_scan_1h_close.py` | judges the 10:45 candle (10:15-10:45 half-hour). ENTER = short now at market. SKIP / DEAD = no 10:45 trade, wait for 11:15. Do NOT rest a limit at the signal close (script 86: worse) |
+| as soon as standup ends (~10:50, by 11:05: the scan drops the 10:45 candle 20 min after it closes) | `python3 38_alarm_scan_1h_close.py` | judges the 10:45 candle (10:15-10:45 half-hour). ENTER = short now at market. SKIP / DEAD = no 10:45 trade, wait for 11:15. Do NOT rest a limit at the signal close (script 86: worse) |
 | 11:16-11:20, only if no trade yet | `python3 38_alarm_scan_1h_close.py` | 11:15 check = the FULL 10:15-11:15 hourly bar, stop = hour high |
 | 11:46-11:50, only if still no trade | `python3 38_alarm_scan_1h_close.py` | half-hour check; skips a shallow pullback after a strong green 10:15 hour (printed as "skipped, would otherwise qualify"). Last trade window of the day |
 | after 15:30 | `./eod_checklist.sh` (from the repo root) | shared with Primed BC: Part A data + health check, Part B trading |
@@ -89,8 +89,14 @@ All commands from `intradaygeeks_replica/`. Times IST.
   - summary first: the FIRST COME pick (ticker, entry, stop, stop %, target) and its status;
   - then the full table;
   - then "no setups" plainly if empty.
-- Status column: only ENTER is tradeable. DEAD = the stop was already touched. SKIP = 2:1 is gone at the current price.
-  Target = the user's fill minus 1%.
+- Status column: only ENTER is tradeable. DEAD = the stop was already touched. SKIP (2:1 gone) = the stop is now > 0.5%
+  above the current price. SKIP (EMA8 0.4-0.6% below) = the user's hard rule (2026-10-04): the 1H EMA8 sits 0.4-0.6%
+  under the candle close -- on all setups that zone lost in both data sets (more stops), so the user never takes it; the
+  scan already passes FIRST COME to the next ENTER. Target = the user's fill minus 1%.
+- TELEMETRY for that rule: after the close (or next session), check what every SKIP (EMA8) setup of the day would have
+  done (entry = candle close, stop = candle high, 1% target, out 15:15) from the 5-min cache, and append it to
+  `live_watch_log.csv` with setup "EMA8-zone skip (telemetry)" and no user fill. After ~20 such rows, compare with the
+  trades actually taken; the rule is kept, changed or dropped on that live evidence.
 - To check a setup on the chart, use `python3 69_snapshot.py TICKER YYYY-MM-DD HH:MM --text`. That's the hourly bars
   plus the checklist, as text. Never open image windows: the user is at work during market hours.
 - Pick = FIRST COME (the scan marks it): the setup closest to the 1H EMA34 at the first alarm with an ENTER. Do not
@@ -99,7 +105,7 @@ All commands from `intradaygeeks_replica/`. Times IST.
 - After a trade:
   - ask the user for fill price/time and exit;
   - log the outcome as target / stall (out at 15:15 or 5h) / stop, plus the stock's daily ATR, so the live target-hit
-    rate can be compared with the backtest (30m plan B: 40% target; 3-yr 1H: ~25%);
+    rate can be compared with the backtest (30m plan B: 40% target; 3-yr 1H: ~25%), plus the scan's ema8_below%;
   - append a row to `live_watch_log.csv` (same columns as the existing rows);
   - do not guess fills.
 - Keep it simple. Lead with what to do, not statistics. The user is trading live.

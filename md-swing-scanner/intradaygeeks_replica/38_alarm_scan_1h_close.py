@@ -188,7 +188,8 @@ if __name__ == "__main__":
         if all(checks.values()):
             rows.append(dict(ticker=t, candle=f"{last:%H:%M}-{cend:%H:%M}" + (" (full hour)" if cend - last == pd.Timedelta("60min") else ""), entry=round(cl, 2), stop=round(hi, 2), stop_pct=round((hi - cl) / cl * 100, 2),
                              target=round(cl * 0.99, 2), ema34_1h=round(E, 2), below_ema_pct=round(dist, 2), live_d8=round(live, 2),
-                             day_high=round(day_hi, 2), adx=round(P.at[t, "adx"], 1), **late_status(g, cend, hi)))
+                             day_high=round(day_hi, 2), adx=round(P.at[t, "adx"], 1), ema8_1h=round(E8, 2),
+                             ema8_below_pct=round((cl - E8) / cl * 100, 2), **late_status(g, cend, hi)))
     R = pd.DataFrame(rows)
     if skipped_green:
         _rr = float(sys.argv[sys.argv.index("--rr") + 1]) if "--rr" in sys.argv else 2.0
@@ -209,11 +210,16 @@ if __name__ == "__main__":
     # 2026-10-03 (56): after the checklist + 2:1 rule no further filter reliably separates better from worse setups,
     # so every qualifying setup is shown (user: equal quality -> show them all, watch them, learn). The first-come one
     # (first alarm with a setup; same alarm -> closest to EMA) is marked for days only one trade is taken.
+    # 2026-10-04 (user's hard rule, TELEMETRY -- not backtest-proven): 1H EMA8 0.4-0.6% below the candle close lost on all
+    # setups in both data sets (more stops); the user skips these, the pick passes to the next ENTER, and the skipped
+    # setup is still saved here so its outcome can be checked later.
+    zone = (R.ema8_below_pct > 0.4) & (R.ema8_below_pct <= 0.6) & (R.status == "ENTER")
+    R.loc[zone, "status"] = "SKIP (EMA8 0.4-0.6% below)"
     live_ix = [i for i, v in enumerate(R.status) if v == "ENTER"]
     R.insert(0, "pick", ["FIRST COME" if i == (live_ix[0] if live_ix else -1) else "" for i in range(len(R))])
     print(f"\n{len(R)} SHORT setup(s), all equal quality after the filters. status = where it stands NOW; enter only 'ENTER' ones,"
           f" target = your fill - 1%. FIRST COME = first ENTER, the one-trade-a-day choice:\n")
-    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "below_ema_pct"]
+    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "below_ema_pct", "ema8_below_pct"]
     pd.set_option("display.width", 200)
-    print(R[show].rename(columns={"risk_now_pct": "stop%_now", "target_now": "target", "entry": "candle_close", "below_ema_pct": "below_ema%"}).to_string(index=False))
-    print(f"saved {out.name}")
+    print(R[show].rename(columns={"risk_now_pct": "stop%_now", "target_now": "target", "entry": "candle_close", "below_ema_pct": "below_ema%", "ema8_below_pct": "ema8_below%"}).to_string(index=False))
+    R.to_csv(out, index=False); print(f"saved {out.name}")
