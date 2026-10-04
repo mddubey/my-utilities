@@ -169,6 +169,8 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 | Skip only if a pivot blocks the target AND the market is up at the alarm (script 73) | Closed: headline points the wrong way in both sets; no version passes both | 73 |
 | Daily 8-EMA above our stop (script 74) | Closed: 30m better, 1H worse | 74 |
 | Allow EMA8 > EMA34 when the EMA8 is rolling over (T2) | Closed: below average on 1H, hurts the 1H plan | 75 |
+| How far do shorts go / ideal target (no 2:1, with and without the 0.5% cap) | Median best point before the stop 0.4-0.6%; ~20% reach 1%. Profit per trade is a PLATEAU from 1% to 3% target (30m 1%: Rs131, 1.5%: 134, hold to 15:15: 114; 1H 98 / 103 / 111); 0.5% clearly worse (116 / 65). Keep 1%. Dropping 2:1 halves R per trade -> keep 2:1. 1H: 42% of post-entry lows are in the last hour | 76 |
+| Where do shorts reverse? Placebo test of 9 levels (1H EMA8, day low so far, prev-day low/close, daily/weekly PP and S1, daily EMA20) | No level clearly holds price. Previous day's low is the only modest one (lowest point before a stop: 1.57x placebo on 30m p=0.02, 1.27x on 1H p=0.07). 1H EMA8 = placebo: it sits 0.2-0.3% under entry, so lows land near it by geometry. Weekly S1 is AVOIDED (0.3-0.5x placebo) | 77 |
 | The channel's own calls by side | 68% longs; longs +0.031% vs shorts +0.002% at target 1; the edge is counter-trend on both sides; most calls match none of his public scanners | 50 |
 
 ---
