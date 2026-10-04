@@ -247,6 +247,17 @@ must be explicitly ruled out before the first is treated as high-confidence.
    does the candle's actual OHLC state make semantic sense for the claimed event? If
    a bullish breakout is intended, how many qualifying events are actually red
    (Close < Open)? Is a partial/live candle ever confused with a completed one?
+   **Caveat, learned the hard way on RQ-OM-00 (2026-10-05)**: this only flags a real
+   problem when the event's own claimed definition is violated by the candle color
+   (e.g. a "breakout" used as a claimed EOD bullish-confirmation signal that turns out
+   red — GRASIM in EMAPB). If the event is explicitly and only a live intrabar trigger
+   (e.g. a real IOC fires the moment `High >= level`), the candle hasn't even closed
+   yet at the decision moment — pooling red and green outcomes afterward is NOT a
+   measurement defect, it's an honest description of "what happens after every live
+   touch." Don't conflate "outcomes vary by a feature unknowable at decision time"
+   (normal, not a defect) with "the population doesn't represent the claimed event"
+   (the actual thing this rule catches). Check what the event CLAIMS before flagging
+   its candle color as a problem.
 2. **Wick vs close, stated explicitly.** Every "broken / reclaimed / confirmed /
    resolved / continued" claim must say whether it means High/Low touched the level,
    an intrabar cross, a candle close beyond it, or a later candle's confirmation.

@@ -502,16 +502,34 @@ real stop at the touch-day's own Low would have been hit three days before the m
 happened. Matched 26,252/26,265 touches (99.95%) to raw bars; numbers are not a join
 artifact.
 
-**Interpretation — not a "Superseded" result, a "Conditional" one.** The pre-touch
-dashboard-state closure (Family A/B/C, G.1, `touch_vol_ratio`) is unaffected: none of
-Dim 1/2/4 above is knowable at the live IOC decision moment, so "no pre-entry OHLCV
-predictor" still stands. What changes: the **pooled 6-year baseline itself** was never
-decomposed by the simplest possible same-day-close signal (did the touch bar even close
-above the level it touched) — a much bigger effect than `touch_vol_ratio`, which *was*
-tested and banked. This is the same information family (same-day-closed, not
-live-IOC-actionable — same non-actionability caveat as `touch_vol_ratio`/G.1), just a
-stronger, cheaper, previously-untested member of it, worth a note on the board even
-though it doesn't reopen the pre-entry question.
+**CORRECTION (same day, user caught it before this went further)**: the interpretation
+below originally tagged the 6-year baseline "Conditional" on the strength of Dim 1/2.
+That was wrong, and the reasoning is worth keeping on record since it's the exact
+conflation Rule #23 exists to prevent — just pointed the wrong way. `touched` never
+claims anything about the candle's eventual close; it claims "price crossed this level,
+live, right now" — which is exactly when the real IOC fires. The candle's Close vs Open
+isn't known until well after the entry has already happened. That's categorically
+different from EMAPB's GRASIM case, where the "A" day WAS being used as a claimed
+bullish-continuation-setup event, and a red close directly falsified that claim. Here,
+pooling red and green touch-day candles isn't a measurement defect — it's an honest,
+correctly-labeled description of "what happens after every live-IOC touch," which is
+exactly what the baseline was built to measure. Dim 1/2 don't downgrade it, and they
+don't touch the closed predictor searches (RVOL, Family A/B/C, `cum_vol_ratio`,
+`dist_open_atr`) either — those stay exactly as closed, High-confidence, unaffected.
+
+**Interpretation, corrected.** Dim 1/2's real contribution is narrower than first
+written: a same-day-close split (red/green, `close_above`) that's real and large, but
+only usable **after** entry — same non-actionable-at-decision-time bucket as
+`touch_vol_ratio`/G.1 (already banked), just a bigger, previously-untested member of
+that same family. Candidate use: not an entry filter (can't be, the IOC already fired),
+possibly a same-day/next-day exit- or stop-management signal — worth banking as a new
+diagnostic lead, not a reason to touch anything already closed.
+
+Dim 4 is a different kind of claim and survives on its own terms: it isn't about
+predicting BLAST, it's about what the BLAST/STALL/FAIL *label* actually represents as a
+trade experience. 19.2% of BLAST-labeled touches breach their own entry-day Low first;
+26.6% close back below the trigger first. That's real information about the label's
+honesty, independent of whether anything predicts it in advance.
 
 **Cross-reference, not yet reconciled**: `close_above` here is conceptually the same
 split as `confirmed_day1/RQ-CD1`'s "Confirmed" (Close0 > raw pivot) — RQ-CD1 called
@@ -521,27 +539,28 @@ FAIL). Both can be true (a small daily edge compounding into a materially differ
 5-day distribution) but this hasn't been directly checked against RQ-CD1's own numbers
 — flagged, not resolved, per the theoretical-sanity-check discipline.
 
-**Prime BC positional-character connection**: Dim 4 directly supports the reframe —
-"BC's tested implementation didn't establish the short-horizon phenomenon and evolved
-into a positional trade" is more consistent with this data than "the phenomenon doesn't
-exist." A meaningful share of real winners (BLAST, 19-27%) only resolve as winners
-*after* round-tripping through a level a tight near-term stop would have hit — a stop
-tight enough to capture the "fast" cases cuts into real eventual winners, which is
+**Prime BC positional-character connection**: Dim 4 (not Dim 1/2) is what supports the
+reframe — "BC's tested implementation didn't establish the short-horizon phenomenon and
+evolved into a positional trade" is more consistent with this data than "the phenomenon
+doesn't exist." A meaningful share of real winners (BLAST, 19-27%) only resolve as
+winners *after* round-tripping through a level a tight near-term stop would have hit —
+a stop tight enough to catch the "fast" cases cuts into real eventual winners, which is
 exactly the kind of pressure that pushes an exit engine toward wider stops/trailing
 over time, independent of whether a genuinely fast subset of moves also exists.
 
-**Revised board, per Rule #23's closure taxonomy:**
+**Revised board, per Rule #23's closure taxonomy (corrected):**
 
 | Item | Prior disposition | Rule #23 taxonomy |
 |---|---|---|
-| 6-year touched→STALL baseline | ESTABLISHED | **Conditional** — correct as stated, but never decomposed by same-day-close; not wrong, just not yet earning "high-confidence" as *the* reference population |
+| 6-year touched→STALL baseline | ESTABLISHED | **High-confidence, unchanged** — correctly and honestly describes the live-IOC-touch population; candle-color/close-confirmation is unexplored heterogeneity, not a measurement defect (corrected from an earlier, wrong "Conditional" tag) |
 | Peak-shape anatomy | ESTABLISHED / useful context | High-confidence (not touched by this audit) |
-| `cum_vol_ratio`, `dist_open_atr`, 4-feature family-wise (gap_pct/first_dir_up/range_so_far_atr/dist_to_trigger_atr) | CLOSE | **High-confidence** — these are genuinely pre-touch/live-IOC-moment features; Dim 1/2/4 don't touch their null result |
-| `touch_vol_ratio` (stock + options), G.1 S1 timing | BANK AS DIAGNOSTIC | High-confidence as diagnostic; **strengthened**, not undermined, by Dim 2 showing a same-day-closed sibling signal with a much bigger effect |
+| `cum_vol_ratio`, `dist_open_atr`, 4-feature family-wise (gap_pct/first_dir_up/range_so_far_atr/dist_to_trigger_atr) | CLOSE | **High-confidence, unchanged** — genuinely pre-touch/live-IOC-moment features; none of Dim 1/2/4 touches their null result |
+| `touch_vol_ratio` (stock + options), G.1 S1 timing | BANK AS DIAGNOSTIC | High-confidence as diagnostic, unchanged; Dim 2 adds a same-day-closed sibling signal (bigger effect, same non-actionable-at-entry status) worth banking alongside it |
+| BLAST/STALL/FAIL *label*, as a description of trade experience (not as a predictor target) | (implicit, never separately audited) | **New finding, Dim 4**: the label hides real stop-breach risk in 19-27% of "winners" — relevant to exit/stop design, not to the entry-predictor question |
 | RQ-TA1 overall "order-flow/depth question is what legitimately reopens" framing | — | Unchanged — still true for the pre-entry question specifically |
 
-**Not done, deliberately**: no new filter built on `close_above`/red-candle (per
-RQ-OM-00's own scope — existing fields, no new thresholds); no re-audit yet of
+**Not done, deliberately**: no new filter or exit rule built on `close_above`/red-candle
+(per RQ-OM-00's own scope — existing fields, no new thresholds); no re-audit yet of
 options_momentum/OMD-01/02, RQ-BPC-05, or SST1 (highest-leverage shared population
 audited first, per the rule's own "don't reopen everything at once" instruction); no
 reconciliation with RQ-CD1 attempted yet.
