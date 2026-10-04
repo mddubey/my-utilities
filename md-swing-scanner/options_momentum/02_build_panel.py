@@ -173,7 +173,15 @@ def process_ticker(ticker, cal, ca_sessions):
                next_tmfe=next_tmfe, next_tmae=next_tmae, next_nbars=next_nbars)
 
     df = pd.DataFrame(out)
-    df = df[df.r.notna()]   # keep only qualifying events (a valid prior-bar return)
+    # keep only qualifying events: a valid, non-zero prior-bar return. r==0 (exactly flat,
+    # 5.1% of all rows, concentrated in illiquid/stale-price tickers like AKSHAR/GTLINFRA) is
+    # not a directional move -- np.sign(0)==0 would otherwise silently fall into the "down"
+    # branch everywhere (direction>0 is False for 0). Caught 2026-10-04 via the
+    # pre_reversal_mfe<=next_mfe invariant check in 04_build_reversal_panel.py. r==0 bars are
+    # still included as legitimate data points in the rolling z-score BASELINE above (a stock
+    # sometimes not moving is real information about its own distribution) -- only excluded
+    # from being emitted as a bucketed directional EVENT here.
+    df = df[df.r.notna() & (df.r != 0)]
     return df
 
 

@@ -1,0 +1,84 @@
+=== RQ-OMD-02 reversal quality map -- 2026-10-04 10:01 ===
+Panel: 8,379,394 rows, 2192 tickers, 2023-10-23 -> 2026-10-01
+intraday-originated: 7,120,173  |  overnight-originated: 1,259,221
+
+--- Table 1: retracement checkpoint reach-rate and median time-to-reach, by bucket x origin ---
+(primary windows: intraday z=1512 bars ~1y, gap z=252 sessions ~1y -- calendar-matched)
+    group      bucket       n  reached25_pct  median_t25  reached50_pct  median_t50  reached75_pct  median_t75  reached100_pct  median_t100
+ intraday  dn_unusual   89082          0.895       1.000          0.787       2.000          0.666       2.000           0.531        3.000
+ intraday dn_elevated  338603          0.925       1.000          0.860       1.000          0.787       2.000           0.703        2.000
+ intraday   dn_normal 1765068          0.950       1.000          0.930       1.000          0.906       1.000           0.879        1.000
+ intraday   up_normal 1421560          0.950       1.000          0.933       1.000          0.915       1.000           0.893        1.000
+ intraday up_elevated  303589          0.926       1.000          0.865       1.000          0.799       2.000           0.723        2.000
+ intraday  up_unusual  119394          0.882       1.000          0.766       2.000          0.638       2.000           0.502        3.000
+overnight  dn_unusual   16339          0.782       2.000          0.614       5.000          0.459       6.000           0.309        7.000
+overnight dn_elevated   64676          0.843       1.000          0.716       2.000          0.601       4.000           0.487        5.000
+overnight   dn_normal  260538          0.914       1.000          0.857       1.000          0.802       1.000           0.747        2.000
+overnight   up_normal  290101          0.942       1.000          0.898       1.000          0.850       1.000           0.797        2.000
+overnight up_elevated   60075          0.831       1.000          0.688       3.000          0.553       5.000           0.424        6.000
+overnight  up_unusual   20566          0.730       2.000          0.499       5.000          0.316       7.000           0.187        7.000
+
+--- Table 2: pre-reversal max continuation (median, log-return units), where measurable ---
+(excludes the ~79% of cases where the 25% checkpoint is crossed in the very first forward
+ bar -- there, 'continuation before reversal' isn't computable from 1H OHLC; reported as
+ its own share below, not silently dropped)
+    group      bucket      n  median_pre_reversal_mfe  share_of_eligible
+ intraday  dn_unusual  25956                   0.0092             0.2895
+ intraday dn_elevated  77900                   0.0085             0.2289
+ intraday   dn_normal 238405                   0.0096             0.1347
+ intraday   up_normal 144250                   0.0101             0.1013
+ intraday up_elevated  57107                   0.0081             0.1875
+ intraday  up_unusual  31813                   0.0094             0.2651
+overnight  dn_unusual   7148                   0.0105             0.4365
+overnight dn_elevated  22580                   0.0101             0.3477
+overnight   dn_normal  52580                   0.0102             0.2011
+overnight   up_normal  53691                   0.0093             0.1847
+overnight up_elevated  20688                   0.0085             0.3438
+overnight  up_unusual   8584                   0.0115             0.4168
+
+--- Table 3: robustness -- unusual buckets, across calendar-matched window pairs ---
+[~4mo]
+         group     bucket      n  reached50_pct  median_t50  reached100_pct  median_t100
+intraday W=504 dn_unusual 142578          0.794       2.000           0.545        3.000
+intraday W=504 up_unusual 188740          0.760       2.000           0.496        3.000
+overnight W=84 dn_unusual  25675          0.603       5.000           0.308        7.000
+overnight W=84 up_unusual  34598          0.516       5.000           0.206        7.000
+[~1y (primary)]
+          group     bucket      n  reached50_pct  median_t50  reached100_pct  median_t100
+intraday W=1512 dn_unusual  89082          0.787       2.000           0.531        3.000
+intraday W=1512 up_unusual 119394          0.766       2.000           0.502        3.000
+overnight W=252 dn_unusual  16339          0.614       5.000           0.309        7.000
+overnight W=252 up_unusual  20566          0.499       5.000           0.187        7.000
+[~2y]
+          group     bucket     n  reached50_pct  median_t50  reached100_pct  median_t100
+intraday W=3024 dn_unusual 35140          0.792       2.000           0.536        3.000
+intraday W=3024 up_unusual 47348          0.776       2.000           0.514        3.000
+overnight W=504 dn_unusual  5568          0.598       4.000           0.302        7.000
+overnight W=504 up_unusual  8496          0.525       5.000           0.199        7.000
+
+--- Table 4: F&O-unusual vs F&O-normal (within F&O only) -- the comparison OMD-01's Table 6 lacked ---
+       group      bucket      n  reached25_pct  median_t25  reached50_pct  median_t50  reached75_pct  median_t75  reached100_pct  median_t100
+F&O intraday  dn_unusual   9874          0.869       1.000          0.738       2.000          0.621       3.000           0.514        3.000
+F&O intraday dn_elevated  43039          0.908       1.000          0.829       1.000          0.747       2.000           0.673        2.000
+F&O intraday   dn_normal 201466          0.949       1.000          0.923       1.000          0.896       1.000           0.869        1.000
+F&O intraday   up_normal 184643          0.943       1.000          0.917       1.000          0.891       1.000           0.865        1.000
+F&O intraday up_elevated  41458          0.898       1.000          0.812       1.000          0.729       2.000           0.652        2.000
+F&O intraday  up_unusual  13004          0.834       1.000          0.689       2.000          0.561       3.000           0.449        4.000
+
+For comparison, non-F&O intraday (same cut):
+           group      bucket       n  reached25_pct  median_t25  reached50_pct  median_t50  reached75_pct  median_t75  reached100_pct  median_t100
+non-F&O intraday  dn_unusual   79208          0.899       1.000          0.793       2.000          0.671       2.000           0.533        3.000
+non-F&O intraday dn_elevated  295564          0.928       1.000          0.865       1.000          0.793       2.000           0.707        2.000
+non-F&O intraday   dn_normal 1563602          0.950       1.000          0.930       1.000          0.908       1.000           0.880        1.000
+non-F&O intraday   up_normal 1236917          0.951       1.000          0.935       1.000          0.918       1.000           0.897        1.000
+non-F&O intraday up_elevated  262131          0.931       1.000          0.874       1.000          0.810       1.000           0.734        2.000
+non-F&O intraday  up_unusual  106390          0.888       1.000          0.775       2.000          0.648       2.000           0.508        3.000
+
+--- Table 5: year-by-year retracement speed, unusual buckets, intraday-originated ---
+group     bucket     n  reached25_pct  median_t25  reached50_pct  median_t50  reached75_pct  median_t75  reached100_pct  median_t100
+ 2024 dn_unusual  5314          0.873       1.000          0.742       2.000          0.622       2.000           0.487        3.000
+ 2024 up_unusual  7610          0.874       1.000          0.729       2.000          0.584       2.000           0.450        3.000
+ 2025 dn_unusual 38430          0.894       1.000          0.781       2.000          0.656       2.000           0.516        3.000
+ 2025 up_unusual 52765          0.880       1.000          0.760       2.000          0.627       2.000           0.488        3.000
+ 2026 dn_unusual 45338          0.899       1.000          0.797       2.000          0.679       2.000           0.549        3.000
+ 2026 up_unusual 59019          0.886       1.000          0.775       2.000          0.655       2.000           0.521        3.000

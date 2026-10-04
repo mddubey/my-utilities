@@ -1,6 +1,6 @@
-=== RQ-OMD-01 behaviour map -- 2026-10-04 08:52 ===
-Panel: 8,832,352 rows, 2192 tickers, 2023-10-23 -> 2026-10-01
-Intraday-bar events: 7,554,116  |  gap-bar events: 1,278,236  (14.5%)
+=== RQ-OMD-01 behaviour map -- 2026-10-04 09:55 ===
+Panel: 8,379,394 rows, 2192 tickers, 2023-10-23 -> 2026-10-01
+Intraday-bar events: 7,120,173  |  gap-bar events: 1,259,221  (15.0%)
 F&O share of tickers in panel: 9.5% (current F&O list, reporting split only, not a filter)
 
 --- Table 1: forward behaviour by stock-relative magnitude bucket (W=1512, intraday bars only) ---
@@ -15,11 +15,11 @@ dn_elevated              2H  340201     -0.0004   -0.0014        0.4695      0.0
 dn_elevated              3H  339787     -0.0003   -0.0013        0.4796      0.0083     -0.0108
 dn_elevated rest-of-session  309505      0.0000   -0.0000        0.4878      0.0063     -0.0074
 dn_elevated    next session  338603      0.0008    0.0001        0.5132      0.0167     -0.0191
-  dn_normal              1H 1955913      0.0000   -0.0001        0.4542      0.0035     -0.0034
-  dn_normal              2H 1955602      0.0000   -0.0000        0.4677      0.0060     -0.0059
-  dn_normal              3H 1954671      0.0000    0.0001        0.4729      0.0082     -0.0082
-  dn_normal rest-of-session 1592138      0.0000    0.0010        0.4911      0.0058     -0.0048
-  dn_normal    next session 1952103      0.0000    0.0015        0.4989      0.0158     -0.0154
+  dn_normal              1H 1768572      0.0001   -0.0001        0.5023      0.0036     -0.0036
+  dn_normal              2H 1768318      0.0004   -0.0000        0.5172      0.0061     -0.0060
+  dn_normal              3H 1767470      0.0006    0.0001        0.5230      0.0082     -0.0082
+  dn_normal rest-of-session 1442954      0.0006    0.0011        0.5419      0.0060     -0.0050
+  dn_normal    next session 1765068      0.0025    0.0017        0.5517      0.0155     -0.0151
   up_normal              1H 1423278     -0.0005   -0.0002        0.4321      0.0032     -0.0040
   up_normal              2H 1422836     -0.0008   -0.0002        0.4448      0.0057     -0.0064
   up_normal              3H 1422539     -0.0010   -0.0002        0.4511      0.0080     -0.0085
@@ -64,7 +64,7 @@ abcd               n  A_immediate_continuation  B_immediate_reversal  C_stall  D
 bucket_1512                                                                                                               
 dn_unusual     89647                     0.137                 0.259    0.371                   0.232                0.001
 dn_elevated   340392                     0.181                 0.310    0.234                   0.274                0.001
-dn_normal    1956889                     0.133                 0.358    0.091                   0.321                0.096
+dn_normal    1769464                     0.147                 0.396    0.101                   0.356                0.001
 up_normal    1423910                     0.119                 0.473    0.127                   0.281                0.001
 up_elevated   304643                     0.160                 0.366    0.256                   0.216                0.002
 up_unusual    119992                     0.138                 0.274    0.395                   0.190                0.004
@@ -91,11 +91,11 @@ D_delayed_continuation: n=43,593  median t_mfe(next-session window, bars)=7.0  m
   gap_up              3H 665796     -0.0020        0.3870
   gap_up rest-of-session 665252     -0.0031        0.3826
   gap_up    next session 664848     -0.0040        0.4305
-gap_down              1H 612434      0.0000        0.4699
-gap_down              2H 612430      0.0000        0.4839
-gap_down              3H 612420      0.0000        0.4958
-gap_down rest-of-session 611186      0.0007        0.5185
-gap_down    next session 610802      0.0018        0.5280
+gap_down              1H 593419      0.0000        0.4850
+gap_down              2H 593415      0.0000        0.4994
+gap_down              3H 593406      0.0003        0.5117
+gap_down rest-of-session 592336      0.0012        0.5350
+gap_down    next session 591832      0.0028        0.5449
 
 --- Table 6: F&O vs non-F&O split -- ABCD shares, unusual buckets only (W=1512) ---
 abcd                    n  A_immediate_continuation  B_immediate_reversal  C_stall  D_delayed_continuation  censored_no_2H_data

@@ -25,9 +25,17 @@ work, once/if a stock-level phenomenon is confirmed — RQ-OMD-01 is stock-only 
 
 ## Status
 
-- RQ-OMD-01 (stock-level fast-move behaviour map): **done, 2026-10-04.** See
-  `RQ-OMD-01_REPORT.md`. Closed-negative on the literal hypothesis (big move -> fast
-  continuation, as a long-options basis); surfaced a robust up-move-fade phenomenon instead
-  (monotonic with move size, holds across 3 z-windows/3 years/an independent gap-bar slice).
-  Logged in `FINDINGS.md`. Next-decision options are listed at the end of the report, not
-  decided yet.
+- RQ-OMD-01 (stock-level fast-move behaviour map) + RQ-OMD-02 (fast reversal quality): **both
+  done and CLOSED, 2026-10-04.** See `RQ-OMD-01_REPORT.md` / `RQ-OMD-02_REPORT.md` /
+  `FINDINGS.md`. OMD-01: closed-negative on fast-continuation-as-long-options-basis; banked a
+  robust fade-with-move-size pattern instead (both directions, monotonic, multi-window/
+  multi-year). Critic verdict: bank the behaviour, not the trade — ordered RQ-OMD-02 as the
+  required next step (overnight/intraday decomposition + continuous retracement depth/speed)
+  before any options framing. OMD-02: the "fade" is mostly a STALL, not a deep reversal —
+  weakens the put-after-spike case rather than strengthening it; overnight-originated moves
+  are actually stickier than intraday ones (argues against an overnight-reversal confound);
+  F&O-vs-non-F&O gap is modest once properly matched. A real bug (flat `r_T==0` bars
+  misclassified as "down" events, caught via an invariant check) was found and fixed during
+  OMD-02's build — corrected OMD-01's dn_normal numbers (strengthened the finding) without
+  touching anything already sent to the critic. Do not resume this branch without a new
+  trigger (critic verdict on OMD-02, or a new hypothesis) — see `FINDINGS.md`.

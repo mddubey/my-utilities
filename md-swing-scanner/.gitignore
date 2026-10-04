@@ -64,3 +64,5 @@ confirmed_day1/events*.csv
 # RQ-OMD-01 -- 100% regeneratable via options_momentum/02_build_panel.py from data/intraday_60m/
 options_momentum/panel_chunk_*.pkl
 options_momentum/panel_full.pkl
+options_momentum/reversal_chunk_*.pkl
+options_momentum/reversal_panel_full.pkl
