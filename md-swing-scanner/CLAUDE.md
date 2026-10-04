@@ -127,6 +127,12 @@ number or name) — this file is only the checklist, not the explanation.
     in the aggregation/formula, not sampling noise. Cheaper and more reliable than
     another robustness sweep.
 
+14. **Has a structurally-defined phenomenon's closed-negative verdict actually been
+    checked against Rule #23's four audit dimensions, or just assumed closed?**
+    (Rule #23 — Measurement Integrity Before Closure, see dedicated section below.)
+    Applies to anything defined in visual/structural terms — breakout, pullback,
+    consolidation, rejection, continuation, reversal — not to purely numeric features.
+
 ## Research Preflight (answer before writing any new RQ's code, adopted 2026-09-27)
 
 Five questions, answered explicitly before coding starts on any new research question:
@@ -223,6 +229,82 @@ caught sector RS: real-looking at 126d, reversed at 21d, wash at 63d — a 126d-
 artifact, not a robust effect, caught before it became a filter.) Not a blanket "test
 everything 3 ways" mandate — applies where a natural parameter choice exists and could
 plausibly have been fit to the data.
+
+## Measurement Integrity Before Closure (Rule #23, adopted 2026-10-05)
+
+A structurally/visually-defined phenomenon (breakout, pullback, consolidation,
+rejection, continuation, reversal, etc.) must not be declared closed-negative until
+the mechanical representation has been checked against the market event it claims to
+measure. A negative result can mean four different things — the phenomenon genuinely
+isn't there; the specific implementation doesn't work; the population doesn't
+represent the intended event; or the measurement/labeling is wrong — and only the
+first is a real finding. Experience shows the last two happen often enough that they
+must be explicitly ruled out before the first is treated as high-confidence.
+
+**Four audit dimensions, minimum, before closing any structurally-defined RQ:**
+
+1. **Trigger-candle sanity.** If the event is a breakout/rejection/continuation:
+   does the candle's actual OHLC state make semantic sense for the claimed event? If
+   a bullish breakout is intended, how many qualifying events are actually red
+   (Close < Open)? Is a partial/live candle ever confused with a completed one?
+2. **Wick vs close, stated explicitly.** Every "broken / reclaimed / confirmed /
+   resolved / continued" claim must say whether it means High/Low touched the level,
+   an intrabar cross, a candle close beyond it, or a later candle's confirmation.
+   Never let code use a wick where the research concept implies a close, or the
+   reverse, silently.
+3. **Discovery population vs. trading constraint.** State explicitly whether
+   position-blocking, one-trade-per-day, cooldowns, or holding-period locks are part
+   of the phenomenon's own definition or merely an inherited portfolio constraint. A
+   discovery population (studying whether a phenomenon exists) should generally be
+   ungated; if a gated population is used anyway, report the suppressed/ungated count
+   too, same discipline as the existing Gate Integrity Rule (item 3 above) but
+   applied to discovery research, not just backtest comparisons.
+4. **Structural context survives the binary label.** A `resumed/failed`,
+   `win/loss`, or `continued/reversed` label can hide the real path. Where the
+   hypothesis is structural, retain the structural high/low, MAE, retracement depth,
+   proximity to invalidation, time spent there, and recovery/reclaim behavior — don't
+   collapse a complex path to a binary before checking whether that collapse destroys
+   the phenomenon being studied.
+
+**Chart audit is not strategy optimization.** Don't use charts to hunt for attractive
+examples or hand-invent rules. But when a mechanical report says "this occurred N
+times and has no useful behaviour," a random sample of that population must be
+inspected and asked "did the code actually identify the thing we said we were
+studying?" — not "does this trade look good?" If the answer to the first question is
+no, the result is a measurement failure, not a negative finding.
+
+**Closure taxonomy** — every research conclusion falls into one of three buckets,
+going forward:
+- **High-confidence closure**: the intended event/population was mechanically
+  verified, chart semantics checked, and the negative result survived.
+- **Conditional closure**: negative/inconclusive, but never received this audit —
+  not wrong, just not yet earned the "high-confidence" label.
+- **Superseded**: a later audit showed the population/measurement was materially
+  wrong, so the old conclusion can no longer be cited as evidence against the
+  underlying phenomenon (the old write-up stays, annotated, not deleted).
+
+Do not retroactively reopen the whole closed-research backlog at once — audit the
+highest-leverage shared population first (the one most other closed findings were
+built on top of), then decide what else needs re-tagging. Most prior "closed"
+verdicts are not wrong; some just haven't earned "high-confidence" yet.
+
+**Applies to Prime BC's own positional character too**: "BC's tested implementation
+did not establish the intended short-horizon phenomenon and evolved into a positional
+trade" is a different, narrower claim than "we proved the underlying market
+phenomenon doesn't exist" — don't conflate the two when citing BC's `max_hold_cap`
+history as evidence either way.
+
+**Born from**: `swing_qs_emapb/`'s RQ-EMAPB session (2026-10-04/05) finding five
+separate definitional bugs in one sitting on the same population — a same-day peak
+leak (EMAPB-03), inherited position-blocking (EMAPB-06), wick-vs-close resolution
+ambiguity (TCS chart check), no bullish-candle requirement letting 17.8% of the
+population be red candles (GRASIM chart check), and no structural-invalidation
+tracking on a `resumed` label that had actually round-tripped through its own entry
+low first (BAJFINANCE chart check). Each one, left uncaught, would have read as "no
+signal" in a final report. Progression with the rule above it: #22 protects a
+surprising positive result from being promoted on a bug; #23 protects a surprising
+negative result from being closed on the same class of bug — Verify-before-promoting
+→ Verify-before-closing.
 
 ## Pre-flight checklist, per RQ (critic-specified, 2026-09-26) — must pass before any number from this project is treated as promotable
 

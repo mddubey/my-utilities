@@ -454,3 +454,94 @@ the Rule #22 spot-check next, do not promote either it or the S1-timing lead to 
 filter yet, and treat Pattern 5 (no OHLCV mechanism distinguishes outcomes) as ruled
 out, not confirmed — something real is there, it just isn't actionable pre-entry with
 this data yet.
+
+## RQ-OM-00 — Measurement-Integrity Audit of the touched population (2026-10-05, per CLAUDE.md Rule #23)
+
+Audits the exact population behind the 6-year baseline and every candidate feature test
+above (`rq_pb2/pivot_feats.pkl`, n=26,265, `touched & ~gap_through`, BLAST/STALL/FAIL =
+r5 ≥1.5 / ≤−1.0 / between, ATR-normalized, at T+5 close). Existing fields only, no new
+filters, no removed observations. Script: `12_measurement_integrity_audit.py`, output
+`rq_om00_out.txt`, round-trip reconstruction `rq_om00_roundtrip.csv` (gitignored,
+regeneratable).
+
+**Dim 1 — trigger-candle sanity.** 24.5% of touches (6,446/26,265) are red candles
+(Close < Open) on the touch day itself. `touched` is correctly wick-based for the
+trigger itself (Rule #18) — this isn't a bug in the trigger definition — but the
+pooled 55.1/26.5/18.5 baseline silently mixes red and green touch-day candles, which
+have very different composition: red touches are 40.4% FAIL / 9.5% BLAST; green
+touches are 21.9% FAIL / 21.4% BLAST. A touch that pokes the trigger and reverses hard
+intraday behaves nothing like one that pushes through cleanly.
+
+**Dim 2 — wick vs close.** 57.1% of ALL touches (14,992/26,265) give back intraday and
+close BELOW the trigger same day (`close_above=False` — already a stored field, never
+conditioned on in any prior test). Composition: `close_above=False` → 34.2% FAIL /
+11.5% BLAST; `close_above=True` → 16.2% FAIL / 27.8% BLAST — more than 2x the FAIL-rate
+spread of anything in the Family A/B/C sweep (max real effect there was |rho|=0.095).
+Mechanically, since `gap_through` rows are excluded (Open always < trigger here), every
+red-candle touch is *necessarily* also a give-back (Close < Open < trigger) — Dim 1's
+24.5% is a strict subset of Dim 2's 57.1%, not an independent second finding.
+
+**Dim 3 — gating.** Verified by source read (`01_build_panel.py`'s `build()` loop has
+no position-state variable at all) and the file's own docstring ("observational, no
+gating of positions... NOT a position population"). **PASS — this population is
+genuinely ungated.** Does not establish anything about downstream consumers; checked
+only for this specific shared panel.
+
+**Dim 4 — structural context (round-trip before resolution).** Reconstructed from raw
+daily bars (not a stored field): did price ever close below the touch-day's own Low,
+or back below the trigger, at any point in T+1..T+5 before the cls label was set?
+**60.1% of ALL touches breach the touch-day's own Low within 5 days; 73.7% close back
+below the trigger again.** By class: FAIL 97.4%/100.0% (expected, that's close to the
+definition). STALL 55.9%/76.8%. **BLAST — the labeled "winner" class — still breaches
+its own entry-day Low 19.2% of the time and closes back below the trigger 26.6% of the
+time before going on to post r5≥1.5.** Hand-verified (Rule #22): HBLENGINE
+2024-02-01 touched at High 544.50 (Low 520.15, trigger 542.70), pulled back to a Low of
+506.05 and a Close of 518.95 on 2024-02-05 (below both the touch-day Low and the
+trigger), then closed 593.70 by 2024-02-09 — r5=1.92, correctly labeled BLAST, but any
+real stop at the touch-day's own Low would have been hit three days before the move
+happened. Matched 26,252/26,265 touches (99.95%) to raw bars; numbers are not a join
+artifact.
+
+**Interpretation — not a "Superseded" result, a "Conditional" one.** The pre-touch
+dashboard-state closure (Family A/B/C, G.1, `touch_vol_ratio`) is unaffected: none of
+Dim 1/2/4 above is knowable at the live IOC decision moment, so "no pre-entry OHLCV
+predictor" still stands. What changes: the **pooled 6-year baseline itself** was never
+decomposed by the simplest possible same-day-close signal (did the touch bar even close
+above the level it touched) — a much bigger effect than `touch_vol_ratio`, which *was*
+tested and banked. This is the same information family (same-day-closed, not
+live-IOC-actionable — same non-actionability caveat as `touch_vol_ratio`/G.1), just a
+stronger, cheaper, previously-untested member of it, worth a note on the board even
+though it doesn't reopen the pre-entry question.
+
+**Cross-reference, not yet reconciled**: `close_above` here is conceptually the same
+split as `confirmed_day1/RQ-CD1`'s "Confirmed" (Close0 > raw pivot) — RQ-CD1 called
+that split "weak" using a Day+1-return lens (+0.26% vs +0.05%). This audit's 5-day
+BLAST/STALL/FAIL lens makes the same underlying split look much larger (34.2% vs 16.2%
+FAIL). Both can be true (a small daily edge compounding into a materially different
+5-day distribution) but this hasn't been directly checked against RQ-CD1's own numbers
+— flagged, not resolved, per the theoretical-sanity-check discipline.
+
+**Prime BC positional-character connection**: Dim 4 directly supports the reframe —
+"BC's tested implementation didn't establish the short-horizon phenomenon and evolved
+into a positional trade" is more consistent with this data than "the phenomenon doesn't
+exist." A meaningful share of real winners (BLAST, 19-27%) only resolve as winners
+*after* round-tripping through a level a tight near-term stop would have hit — a stop
+tight enough to capture the "fast" cases cuts into real eventual winners, which is
+exactly the kind of pressure that pushes an exit engine toward wider stops/trailing
+over time, independent of whether a genuinely fast subset of moves also exists.
+
+**Revised board, per Rule #23's closure taxonomy:**
+
+| Item | Prior disposition | Rule #23 taxonomy |
+|---|---|---|
+| 6-year touched→STALL baseline | ESTABLISHED | **Conditional** — correct as stated, but never decomposed by same-day-close; not wrong, just not yet earning "high-confidence" as *the* reference population |
+| Peak-shape anatomy | ESTABLISHED / useful context | High-confidence (not touched by this audit) |
+| `cum_vol_ratio`, `dist_open_atr`, 4-feature family-wise (gap_pct/first_dir_up/range_so_far_atr/dist_to_trigger_atr) | CLOSE | **High-confidence** — these are genuinely pre-touch/live-IOC-moment features; Dim 1/2/4 don't touch their null result |
+| `touch_vol_ratio` (stock + options), G.1 S1 timing | BANK AS DIAGNOSTIC | High-confidence as diagnostic; **strengthened**, not undermined, by Dim 2 showing a same-day-closed sibling signal with a much bigger effect |
+| RQ-TA1 overall "order-flow/depth question is what legitimately reopens" framing | — | Unchanged — still true for the pre-entry question specifically |
+
+**Not done, deliberately**: no new filter built on `close_above`/red-candle (per
+RQ-OM-00's own scope — existing fields, no new thresholds); no re-audit yet of
+options_momentum/OMD-01/02, RQ-BPC-05, or SST1 (highest-leverage shared population
+audited first, per the rule's own "don't reopen everything at once" instruction); no
+reconciliation with RQ-CD1 attempted yet.

@@ -1,0 +1,80 @@
+Population: n=26265, 2021-11-29 -> 2026-09-29
+cls
+STALL    0.551
+FAIL     0.265
+BLAST    0.185
+Name: proportion, dtype: float64
+
+=== DIM 1: Trigger-candle sanity (touch-day Close vs Open) ===
+red (Close < Open) touches: 6446 / 26265 = 24.5%
+
+cls distribution, red vs green touch-day candle:
+cls    BLAST   FAIL  STALL
+red                       
+False  0.214  0.219  0.567
+True   0.095  0.404  0.501
+
+counts:
+cls    BLAST  FAIL  STALL
+red                      
+False   4239  4348  11232
+True     615  2602   3229
+
+=== DIM 2: Wick vs close (closed back below trigger same day?) ===
+touched intrabar but closed BELOW trigger (give-back): 14992 / 26265 = 57.1%
+
+cls distribution, close_above True vs False:
+cls          BLAST   FAIL  STALL
+close_above                     
+False        0.115  0.342  0.543
+True         0.278  0.162  0.560
+
+counts:
+cls          BLAST  FAIL  STALL
+close_above                    
+False         1723  5122   8147
+True          3131  1828   6314
+
+Overlap: red candle AND give-back (both failure modes at once):
+6446 / 26265 = 24.5%
+
+=== DIM 3: Discovery population vs trading constraint ===
+Verified by source read, not re-derived: pre_breach/01_build_panel.py's `build()`
+loops i in range(20, len(rows)) per ticker with no position-state variable at all --
+every day that passes the T-1 gate + has a valid trigger becomes a row, regardless
+of any other touch for that ticker before/after it. panel.csv is explicitly
+documented as 'observational, no gating of positions... NOT a position population.'
+PASS -- this population is genuinely ungated. (Does not mean later consumers of it
+are: confirm the same for any NEW script before assuming inheritance.)
+
+=== DIM 4: Structural context -- round-trip below touch-day's own Low before T+5 ===
+  ... 0/500 tickers
+  ... 50/500 tickers
+  ... 100/500 tickers
+  ... 150/500 tickers
+  ... 200/500 tickers
+  ... 250/500 tickers
+  ... 300/500 tickers
+  ... 350/500 tickers
+  ... 400/500 tickers
+  ... 450/500 tickers
+
+matched 26252 / 26265 touches to raw daily bars
+
+% that breached the touch-day's own Low at some point in T+1..T+5, by cls:
+cls
+BLAST    0.192
+FAIL     0.974
+STALL    0.559
+Name: breached_touch_low, dtype: float64
+
+% that closed back below the trigger at some point in T+1..T+5, by cls:
+cls
+BLAST    0.266
+FAIL     1.000
+STALL    0.768
+Name: breached_trigger_again, dtype: float64
+
+Overall:
+breached_touch_low: 60.1%
+breached_trigger_again: 73.7%
