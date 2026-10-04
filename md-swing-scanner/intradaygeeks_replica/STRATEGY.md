@@ -198,6 +198,7 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 | 10:45 signal looked at late: limit sell at the signal close (till 11:15) when price has dropped below it (script 86) | Worse than the plain scan rule at 10:50 (plan net Rs143 user-limit / 187 mix vs 223 scan); equal at 11:00 (169-174). Limits fill when price bounces back up = more stops (adverse selection again). Use the scan's ENTER / SKIP / DEAD as is | 86 |
 | 10:15 alarm re-checked on today's rules (script 87; user is free 10:15-10:20) | Still the weakest: 30-min candle 09:45-10:15: 118 setups, 63% stopped, net Rs-22/trade; making it the first pick turns the plan negative (net -49/trade vs +220). Full opening hour 09:15-10:15: only 12 setups in 4 months (opening stops are wide, 2:1 removes them). Confirms scripts 39/43: opening noise. Use 10:15-10:20 for prep, not trades | 87 |
 | User's chart reads on 10 plan-B trades, checked on all trades (script 88): 1H EMA8 'channel' below entry, stock's daily trend, daily 34-EMA rejection | None separates in both sets. Channel (EMA8 >= 0.3% below EMA34, under entry): 30m worst (net Rs+20 vs +65), 1H best (+28 vs +15). Daily uptrend: 30m +36 vs +48, 1H +32 vs +17. Daily-34 rejection today: 30m -43 vs +63 (62% stopped), 1H +35 vs +20. Plan-B stops and targets spread evenly across all groups | 88 |
+| User's channel definition: 1H EMA8 0.5-1.0% below entry (inside the 1% target path, deep) -- inline on chart_review_reads.csv | Candidate, NOT adopted. Net Rs-94 vs +66 (30m, n=68, p 0.015) and -22 vs +27 (1H, n=189, p 0.135); it causes STOPS (68% / 62%), not stalls. Neighbours: 0.4-1.0 holds, 0.5-0.9 holds, 0.6-1.0 vanishes in both sets (the bad zone is ~0.4-0.6% below). EMA8 > 1% below (past the target) is the BEST group (1H target 44%). Plan B with the skip: net Rs220 -> 244/trade (Jul slightly worse). Likely mechanism: price 0.5%+ above its own 8-EMA = a sharp rally into the EMA34 (buyers strong, like the green-hour skip), not a support floor. Watch item 5.8e | inline |
 | The channel's own calls by side | 68% longs; longs +0.031% vs shorts +0.002% at target 1; the edge is counter-trend on both sides; most calls match none of his public scanners | 50 |
 
 ---
@@ -289,6 +290,7 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    looked better in both sets (30m Rs180 vs 119, 1H 159 vs 99) but not every month/year; (ii) trigger candle closing
    exactly at its low looked worse in both sets (shuffle p 0.007 / 0.02, holds inside price and range buckets) but has
    no logic for why 0% is bad and 5% is the best bucket, and barely changes the one-a-day pick -> yellow flag only;
+   (iii-b) 1H EMA8 position vs entry (0.5-1.0% below looked worse, fragile) -- log it per live trade;
    (iii) daily ATR band of each live trade (3-4% looked worse in-sample, not robust: script 81) -- do NOT re-order picks by
    ATR (tested worse); (iv) the user's discretionary skips ("looks like support") -- log the reason, compare after 1-2 months.
    **Chart-reading trap:** TradingView/Dhan label candles by START time; the 12:15 alarm judges the candle labeled 11:15.
