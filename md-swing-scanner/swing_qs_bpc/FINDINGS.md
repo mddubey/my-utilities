@@ -507,3 +507,45 @@ A. Small n (20), stop-width sensitivity applies (a 3% stop under a 2-ATR-extende
 gets stopped by ordinary noise), so this is a look, not a measurement. Recommend closing
 the branch per the pre-declared tree; steps 4 to 6 (structural-stop comparison, QS
 product-fit, performance test) not started and not justified by 04B or 04C.
+
+## RQ-BPC-05 — Volume-Confirmed A Population Audit (2026-10-04) — CLOSED, reopen FAILS
+
+Reopened PARKING_LOT #9 after user chart-reading (not aggregate stats) found the 04A-04C "A"
+population had zero volume requirement (`gate_check()` only checks price clearing a prior
+high). Confirmed by hand on real examples (GAIL A=0.70x avg volume; CONCORDBIO's real blast
+was 8 days before its tested A; FEDERALBNK/COCHINSHIP's B days ran ~1.0x avg volume despite
+genuinely strong A's). Already on the critic's own 2026-09-29 literature checklist
+("breakout volume 40-50%+ above average... later") and never executed before 04B/04C ran.
+
+**Critic's pre-registered design**: A = existing gate AND breakout-day volume >= 1.5x
+`vol_avg10_prior` (literature threshold — Bulkowski/CFA Institute/O'Neil 1995-2021 study all
+converge near 40-150%+ above average; NOT the 3x the hand-inspected examples suggested). No B
+volume filter — a quiet B is consistent with the hypothesis (reduced selling pressure after
+the demand event), not a disqualifier. 3x reported as a diagnostic high-volume subgroup only.
+
+**Result: reopen FAILS, with MORE confidence than the original close.** Full population
+(46,811 A's; corrected >=1.5x population 25,802; holds-above-A subset 5,494, 4,959 resolved):
+
+| metric | original (uncorrected A) | corrected (A >= 1.5x) |
+|---|---|---|
+| duration P25/50/75/90 | 1/2/4/9 days | 1/2/4/9 — identical |
+| range width % median | 4.33% | 4.62% — no tightening |
+| pause volume / 10d avg | 1.29x (no dry-up) | 1.53x — worse, not dry-up |
+| B close above consolidation high | 45.6% | 44.8% — no change |
+
+High-volume subgroup (>=3x) is worse (43.6%) than 1.5-3x (46.0%) — bigger A volume doesn't
+help. `has_bigger_preceding_thrust` (A may be a late echo of an earlier, bigger thrust): 57%
+of ALL A's, still 44% even within the corrected population — the mis-identification the user
+found is reduced by the volume filter but not solved. Rows where A genuinely is the standout
+day do modestly better (45.9% vs 42.8% B-close-above-high) — real, small, correctly directed,
+not enough to change the verdict. 20-pair replay (seed 42, same stratified method as 04C)
+showed 12/20 close-above-high, visually more mixed than the original grid — but that's
+ordinary n=20 sampling variance around the true ~45% rate, not a contradiction; the 4,959-row
+result is the one to trust (`plot_bpc05c_pairs.png`, `rq_bpc05c_pairs.csv`).
+
+**Per the critic's own pre-declared decision rule, this is a stronger negative than 04B/04C's
+original close** — it rules out "we tested the wrong population," since this is now the
+correct, literature-grade, volume-confirmed population, and the hypothesized BPC continuation
+structure still doesn't show up in aggregate. **CLOSED.** Branch should not reopen again
+without a materially different population definition (not another threshold tweak on the
+same A/B/pause mechanics) — see `RQ-BPC-05_REPORT.md` for full detail and caveats.

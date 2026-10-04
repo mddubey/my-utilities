@@ -264,9 +264,35 @@ gap is stop-width, not weak price action" section (2026-09-27).
 
 ---
 
-## 9. RQ-QS-04B onward — Post-Breakout Consolidation Anatomy — 04B RUN, answer is NO, awaiting critic's close/continue call
+## 9. RQ-QS-04B onward — Post-Breakout Consolidation Anatomy — REOPENED then RE-CLOSED 2026-10-04, see RQ-BPC-05
 
-**Status update 2026-09-29 (afternoon)**: step 1 (04B) is done — `swing_qs_bpc/08_rq04b_anatomy.py`,
+**Status update 2026-10-04**: reopened briefly, then closed again with STRONGER evidence.
+User chart-reading (not aggregate stats) found the 04A-04C "A" population had no volume
+requirement at all — `gate_check()` in `01_rq03a_mechanical_reentry.py` only checks price
+clearing a prior high, never breakout-day volume. Real examples (GAIL A=0.70x avg volume,
+CONCORDBIO's real blast was 8 days before its tested "A", FEDERALBNK/COCHINSHIP's B days had
+~1.0x/avg volume) confirmed this by hand. This was already on the critic's own 2026-09-29
+checklist ("breakout volume 40-50%+ above average... later") and never executed before 04B/
+04C ran. Critic verdict: reopen as a population-repair audit, not an assumption volume would
+rescue BPC — pre-registered A >= 1.5x `vol_avg10_prior` (literature threshold, not the 3x the
+hand examples suggested), no B volume filter.
+
+**RQ-BPC-05 result (`swing_qs_bpc/RQ-BPC-05_REPORT.md`): reopen FAILS.** Every decisive 04B
+metric is unchanged on the corrected, volume-confirmed population (n=5,494 holds-above-A,
+4,959 resolved): duration 1/2/4/9 days identical, pause volume 1.53x vs old 1.29x (worse, not
+dry-up), B-close-above-consolidation-high 44.8% vs old 45.6% (no change). High-volume (>=3x)
+subgroup is if anything worse (43.6%) than 1.5-3x (46.0%). Per the critic's own pre-declared
+decision rule, this is a STRONGER negative than the original 04B/04C close, because it rules
+out "we tested the wrong population" as the explanation — this is now the right population,
+and the hypothesized structure still doesn't show up in aggregate. **Branch closed again,
+citing RQ-BPC-05 as the operative evidence, not the superseded 04B/04C numbers.** NOT yet
+sent to critic for final close call as of this writing — draft the handoff next session if
+not already done.
+
+---
+
+Status update 2026-09-29 (afternoon), kept for the record (superseded by RQ-BPC-05 above,
+not erased — correct for the population it actually tested): step 1 (04B) is done — `swing_qs_bpc/08_rq04b_anatomy.py`,
 full writeup in `swing_qs_bpc/FINDINGS.md` "RQ-QS-04B". The data says the 8,403 subset is
 NOT a recognizable tight continuation structure: 61% pause for at most 2 bars, median
 close-to-close range 0.48%, no volume dry-up, longer pauses are wider not tighter, and B
