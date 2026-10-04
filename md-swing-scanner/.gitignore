@@ -60,3 +60,7 @@ data/*
 
 # 2026-10-04: RQ-CD1/CD2 event tables, 100% regeneratable from confirmed_day1/*.py
 confirmed_day1/events*.csv
+
+# RQ-OMD-01 -- 100% regeneratable via options_momentum/02_build_panel.py from data/intraday_60m/
+options_momentum/panel_chunk_*.pkl
+options_momentum/panel_full.pkl

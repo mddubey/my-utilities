@@ -1,0 +1,49 @@
+=== RQ-OMD-01 1H construction verification -- 2026-10-04 08:46 ===
+nse_equity_universe.csv: 2327 tickers; intraday_60m files present: 2266
+
+Usable files (>=100 bars after cleaning): 2192
+Date range across universe: 2023-10-23 -> 2026-10-01
+Bars per ticker: min=100, median=5039, max=5054, total=8,843,168
+Tickers whose history starts after 2024-06-01 (late starts): 544 / 2192
+Tickers whose history ends before 2026-09-15 (stale/delisted/not topped up): 0 / 2192
+
+--- bars/day distribution (sample of 40 tickers, for speed) ---
+1       27
+2       43
+3       54
+4       54
+5      206
+6      420
+7    22541
+
+--- bar-time-of-day distribution (same 40-ticker sample) ---
+09:15    23187
+10:15    23158
+11:15    23120
+12:15    23112
+13:15    23132
+14:15    23261
+15:15    22963
+
+--- 09:15 bar quality (same 40-ticker sample) ---
+Mean zero-volume share on the 09:15 bar: 83.9%
+Mean flat-bar (O=H=L=C) share on the 09:15 bar: 3.3% (low = the bar carries real price range despite the volume quirk)
+
+--- cross-check vs data/daily/ (4 tickers x last 3 common sessions) ---
+MUNJALAU 2026-09-29: 60m O/H/L/C = 105.80/107.81/104.12/106.48  |  daily O/H/L/C = 105.71/107.90/104.12/106.48
+MUNJALAU 2026-09-30: 60m O/H/L/C = 106.30/115.70/106.00/112.86  |  daily O/H/L/C = 106.30/115.70/106.00/112.86
+MUNJALAU 2026-10-01: 60m O/H/L/C = 110.21/110.39/102.80/104.15  |  daily O/H/L/C = 110.76/110.76/102.58/104.07
+ETHOSLTD 2026-09-29: 60m O/H/L/C = 2501.70/2510.90/2411.40/2489.90  |  daily O/H/L/C = 2502.00/2516.80/2410.40/2489.80
+ETHOSLTD 2026-09-30: 60m O/H/L/C = 2492.80/2555.00/2484.90/2537.20  |  daily O/H/L/C = 2489.90/2555.00/2484.40/2537.20
+ETHOSLTD 2026-10-01: 60m O/H/L/C = 2549.80/2549.80/2480.30/2531.90  |  daily O/H/L/C = 2549.90/2549.90/2473.80/2531.90
+RAMCOCEM 2026-09-29: 60m O/H/L/C = 842.10/849.80/822.05/844.25  |  daily O/H/L/C = 849.70/850.00/822.05/844.25
+RAMCOCEM 2026-09-30: 60m O/H/L/C = 854.75/867.80/842.05/845.55  |  daily O/H/L/C = 849.90/869.00/842.05/845.55
+RAMCOCEM 2026-10-01: 60m O/H/L/C = 842.00/842.00/816.15/830.85  |  daily O/H/L/C = 845.05/845.55/816.15/830.85
+ASTRAZEN 2026-09-29: 60m O/H/L/C = 6235.00/6349.00/6202.00/6225.00  |  daily O/H/L/C = 6235.00/6355.00/6195.50/6254.50
+ASTRAZEN 2026-09-30: 60m O/H/L/C = 6210.00/6276.50/6120.50/6186.00  |  daily O/H/L/C = 6210.00/6289.00/6120.50/6186.00
+ASTRAZEN 2026-10-01: 60m O/H/L/C = 6150.50/6153.50/5990.00/6031.00  |  daily O/H/L/C = 6153.50/6172.00/5986.00/6031.00
+
+=== verdict ===
+Matches data/README.md's documented caveats (7 bars/day, 15:15 stub, split-adjusted-not-
+CA-adjusted, Yahoo misses true intraday H/L on a large minority of stock-days). No new
+defect found. Safe to proceed to 02_build_panel.py under the preflight's conventions.

@@ -1,0 +1,116 @@
+=== RQ-OMD-01 behaviour map -- 2026-10-04 08:52 ===
+Panel: 8,832,352 rows, 2192 tickers, 2023-10-23 -> 2026-10-01
+Intraday-bar events: 7,554,116  |  gap-bar events: 1,278,236  (14.5%)
+F&O share of tickers in panel: 9.5% (current F&O list, reporting split only, not a filter)
+
+--- Table 1: forward behaviour by stock-relative magnitude bucket (W=1512, intraday bars only) ---
+     bucket         horizon       n  median_ret  mean_ret  pct_positive  median_mfe  median_mae
+ dn_unusual              1H   89620     -0.0012   -0.0031        0.4043      0.0040     -0.0071
+ dn_unusual              2H   89592     -0.0017   -0.0036        0.4279      0.0068     -0.0117
+ dn_unusual              3H   89455     -0.0020   -0.0037        0.4362      0.0090     -0.0151
+ dn_unusual rest-of-session   82991     -0.0008   -0.0015        0.4474      0.0070     -0.0103
+ dn_unusual    next session   89082     -0.0013   -0.0021        0.4771      0.0178     -0.0248
+dn_elevated              1H  340294     -0.0003   -0.0013        0.4465      0.0036     -0.0050
+dn_elevated              2H  340201     -0.0004   -0.0014        0.4695      0.0062     -0.0083
+dn_elevated              3H  339787     -0.0003   -0.0013        0.4796      0.0083     -0.0108
+dn_elevated rest-of-session  309505      0.0000   -0.0000        0.4878      0.0063     -0.0074
+dn_elevated    next session  338603      0.0008    0.0001        0.5132      0.0167     -0.0191
+  dn_normal              1H 1955913      0.0000   -0.0001        0.4542      0.0035     -0.0034
+  dn_normal              2H 1955602      0.0000   -0.0000        0.4677      0.0060     -0.0059
+  dn_normal              3H 1954671      0.0000    0.0001        0.4729      0.0082     -0.0082
+  dn_normal rest-of-session 1592138      0.0000    0.0010        0.4911      0.0058     -0.0048
+  dn_normal    next session 1952103      0.0000    0.0015        0.4989      0.0158     -0.0154
+  up_normal              1H 1423278     -0.0005   -0.0002        0.4321      0.0032     -0.0040
+  up_normal              2H 1422836     -0.0008   -0.0002        0.4448      0.0057     -0.0064
+  up_normal              3H 1422539     -0.0010   -0.0002        0.4511      0.0080     -0.0085
+  up_normal rest-of-session 1145526     -0.0009   -0.0010        0.4175      0.0045     -0.0061
+  up_normal    next session 1421560     -0.0025   -0.0013        0.4435      0.0149     -0.0153
+up_elevated              1H  304537     -0.0011   -0.0015        0.3922      0.0031     -0.0056
+up_elevated              2H  303958     -0.0018   -0.0016        0.4107      0.0058     -0.0089
+up_elevated              3H  303870     -0.0021   -0.0014        0.4220      0.0080     -0.0111
+up_elevated rest-of-session  275585     -0.0016   -0.0020        0.3963      0.0050     -0.0086
+up_elevated    next session  303589     -0.0036   -0.0021        0.4329      0.0162     -0.0189
+ up_unusual              1H  119942     -0.0017   -0.0026        0.3796      0.0042     -0.0077
+ up_unusual              2H  119509     -0.0030   -0.0032        0.3911      0.0071     -0.0120
+ up_unusual              3H  119491     -0.0036   -0.0033        0.3985      0.0093     -0.0147
+ up_unusual rest-of-session  112620     -0.0022   -0.0032        0.3900      0.0066     -0.0116
+ up_unusual    next session  119394     -0.0054   -0.0034        0.4212      0.0186     -0.0238
+
+--- Table 2: robustness check -- 'unusual' buckets only, across the 3 pre-declared windows ---
+  W     bucket         horizon      n  median_ret  mean_ret  pct_positive  median_mfe  median_mae
+504 dn_unusual              2H 143223     -0.0016   -0.0038        0.4284      0.0070     -0.0115
+504 dn_unusual rest-of-session 133645     -0.0007   -0.0017        0.4480      0.0071     -0.0100
+504 dn_unusual    next session 142578     -0.0017   -0.0031        0.4710      0.0180     -0.0246
+504 up_unusual              2H 188900     -0.0028   -0.0029        0.3939      0.0072     -0.0117
+504 up_unusual rest-of-session 177829     -0.0021   -0.0028        0.3937      0.0067     -0.0113
+504 up_unusual    next session 188740     -0.0048   -0.0026        0.4298      0.0188     -0.0230
+   W     bucket         horizon      n  median_ret  mean_ret  pct_positive  median_mfe  median_mae
+1512 dn_unusual              2H  89592     -0.0017   -0.0036        0.4279      0.0068     -0.0117
+1512 dn_unusual rest-of-session  82991     -0.0008   -0.0015        0.4474      0.0070     -0.0103
+1512 dn_unusual    next session  89082     -0.0013   -0.0021        0.4771      0.0178     -0.0248
+1512 up_unusual              2H 119509     -0.0030   -0.0032        0.3911      0.0071     -0.0120
+1512 up_unusual rest-of-session 112620     -0.0022   -0.0032        0.3900      0.0066     -0.0116
+1512 up_unusual    next session 119394     -0.0054   -0.0034        0.4212      0.0186     -0.0238
+   W     bucket         horizon     n  median_ret  mean_ret  pct_positive  median_mfe  median_mae
+3024 dn_unusual              2H 35524     -0.0019   -0.0040        0.4210      0.0068     -0.0125
+3024 dn_unusual rest-of-session 32919     -0.0010   -0.0017        0.4387      0.0068     -0.0109
+3024 dn_unusual    next session 35140     -0.0019   -0.0029        0.4682      0.0172     -0.0257
+3024 up_unusual              2H 47435     -0.0033   -0.0034        0.3847      0.0068     -0.0125
+3024 up_unusual rest-of-session 44778     -0.0025   -0.0035        0.3833      0.0063     -0.0120
+3024 up_unusual    next session 47348     -0.0064   -0.0038        0.4088      0.0179     -0.0247
+
+--- Table 3: A/B/C/D shares by bucket (W=1512, primary) ---
+abcd               n  A_immediate_continuation  B_immediate_reversal  C_stall  D_delayed_continuation  censored_no_2H_data
+bucket_1512                                                                                                               
+dn_unusual     89647                     0.137                 0.259    0.371                   0.232                0.001
+dn_elevated   340392                     0.181                 0.310    0.234                   0.274                0.001
+dn_normal    1956889                     0.133                 0.358    0.091                   0.321                0.096
+up_normal    1423910                     0.119                 0.473    0.127                   0.281                0.001
+up_elevated   304643                     0.160                 0.366    0.256                   0.216                0.002
+up_unusual    119992                     0.138                 0.274    0.395                   0.190                0.004
+
+Share of each bucket's 'C_stall' rows that are actually right-censored (no delayed-window data yet, i.e. near the end of the dataset) rather than a genuine stall:
+bucket_1512
+dn_unusual    0.000
+dn_elevated   0.000
+dn_normal     0.000
+up_normal     0.000
+up_elevated   0.000
+up_unusual    0.000
+
+--- Table 4: timing structure within continuation outcomes (W=1512 bucket, unusual only) ---
+A_immediate_continuation: n=28,787  median t_mfe(next-session window, bars)=4.0  median MAE(next-session window)=-0.0054  median |r_T| (initial move size)=0.0193
+B_immediate_reversal: n=56,109  median t_mfe(next-session window, bars)=1.0  median MAE(next-session window)=-0.0405  median |r_T| (initial move size)=0.0222
+C_stall: n=80,612  median t_mfe(next-session window, bars)=3.0  median MAE(next-session window)=-0.0275  median |r_T| (initial move size)=0.0238
+D_delayed_continuation: n=43,593  median t_mfe(next-session window, bars)=7.0  median MAE(next-session window)=-0.0126  median |r_T| (initial move size)=0.0206
+
+--- Table 5: gap-bar (overnight + first-hour) descriptive split, up-gap vs down-gap ---
+     gap         horizon      n  median_ret  pct_positive
+  gap_up              1H 665801     -0.0008        0.4032
+  gap_up              2H 665799     -0.0015        0.3932
+  gap_up              3H 665796     -0.0020        0.3870
+  gap_up rest-of-session 665252     -0.0031        0.3826
+  gap_up    next session 664848     -0.0040        0.4305
+gap_down              1H 612434      0.0000        0.4699
+gap_down              2H 612430      0.0000        0.4839
+gap_down              3H 612420      0.0000        0.4958
+gap_down rest-of-session 611186      0.0007        0.5185
+gap_down    next session 610802      0.0018        0.5280
+
+--- Table 6: F&O vs non-F&O split -- ABCD shares, unusual buckets only (W=1512) ---
+abcd                    n  A_immediate_continuation  B_immediate_reversal  C_stall  D_delayed_continuation  censored_no_2H_data
+is_fo bucket_1512                                                                                                              
+False dn_unusual    79651                     0.131                 0.263    0.374                   0.232                0.001
+      up_unusual   106896                     0.131                 0.281    0.400                   0.184                0.004
+True  dn_unusual     9996                     0.188                 0.231    0.348                   0.231                0.001
+      up_unusual    13096                     0.189                 0.217    0.354                   0.234                0.005
+
+--- Table 7: year-by-year ABCD shares, unusual buckets only (W=1512) -- check regime stability ---
+abcd                  n  A_immediate_continuation  B_immediate_reversal  C_stall  D_delayed_continuation  censored_no_2H_data
+year bucket_1512                                                                                                             
+2024 dn_unusual    5320                     0.167                 0.247    0.342                   0.244                0.000
+     up_unusual    7613                     0.134                 0.254    0.407                   0.204                0.000
+2025 dn_unusual   38449                     0.132                 0.251    0.380                   0.237                0.000
+     up_unusual   52783                     0.132                 0.275    0.404                   0.189                0.000
+2026 dn_unusual   45878                     0.138                 0.267    0.367                   0.227                0.001
+     up_unusual   59596                     0.143                 0.276    0.385                   0.189                0.008
