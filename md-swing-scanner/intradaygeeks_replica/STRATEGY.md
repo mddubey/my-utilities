@@ -121,10 +121,13 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
   stocks after the close; the scan builds its 1H candles and 34-EMA from that 5-min cache (identical to Yahoo's hourly
   bars, checked). If a stock's cache is behind the previous session the scan excludes it and prints "STALE DATA -- run
   eod_checklist.sh". (Stale daily data once wrongly excluded TANLA on 2026-10-01: ADX read 25.7 instead of 24.0.)
-- **Prep (optional, ~6 s, local only):** `python3 38_alarm_scan_1h_close.py --prep` builds the day's candidate list from
-  the previous close: 1H trend down, within 3% of the 1H EMA34, daily ADX <= 25 (keeps 98% of real setups, script 59),
-  plus a 150-stock breadth sample. Alarm runs build it themselves if it's missing.
-- **Alarm runs** fetch live 5-min bars only for those ~400-450 stocks. Replays (`--replay DATE HH:MM`) read the cache
+- **Prep (optional, ~6 s, local only):** `python3 38_alarm_scan_1h_close.py --prep` builds the day's watchlist from
+  the previous close. Since 2026-10-04 the alarm scan fetches every stock passing the DAILY filters only (liquid, daily
+  ADX <= 25, daily ATR >= 2.56%, fresh data; ~500-580 stocks incl. a 150-stock breadth sample): the 1H trend and the
+  distance to the 1H EMA34 are checked live on today's bars, so gap / wild mornings can't hide a setup (the old
+  yesterday-close screen missed ~2%). Re-running --prep mid-day gives the same list (it uses yesterday's data only).
+  Alarm runs build it themselves if it's missing.
+- **Alarm runs** fetch live 5-min bars only for those ~500-580 stocks. Replays (`--replay DATE HH:MM`) read the cache
   and take ~13 s. Run 1-2 minutes after each alarm: Yahoo publishes each 5-min bar with a short lag; if many stocks
   are missing the alarm candle's last bar, the scan says "DATA NOT READY -- run again in a minute".
 - **Running late is fine (script 57):** up to 20 minutes late costs ~nothing per trade (+0.065-0.075% vs +0.075% on

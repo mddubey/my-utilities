@@ -106,7 +106,12 @@ if __name__ == "__main__":
               f"| {time.time() - _t0:.0f}s")
         if stale: print(f"STALE DATA: {stale} stocks' caches end before {PREV_DAY:%Y-%m-%d} -- run eod_checklist.sh (excluded until then)")
         sys.exit()
-    C = P[P.candidate]; B = P[P.breadth]; need = sorted(set(C.index) | set(B.index))
+    # 2026-10-04 (user): the watchlist uses only the DAILY filters (liquid, daily ADX <= 25, daily ATR >= 2.56%, fresh data)
+    # -- those are defined on yesterday's values. The 1H trend and the distance to the 1H EMA34 are NOT pre-screened from
+    # yesterday's close any more (that missed ~2% of setups, more on gap / wild mornings); the live checklist checks both
+    # on today's bars at every alarm. Costs ~140 more stocks per fetch. `candidate` (old screen) stays in the prep file.
+    daily_ok = (P.adx <= 25) & (P.atrp >= MIN_ATR_PCT) & P.data_ok
+    C = P[daily_ok]; B = P[P.breadth]; need = sorted(set(C.index) | set(B.index))
     print(f"as of {ASOF:%Y-%m-%d %H:%M} | candidates {len(C)} + breadth sample {len(B)} -> {len(need)} stocks "
           f"{'(from cache)' if REPLAY else '| fetching live 5m...'}", flush=True)
     if stale: print(f"STALE DATA: {stale} stocks excluded (caches end before {PREV_DAY:%Y-%m-%d}) -- run eod_checklist.sh", flush=True)
