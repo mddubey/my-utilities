@@ -9,3 +9,5 @@ rechecks/
 !live_watch_log.csv
 prep/
 snapshots/
+!eod_review_log.csv
+replays/

@@ -189,12 +189,14 @@ if __name__ == "__main__":
         checks = dict(red=cl < o, wick_through_ema=hi >= E, close_below_ema=cl < E, within_0_5=0 < dist <= 0.5,
                       trend_1h=E8 < E, below_daily8=cl < d8y, wick_through_live_d8=day_hi >= live, below_vwap=cl < vwap)
         if all(checks.values()) and strong_green_before:
-            skipped_green.append(f"{t} (stop {(hi - cl) / cl * 100:.2f}%)"); continue
+            skipped_green.append(f"{t} (stop {(hi - cl) / cl * 100:.2f}%)")
         if all(checks.values()):
             rows.append(dict(ticker=t, candle=f"{last:%H:%M}-{cend:%H:%M}" + (" (full hour)" if cend - last == pd.Timedelta("60min") else ""), entry=round(cl, 2), stop=round(hi, 2), stop_pct=round((hi - cl) / cl * 100, 2),
                              target=round(cl * 0.99, 2), ema34_1h=round(E, 2), below_ema_pct=round(dist, 2), live_d8=round(live, 2),
                              day_high=round(day_hi, 2), adx=round(P.at[t, "adx"], 1), ema8_1h=round(E8, 2),
-                             ema8_below_pct=round((cl - E8) / cl * 100, 2), **late_status(g, cend, hi)))
+                             ema8_below_pct=round((cl - E8) / cl * 100, 2), green_skip=bool(strong_green_before),
+                             cend=f"{cend:%H:%M}", **late_status(g, cend, hi)))
+            if strong_green_before: rows[-1]["status"] = "SKIP (strong green hour before)"
     R = pd.DataFrame(rows)
     if skipped_green:
         _rr = float(sys.argv[sys.argv.index("--rr") + 1]) if "--rr" in sys.argv else 2.0
@@ -209,7 +211,8 @@ if __name__ == "__main__":
     if RR > 0 and len(R):
         n0 = len(R); R = R[R.stop_pct <= 1.0 / RR]; print(f"reward:risk >= {RR:g}:1 -> kept {len(R)} of {n0} (stop <= {1/RR:.2f}%)")
     if len(R): R["breadth_pct"] = round(BREADTH * 100)
-    out = HERE / f"alarm_scan_{'30m_' if TF == 30 else ''}{ASOF:%Y%m%d_%H%M}.csv"; R.to_csv(out, index=False)
+    outdir = HERE / "replays" if REPLAY else HERE; outdir.mkdir(exist_ok=True)   # replays never overwrite live alarm files
+    out = outdir / f"alarm_scan_{'30m_' if TF == 30 else ''}{ASOF:%Y%m%d_%H%M}.csv"; R.to_csv(out, index=False)
     if R.empty: print("no setups at this alarm"); sys.exit()
     R = R.sort_values("below_ema_pct")
     # 2026-10-03 (56): after the checklist + 2:1 rule no further filter reliably separates better from worse setups,

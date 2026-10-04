@@ -83,6 +83,7 @@ All commands from `intradaygeeks_replica/`. Times IST.
 | 11:16-11:20, only if no trade yet | `python3 38_alarm_scan_1h_close.py` | 11:15 check = the FULL 10:15-11:15 hourly bar, stop = hour high |
 | 11:46-11:50, only if still no trade | `python3 38_alarm_scan_1h_close.py` | half-hour check; skips a shallow pullback after a strong green 10:15 hour (printed as "skipped, would otherwise qualify"). Last trade window of the day |
 | after 15:30 | `./eod_checklist.sh` (from the repo root) | shared with Primed BC: Part A data + health check, Part B trading |
+| after `eod_checklist.sh` | `python3 89_eod_review.py` | EOD REVIEW (continuous improvement): replays the day's alarms (10:50 / 11:16 / 11:46 / 12:16) and logs what EVERY setup would have done -- plan pick, ENTERs not taken, and each skip type (EMA8 zone, chased, dead, green hour, stop > 0.5%) -- to `eod_review_log.csv`, then prints the running summary by category. Report: the day's pick vs what the user actually did, then the summary. `--summary` = summary only. Replaces the manual EMA8-zone telemetry step |
 
 - If the scan prints DATA NOT READY, Yahoo is lagging: wait a minute and run again.
 - How to report a scan:
@@ -93,10 +94,9 @@ All commands from `intradaygeeks_replica/`. Times IST.
   above the current price. SKIP (EMA8 0.4-0.6% below) = the user's hard rule (2026-10-04): the 1H EMA8 sits 0.4-0.6%
   under the candle close -- on all setups that zone lost in both data sets (more stops), so the user never takes it; the
   scan already passes FIRST COME to the next ENTER. Target = the user's fill minus 1%.
-- TELEMETRY for that rule: after the close (or next session), check what every SKIP (EMA8) setup of the day would have
-  done (entry = candle close, stop = candle high, 1% target, out 15:15) from the 5-min cache, and append it to
-  `live_watch_log.csv` with setup "EMA8-zone skip (telemetry)" and no user fill. After ~20 such rows, compare with the
-  trades actually taken; the rule is kept, changed or dropped on that live evidence.
+- TELEMETRY for every skip rule (EMA8 zone, chased, green hour, stop > 0.5%) is automatic: `89_eod_review.py` after the
+  EOD run logs each skipped setup's would-be outcome in `eod_review_log.csv`. After ~20 cases per category, compare with
+  the ENTERs and the plan picks; a rule is kept, changed or dropped on that live evidence.
 - To check a setup on the chart, use `python3 69_snapshot.py TICKER YYYY-MM-DD HH:MM --text`. That's the hourly bars
   plus the checklist, as text. Never open image windows: the user is at work during market hours.
 - Pick = FIRST COME (the scan marks it): the setup closest to the 1H EMA34 at the first alarm with an ENTER. Do not

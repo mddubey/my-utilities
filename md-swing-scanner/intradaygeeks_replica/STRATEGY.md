@@ -140,6 +140,11 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 - **Breadth** (info only): each run prints the share of the most liquid stocks above yesterday's close. The earlier
   "bullish breadth -> be cautious" warning was dropped (script 61): on clean data the effect flips between periods
   (3-yr 1H: bullish-breadth days weakest on average, not every year; Jun-Sep 2026: bullish-breadth days were the best).
+- **EOD review (2026-10-04, continuous improvement):** after `eod_checklist.sh`, run `python3 89_eod_review.py`. It replays the
+  day's alarms with the live scan (10:50 / 11:16 / 11:46 / 12:16, `--rr 0`) and logs what every setup would have done --
+  plan pick, ENTERs not taken, and each skip type (EMA8 zone, chased, dead, strong green hour, stop > 0.5%) -- to
+  `eod_review_log.csv` (tracked), then prints a running summary by category. Replays write to `replays/`, never over
+  live alarm files. Seeded with 30 Sep and 1 Oct.
 - **Monthly re-check:** `./51_monthly_recheck.sh` tops up the 1H cache, re-runs the 30-min alarm test over all 5m data,
   and writes `rechecks/recheck_YYYY-MM.txt`. To schedule it on the 1st of each month at 18:37:
   `(crontab -l 2>/dev/null; echo "37 18 1 * * $PWD/51_monthly_recheck.sh") | crontab -`

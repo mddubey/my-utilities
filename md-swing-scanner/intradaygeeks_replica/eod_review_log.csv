@@ -1,0 +1,60 @@
+date,alarm,ticker,category,status,entry,stop,stop_pct,ema8_below_pct,below_ema_pct,outcome,ret,exit_at,look_price,outcome_plan,ret_plan,plan_pick
+2026-09-30,10:45,VIMTALABS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),598.45,604.1,0.94,0.64,0.01,stop,-0.944,15:15,596.55,,,False
+2026-09-30,10:45,AARTIIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),483.4,486.85,0.71,0.96,0.05,target,1.0,12:15,484.1,,,False
+2026-09-30,10:45,MASTEK,skip: chased (2:1 gone at look),SKIP (2:1 gone at this price),1552.8,1559.5,0.43,0.87,0.1,target,1.0,11:25,1549.4,,,False
+2026-09-30,10:45,KAPSTON,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),556.1,563.3,1.29,0.18,0.14,target,1.0,12:00,556.65,,,False
+2026-09-30,10:45,PITTIENG,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1142.3,1152.0,0.85,0.35,0.14,stall,0.359,15:15,1144.1,,,False
+2026-09-30,10:45,PARAS,skip: stop > 0.5% (2:1 rule),SKIP (EMA8 0.4-0.6% below),1332.7,1342.7,0.75,0.57,0.16,stop,-0.75,10:55,1337.6,,,False
+2026-09-30,10:45,JUSTDIAL,ENTER,ENTER,664.55,667.0,0.37,0.87,0.2,target,1.0,13:45,664.55,target,1.0,True
+2026-09-30,10:45,GARUDA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),177.62,178.98,0.77,0.1,0.21,target,1.0,13:55,177.89,,,False
+2026-09-30,10:45,KPRMILL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1103.6,1109.8,0.56,0.79,0.24,target,1.0,11:50,1102.0,,,False
+2026-09-30,10:45,ATLANTAELE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1613.7,1631.4,1.1,-0.17,0.28,stop,-1.097,13:35,1611.4,,,False
+2026-09-30,10:45,NUVAMA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1663.8,1675.2,0.69,0.47,0.29,stall,0.817,15:15,1658.1,,,False
+2026-09-30,10:45,SCHNEIDER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1202.8,1213.2,0.86,0.2,0.29,stall,-0.366,15:15,1203.6,,,False
+2026-09-30,10:45,SFL,skip: chased (2:1 gone at look),SKIP (2:1 gone at this price),634.4,637.45,0.48,0.39,0.32,stop,-0.481,13:45,634.2,,,False
+2026-09-30,10:45,BFUTILITIE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),517.6,522.0,0.85,0.86,0.36,stop,-0.85,10:55,519.0,,,False
+2026-09-30,10:45,JISLJALEQS,skip: stop > 0.5% (2:1 rule),ENTER,28.85,29.01,0.55,-0.22,0.47,target,1.0,14:20,28.87,,,False
+2026-09-30,10:45,INDUSTOWER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),370.55,373.15,0.7,0.29,0.48,stop,-0.702,11:40,370.65,,,False
+2026-09-30,11:15,ATLANTAELE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1617.5,1631.4,0.86,0.07,0.04,stop,-0.859,13:35,1617.5,,,False
+2026-09-30,11:15,ADANIENT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),2900.9,2927.1,0.9,0.28,0.06,stall,0.51,15:15,2900.9,,,False
+2026-09-30,11:15,PARAS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1333.5,1344.0,0.79,0.63,0.1,target,1.0,14:25,1333.5,,,False
+2026-09-30,11:15,MOSCHIP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),201.88,204.27,1.18,0.82,0.12,stop,-1.184,14:35,201.88,,,False
+2026-09-30,11:15,ASIANTILES,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),50.05,50.5,0.9,0.19,0.13,stall,0.539,15:15,50.05,,,False
+2026-09-30,11:15,AARTIIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),482.55,486.85,0.89,0.79,0.23,target,1.0,13:45,482.55,,,False
+2026-09-30,11:15,PNBHOUSING,ENTER,ENTER,1102.6,1107.4,0.44,0.16,0.28,stop,-0.435,11:50,1102.6,,,False
+2026-09-30,11:15,TATATECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),705.05,719.7,2.08,1.11,0.28,stall,-0.142,15:15,705.05,,,False
+2026-09-30,11:15,TCS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),2072.5,2100.5,1.35,0.55,0.31,target,1.0,14:45,2072.5,,,False
+2026-09-30,11:15,RBLBANK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),408.0,410.2,0.54,0.56,0.37,stop,-0.539,12:05,408.0,,,False
+2026-09-30,11:15,SFL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),634.1,637.45,0.53,0.34,0.37,stop,-0.528,13:45,634.1,,,False
+2026-09-30,11:15,CENTENKA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),557.95,565.6,1.37,0.52,0.38,stall,0.233,15:15,557.95,,,False
+2026-09-30,11:15,LTM,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4082.4,4138.0,1.36,0.53,0.4,target,1.0,13:05,4082.4,,,False
+2026-09-30,11:15,PITTIENG,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1139.1,1152.0,1.13,0.07,0.42,stall,0.079,15:15,1139.1,,,False
+2026-09-30,11:15,JISLJALEQS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),28.86,29.01,0.52,-0.18,0.43,target,1.0,14:20,28.86,,,False
+2026-09-30,11:15,BFUTILITIE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),517.1,522.0,0.95,0.77,0.45,target,1.0,14:45,517.1,,,False
+2026-09-30,11:15,HINDOILEXP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),173.71,174.6,0.51,-0.4,0.46,target,1.0,14:30,173.71,,,False
+2026-09-30,11:15,SCHNEIDER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1200.6,1213.2,1.05,0.01,0.48,stall,-0.55,15:15,1200.6,,,False
+2026-09-30,11:15,MOBIKWIK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),198.69,200.16,0.74,1.11,0.49,stop,-0.74,13:10,198.69,,,False
+2026-09-30,11:15,JUSTDIAL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),662.6,667.0,0.66,0.58,0.49,target,1.0,14:15,662.6,,,False
+2026-09-30,11:45,UNIPARTS,ENTER,ENTER,847.7,848.7,0.12,0.2,0.02,target,1.0,14:30,847.7,,,False
+2026-09-30,11:45,BAJAJCON,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),495.95,498.65,0.54,0.23,0.1,stop,-0.544,13:00,495.95,,,False
+2026-09-30,11:45,NETWEB,ENTER,ENTER,4610.0,4625.5,0.34,-0.17,0.27,target,1.0,14:45,4610.0,,,False
+2026-09-30,11:45,AIIL,ENTER,ENTER,547.75,550.0,0.41,-0.0,0.37,stop,-0.411,12:10,547.75,,,False
+2026-09-30,11:45,PARAS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1328.7,1335.9,0.54,0.13,0.45,target,1.0,14:25,1328.7,,,False
+2026-09-30,12:15,VIMTALABS,skip: EMA8 0.4-0.6% zone,SKIP (EMA8 0.4-0.6% below),598.2,600.95,0.46,0.42,0.06,stop,-0.46,13:35,598.2,,,False
+2026-09-30,12:15,BAJAJCON,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),495.9,498.65,0.55,0.22,0.11,stop,-0.555,13:00,495.9,,,False
+2026-09-30,12:15,UNIPARTS,ENTER,ENTER,844.65,848.7,0.48,-0.16,0.38,stall,0.681,15:15,844.65,,,False
+2026-09-30,12:15,SCHNEIDER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1200.4,1207.3,0.57,-0.01,0.47,stop,-0.575,14:50,1200.4,,,False
+2026-10-01,10:45,MOBIKWIK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),199.11,201.02,0.96,0.62,0.03,target,1.0,11:30,199.09,,,False
+2026-10-01,10:45,SOBHA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1214.9,1224.8,0.81,-0.07,0.14,target,1.0,12:55,1212.4,,,False
+2026-10-01,10:45,BEPL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),125.89,126.76,0.69,0.34,0.23,target,1.0,10:55,125.1,,,False
+2026-10-01,10:45,GABRIEL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1343.0,1365.0,1.64,0.51,0.37,target,1.0,10:55,1336.1,,,False
+2026-10-01,11:15,TANLA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),493.45,496.6,0.64,-0.25,0.27,target,1.0,12:25,493.45,,,False
+2026-10-01,11:15,SOBHA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1212.8,1224.8,0.99,-0.24,0.31,target,1.0,12:55,1212.8,,,False
+2026-10-01,11:15,KNACK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),179.02,180.43,0.79,-0.3,0.36,stop,-0.788,11:55,179.02,,,False
+2026-10-01,11:15,PHOENIXLTD,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1938.1,1958.4,1.05,-0.36,0.49,target,1.0,13:45,1938.1,,,False
+2026-10-01,11:45,EMBDL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),56.97,57.39,0.74,-0.1,0.14,target,1.0,12:15,56.97,,,False
+2026-10-01,11:45,ZENSARTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),429.6,435.0,1.26,-0.05,0.31,target,1.0,12:30,429.6,,,False
+2026-10-01,11:45,EXIDEIND,ENTER,ENTER,414.05,415.75,0.41,0.28,0.36,target,1.0,12:15,414.05,,,True
+2026-10-01,11:45,BSOFT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),273.5,276.1,0.95,-0.43,0.5,target,1.0,12:25,273.5,,,False
+2026-10-01,12:15,APARINDS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),17620.0,17868.0,1.41,0.41,0.06,target,1.0,13:40,17620.0,,,False
+2026-10-01,12:15,HCLTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1241.3,1249.7,0.68,0.15,0.21,stall,-0.499,15:15,1241.3,,,False
