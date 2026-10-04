@@ -57,3 +57,6 @@ data/*
 !data/*.py
 !data/README.md
 !data/*.sh
+
+# 2026-10-04: RQ-CD1/CD2 event tables, 100% regeneratable from confirmed_day1/*.py
+confirmed_day1/events*.csv

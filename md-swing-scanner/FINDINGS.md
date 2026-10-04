@@ -8713,3 +8713,26 @@ Infrastructure note, not a research finding: Rule #20 (Risk Unit Integrity) adde
 the swing_qs Quick Swing line silently inheriting BC v2's stop for a weekend of R-based
 work before it was caught — lives in `swing_qs/FINDINGS.md`'s Stop Definition Audit, not
 here; this project stays BC/Cell C's own research log.
+
+## Entry-evolution reconstruction + RQ-CD1/CD2 — what confirmed breakouts do on Day+1 (2026-10-04, stock-only, descriptive)
+
+**Reconstruction (historical, nothing rerun).** Asked by the critic: what does the record say about entry timing (EOD-confirmed → late-day → intraday breach) for stock vs long options? Stock: earlier entry beat confirmed next-day-open entry historically (2026-09-13 A/B/C: immediate 63.5%/+2.06% vs day+1 open 60.4%/+1.51%; RQ-94 aggregate 0.098 vs 0.077 R), flat for both in 2025-26. Earlier than the touch (blind open, approach entry) did not help; a later, cheaper same-day pullback beat the breach fill (2026-09-24). Options: **no like-for-like entry-timing test exists** — every option backtest through 2026-09-20 priced the option entry at the breach-day option close regardless of stock-side entry; RQ-94 had no option leg; only the 2026-09-15 stock proxy (close basis erases ~70-75% of mean edge) and RQ-PB-1's OX1-reconstructed touch fill (ATM ≈ break-even gross) speak to it, in opposite directions. The 14:45 pre-close architecture (original spec, `daily_scan.py --live --cutoff`) was never backtested. Unrecoverable: original 17 fades (2026-09-04), corrected natural-population A/B/C numbers (2026-09-13), the "Confirmed vs Rejected split is universal" section (cited, header not found).
+
+**RQ-CD1** (`confirmed_day1/01_day1_behaviour.py`, `out.txt`). Population: canonical BC v2 primed touches (`build_population`, `bc_v2_recipe`, `gate_clock="T-1"`, reused `pre_breach/bc_v2_chunk_*.csv`), n=10,671, 2021-09-29..2026-09-17. Confirmed = Day 0 Close > raw pivot (`high10_prior`, the 2026-09-24 Phase 1 definition, user's choice) = 57.8%; Close > trigger reconciles to 44.2% vs RQ-94's 44.5%. Entry = Day 0 close (CAS official close accepted as proxy for a just-before-close entry). Hand-checked 5 events vs raw `data/daily` files — exact match.
+
+| group | n | win% C1>C0 | mean | median | overnight mean/median | Day+1 open→close mean/median | hit +2% | D+1 share of D+10 mean |
+|---|---|---|---|---|---|---|---|---|
+| Confirmed | 6,169 | 50.3 | +0.26 | +0.02 | +0.41 / +0.34 | −0.15 / −0.30 | 41.0 | 26% |
+| Rejected | 4,502 | 47.5 | +0.05 | −0.09 | +0.26 / +0.26 | −0.20 / −0.33 | 36.4 | 6% |
+
+Confirmed ahead every year 2021-2026, but distributions overlap (no percentile differs by >~0.5pp). All Day+1 edge is the opening gap; Day+1 session closes below its open ~57% for both. Gap vs ordinary days (same tickers, n=555,447): Confirmed median +0.34% vs +0.17%; gap ≥ +0.5% 39% vs 30%; Confirmed median gap shrinking 2021 +0.53% → 2026 +0.20%. "Day+1 high reaches +1% above entry" is mostly ordinary volatility (any day 60.6% vs all breaches 66.8%; with a +1% limit-else-close rule +0.15% vs +0.29% mean, gross). **Classification: Outcome 2 (better quality, not sufficiently immediate), weak end.**
+
+**RQ-CD2** (`confirmed_day1/02_next_day_breakout.py`, `out_cd2.txt`). Original BC definition: Close > `high10_prior`, vol z ≥ 1.5, `base_filters_pass` on Day 0's own row (same-day legitimate — EOD decision). Event-level (every qualifying stock-day; back-to-back days each count), Nifty 500, 2021-09..2026-09-17. Pre-declared Day+1 classes:
+
+| group | n | CONTINUED C1>H0 | new high, closed back under | held | FADED (<C0, >pivot) | FAILED (≤pivot) | closed >H0 by D+3 | by D+5 |
+|---|---|---|---|---|---|---|---|---|
+| Breakout (high vol) | 12,662 | 29.3 | 13.0 | 6.9 | 33.5 | 17.2 | 48.2 | 56.8 |
+| Close > pivot, normal vol | 13,037 | 32.8 | 12.3 | 3.9 | 21.5 | 29.4 | 53.6 | 62.6 |
+| Ordinary day | 529,259 | 21.4 | 12.5 | — | — | — | 41.7 | 52.0 |
+
+Only ~3 in 10 high-volume 10-day breakouts keep breaking out the next day (vs ~2 in 10 for any day); most common outcome is a fade that holds the pivot. High volume lowers next-day failure below the pivot but does not raise continuation (inference, untested: high-volume days are wide-range, so H0 is further away and C0 further above the pivot). Continuation 28-31% in every year; Nifty regime gate no effect (29.2% open vs 29.4% closed). Descriptive only; no recommendation, no production change.
