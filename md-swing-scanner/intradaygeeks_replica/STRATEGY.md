@@ -1,6 +1,6 @@
 # Intraday 34-EMA rejection (shorts): living strategy doc
 
-Last updated: 2026-10-04 (IST, evening): chart-review session -- pivots (daily/weekly/monthly), pivot x market, candle shape, lower-wick sweep, daily 8-EMA above the stop, rolling-over-after-a-top tested (scripts 72-75); no rule changed, two watch items added (5.8e). Research PAUSED after this; Monday 2026-10-05 goes live on the rules below unchanged. Earlier same day: full-hour candle at 11:15 / 12:15 and the strong-green-hour skip adopted (scripts 68, 70).
+Last updated: 2026-10-04 (IST, late night): target / stall / stop studies, entry variants and alarm timing (scripts 76-87). No checklist rule changed; 1% target kept; plan option B (10:45 signal taken when standup ends) is the leading candidate -- see the plan table in section 1. Earlier same day: full-hour candle at 11:15 / 12:15 and the strong-green-hour skip adopted (scripts 68, 70); chart-review tests 72-75 closed.
 Detailed test-by-test log: `TELEGRAM_CALLS.md`. Literature notes: `INTRADAY_RESEARCH.md`.
 All returns are % per trade, gross of costs, unless stated.
 
@@ -67,6 +67,22 @@ Your broker must allow intraday (MIS) shorting of the name.
 | Median stop | 0.35% |
 | By month (Jun / Jul / Aug / Sep) | +0.04 / +0.05 / +0.13 / +0.38 |
 | Where the trade comes from | 10:45 alarm 81%, 11:15 alarm 13% |
+
+**Plan options on the CURRENT rules (2026-10-04 evening; 30m set Jun 10 - Sep 30 2026, 71 days; net = minus ~Rs85
+charges per Rs 1 lakh; scripts 83, 86, 87):**
+
+| One trade a day | Trades | Target / stall / stop | Net per trade | Total net | Worst streak | Max DD |
+|---|---|---|---|---|---|---|
+| A: 11:15 else 11:45 (live plan for 2026-10-05) | 63 | 32 / 14 / 54 | Rs+94 | Rs5,907 | 9 | -3,523 |
+| **B: 10:45 signal taken when standup ends (scan ENTER at ~10:50), else 11:15, else 11:45** | 68 | **40 / 13 / 47** | **Rs+220** | **Rs14,971** | 4 | -1,813 |
+| B, looked at 11:00 | 67 | 34 / 13 / 52 | Rs+172 | Rs11,529 | 5 | -1,561 |
+| 10:15 first, then B | 69 | 23 / 9 / 68 | Rs-49 | -3,357 | | |
+
+B is the leading candidate (user's standup runs ~10:20-10:50): run the scan as soon as standup ends; ENTER = short at
+market (target = fill - 1%, stop = candle high); SKIP / DEAD = wait for 11:15. A limit at the signal close is worse
+(script 86). 30m data only -- the 3-year 1H set has no 10:45 alarm; it was the original plan, moved to 11:15 for
+logistics only. Use 10:15-10:20 for `--prep`, never the 10:15 alarm (script 87). 3-year 1H plan (11:15 else 12:15):
+25 / 21 / 54, net Rs+32 -- the long-run reference.
 
 This is **exploratory**. It covers 4 months of a falling market, September dominates the result,
 and it was the best of several variants tested. **The one-trade-a-day number is fragile:** with ~65 trades it moved
@@ -175,6 +191,12 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 | RULE test: skip when the previous day's low sits between entry and the 1% target (script 79; Osler 2000/2003: known levels interrupt trends) | Closed: stall effect confirmed (stall 30 vs 19% both sets) but the removed trades are also stopped LESS (1H 51 vs 55%) -- quieter trades, not worse ones. 30m kept Rs153 vs 130 (shuffle p 0.06, July reversed), plan Rs179 -> 202 but total down; 1H kept 113 vs 107 (p 0.26), plan 117 -> 114, 2024 reversed; neighbours (0.75 / 1.25%) disagree | 79 |
 | Volatility (daily ATR%) of our trades; stop vs ATR; volatility-scaled target max(1%, k x ATR), k 0.25/0.30/0.35 (script 80) | Mix: ~31% at 2.6-3% ATR, ~30% each middle band, 7-11% at 4.5%+. Most volatile (4.5%+) is the best band in both sets (30m Rs390, 1H 218; target hit 50 / 37%) but too few for a filter (0.25-0.5/day); picking the highest-ATR setup is worse (30m 155 vs 179, 1H 91 vs 117). Stop = ~11% of daily ATR. Stop rate rises with ATR up to ~4% (50 -> 60%) and target rate rises steadily (17 -> 38%): the 3.5-4.5% "dip" is where more stops arrive before more targets pay; finer split shows no real valley (shuffle p 0.66 / 0.12). Scaled target ~= fixed 1% (all setups 30m 130 -> 125-129, 1H 107 -> 108-115; plan 30m 179 -> 175-197, 1H 117 -> 111-116) -> keep 1%; only the 4.5%+ band gains from a bigger target (30m 390 -> 420, 1H 218 -> 276), small n | 80 |
 | Middle-ATR band (3-4% daily ATR) worse? Robustness (script 81; band picked after looking) | Not robust. 3-4%: Rs84 vs 175 (30m), 79 vs 131 (1H), p 0.04. But on 30m shifting the band up 0.1-0.25% erases or reverses it (3.25-4.25: 146 vs 119); 1H holds in direction for all shifts but weakens (p .03 -> .16) and rests on 2026 (2024 tied). Mechanism check (stop / typical candle range terciles) shows no consistent pattern. Plan "skip 3-4%": total net +13% / +17% but 1H 2024 and 2025 worse. User's pick order volatile > calm > 3-4% is WORSE (30m Rs167 vs 179, 1H 102 vs 117) -> keep closest-to-EMA | 81 |
+| Confirmation entry: sell-stop at the signal candle's LOW, next candle only; cancel if the high is hit first (script 82, Al Brooks-style signal/entry bar) | Not adopted. The break IS information: signals that triggered made Rs+272 / +240 with a close entry (target 33 / 31%), cancelled ones were 100% stops, never-broke ~0. But entering at the low costs the close-to-low distance and the 1% target gets harder (more stalls): all setups 30m Rs156 vs 130 gross, 1H 84 vs 107 (1H fills resolved against us, no 5-min data); one-a-day plan worse in both (30m net +29 vs +94, 1H -32 vs +32). Keep the close entry | 82 |
+| 10:45 signal entered LATE (standup), and price coming back to entry after entry (script 83) | 10:45 first, entered at 10:50 / 11:00 / 11:05 only if the stop is untouched and 2:1 still holds, else 11:15 else 11:45: plan net Rs+220 / +172 / +159 per trade vs +94 today, total net 2-2.5x, better in 3-4 of 4 months. 30m data only (the 1H set has no 10:45 alarm); the original plan WAS 10:45-first, moved to 11:15 for logistics, not evidence. Retest: 73% of eventual TARGET trades come back to the entry price (65% within 30 min), 28% even back to the EMA34 -- being underwater early is normal; a second-chance limit at entry would fill 100% of the losers (adverse selection) | 83 |
+| 15-min signal + follow-through break (script 84, 30m data only) | 15-min close entry: 13 signals/day, 66% stopped, net ~0 (Rs83 gross). Break-of-low entry helps the 15-min version (Rs109 gross / +24 net, better in 3 of 4 months) but stays below today's 30-min close entry (Rs130 / +45); plan from 10:45: +73 net/trade, total Rs5,183 vs 5,907 (plan A) and 14,971 (10:45-at-10:50 plan). A 30-min candle already is the 'two seller bars' confirmation. Not adopted | 84 |
+| Inside the trigger candle: high in the first half + lower low in the second ("sequential selling") vs the rest (script 85, 30m only) | Not better: sequential Rs116 vs other 151 gross (p 0.74), mixed by month; sequential-only plans much worse. Likely: sequential candles close near their low (shorting the bottom of the push); the "messy" ones are often a second failed test of the EMA | 85 |
+| 10:45 signal looked at late: limit sell at the signal close (till 11:15) when price has dropped below it (script 86) | Worse than the plain scan rule at 10:50 (plan net Rs143 user-limit / 187 mix vs 223 scan); equal at 11:00 (169-174). Limits fill when price bounces back up = more stops (adverse selection again). Use the scan's ENTER / SKIP / DEAD as is | 86 |
+| 10:15 alarm re-checked on today's rules (script 87; user is free 10:15-10:20) | Still the weakest: 30-min candle 09:45-10:15: 118 setups, 63% stopped, net Rs-22/trade; making it the first pick turns the plan negative (net -49/trade vs +220). Full opening hour 09:15-10:15: only 12 setups in 4 months (opening stops are wide, 2:1 removes them). Confirms scripts 39/43: opening noise. Use 10:15-10:20 for prep, not trades | 87 |
 | The channel's own calls by side | 68% longs; longs +0.031% vs shorts +0.002% at target 1; the edge is counter-trend on both sides; most calls match none of his public scanners | 50 |
 
 ---
