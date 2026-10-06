@@ -1428,3 +1428,84 @@ one -- but is formally NOT a tradable strategy yet. The single next required ste
 defining Candidate A's structural-invalidation/stop convention (a logic-first design decision per
 this project's standing discipline, not a data-mining exercise) before any further resumption-rate
 or R-based work is built on top of it.
+
+## Pivot to a realistic entry clock: user can only act around 3pm, not instantly (2026-10-06)
+
+User flagged a real execution constraint that invalidates most of the prior entry-timing research
+for practical use: they will realistically be checking and placing trades around 3pm, not catching
+`box_high` breaks the instant they happen. Everything tested earlier this week (first-hour vs
+later-hour cross, instant-entry MFE/MAE, EMA8 pullback) assumed near-instant execution. Rebuilt the
+baseline around the actual constraint: entry = the 14:15 hourly bar's Close (the realistic price
+available checking in ~3pm), on the FULLY UNFILTERED resumption population (no CLV gate, no gap
+condition) -- entry day = first day (any day after box confirmation) where price has closed above
+`box_high` at any point up to and including the 14:15 bar.
+
+**Raw baseline, unfiltered, instant entry vs ~3pm entry (n=18,399 / 18,311)**:
+
+| checkpoint | instant entry | ~3pm entry |
+|---|---|---|
+| Today's close | median 0.00%, 46.3% positive | median 0.00%, 45.7% positive |
+| Tomorrow's open | median +0.41%, 59.9% positive | median +0.43%, **71.0%** positive |
+| Tomorrow's close | median +0.11%, 51.7% positive | median +0.13%, 52.3% positive |
+| Peak (next ~2 days) | median +2.30%, 97.6% positive | median +2.10%, 99.2% positive |
+
+**Result: a realistic 3pm entry is NOT worse than catching the break instantly** -- if anything the
+overnight-gap win rate is meaningfully higher (71.0% vs 59.9%). This matters practically: the user's
+real constraint (can't watch a screen all day) does not appear to cost edge on this unfiltered
+baseline.
+
+**Pullback/instant-entry question, raw unfiltered population**: 94.1% of ALL entries dip below the
+instant-entry price at some point the same day (median dip -1.07%); only 5.9% never dip at all, and
+that 5.9% is the stronger-performing subset (today's-close median +0.39%/57.6% positive vs -0.07%/
+45.6% for the dippers). So waiting for a pullback would improve average entry price on 94% of cases
+but would completely miss the strongest 5.9% -- the same "waiting selects a weaker population"
+pattern RQ-11A already found with EMA8, now confirmed independently with a simpler, EMA-free
+definition.
+
+## RQ-EMAPB-3PM-01 -- extension above box_high at 3pm, formally confirmed (2026-10-06)
+
+**Data quality catch first (Rule #22)**: before bucketing, checked for outliers -- found 256 rows
+(1.4% of the 3pm-entry population) with an impossible `entry_price`/`box_high` ratio (e.g. BAJFINANCE
+showing `box_high`~=750 against `entry_price`~=3,700 on the same row -- BAJFINANCE never traded that
+spread in a single session; it had a 1:4 split in mid-2024 and `box_high`/`entry_price` are being
+pulled from inconsistently-adjusted price series, the same unadjusted-corporate-action issue flagged
+in the short-side RQ-S01 NSE data lessons). Excluded (|extension|>50%) before any aggregate --
+n=18,055 remain.
+
+**Question**: among 3pm entries, does how far price has already run above `box_high` by the time
+you'd actually buy predict the next day's outcome?
+
+| 3pm price vs box_high | n | % of pop | D1 open (median/%pos) | D1 close (median/%pos) | peak (median) | worst point (median) |
+|---|---|---|---|---|---|---|
+| Below box_high (already pulled back) | 3,997 | 22.1% | +0.42% / 72.7% | **+0.50% / 61.5%** | +2.24% | -1.07% |
+| 0-1% above | 5,199 | 28.8% | +0.30% / 67.7% | +0.01% / 50.2% | +1.69% | -1.40% |
+| 1-2% above | 3,209 | 17.8% | +0.41% / 71.8% | +0.04% / 50.7% | +1.92% | -1.57% |
+| 2-3% above | 1,836 | 10.2% | +0.50% / 74.7% | +0.00% / 49.8% | +2.20% | -1.84% |
+| 3-5% above | 2,024 | 11.2% | +0.63% / 74.3% | +0.17% / 52.5% | +2.88% | -1.94% |
+| 5%+ above | 1,790 | 9.9% | +0.69% / 71.1% | -0.20% / 46.9% | +3.32% | -2.65% |
+
+**Finding: chasing extension at 3pm does not pay, and a same-day pullback below the level by 3pm is
+not a red flag.** The most-extended bucket (5%+ above) has the biggest peak potential but the worst
+D1-close win rate (46.9%) and deepest drawdown (-2.65%) -- paying up for a worse risk/reward. The
+"already pulled back below box_high" bucket has the BEST D1-close win rate of any bucket (61.5% vs
+~50% for the just-above buckets) -- a same-day shakeout is not damaged goods, consistent with the
+RQ-10B "quick recovery" pattern found earlier this week.
+
+**Formally confirmed, three independent tests, all p=0.0000**:
+- Below-box_high vs. rest, D1-close win rate: +11.32pp observed vs 1.74pp null p95.
+- Full 6-bucket spread, D1-close win rate: 14.57pp observed vs 4.12pp null p95.
+- Below-box_high vs. rest, D1-close actual return (mean): +0.56pp observed vs 0.12pp null p95.
+
+**Hand-verified** (Rule #22): 5 real examples from the below-box_high bucket, including both a
+winner (PLASTIBLEN, entry 278.00 vs box_high 281.35, D1 close +3.67%) and a real loser (INDOAMIN,
+entry 175.34 vs box_high 177.80, D1 close -4.28%) -- not cherry-picked, prices are sane, no data
+artifact.
+
+**Robustness check, per Rule #19 (2-3 materially distinct splits, pre-declared)**: holds inside
+both CLV bands almost identically (CLV>=0.80: +11.5pp, p=0.0000; CLV<0.80: +12.1pp, p=0.0000 --
+this is NOT a CLV-restated effect) and holds in every individual year with no decay (2023 +9.2pp,
+2024 +11.9pp, 2025 +9.7pp, 2026 +15.6pp -- actually strongest in the most recent year). **Clears
+this project's robustness bar.** This is the first real, 3pm-entry-specific, formally-verified
+piece of entry logic for a realistic (can't-watch-all-day) execution constraint. Not yet a
+complete strategy -- still missing the stop/invalidation convention (Rule #20, still open from the
+critic's confidence re-tag above) -- but a genuine, validated building block for one.
