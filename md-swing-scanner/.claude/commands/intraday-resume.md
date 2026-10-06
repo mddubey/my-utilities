@@ -74,18 +74,32 @@ The user's day: free 10:15-10:20, standup ~10:20-10:50. Plan B on the 30m backte
 target / stall / stop 40 / 13 / 47, net ~Rs+220 per trade vs Rs+94 for the old 11:15-first plan. The sooner after
 10:45 the scan runs, the better (10:50 best; 11:00 still good).
 
+**Two checkpoints at the 10:45 alarm, run BOTH and compare live (added 2026-10-06, still experimental):** the
+10:15-10:45 candle doesn't finish being "tested" until the following 5-min bar (10:45-10:50) closes -- running at
+10:48 only sees the candle itself (same info as 10:45, ladder bucket ~Rs+25/trade); running just after 10:50 (10:51-
+10:52, allowing Yahoo's publish lag) sees whether the setup already died or ran too far to chase in that first 5
+minutes (ladder bucket ~Rs+89/trade, the best checkpoint found). Run both every day, log which one you actually
+traded from, so the live comparison accumulates. Don't conflate the two in review -- they're different checkpoints
+on the same candle, not a tie-break.
+
 All commands from `intradaygeeks_replica/`. Times IST.
 
 | When | Run | Notes |
 |---|---|---|
 | 10:15-10:20 (user free), or any time before standup | `python3 38_alarm_scan_1h_close.py --prep` | builds today's candidate list; also flags STALE data (then the EOD run was missed). NEVER trade the 10:15 alarm (script 87: opening noise, turns the plan negative) |
-| as soon as standup ends (~10:50, by 11:05: the scan drops the 10:45 candle 20 min after it closes) | `python3 38_alarm_scan_1h_close.py` | judges the 10:45 candle (10:15-10:45 half-hour). ENTER = short now at market. SKIP / DEAD = no 10:45 trade, wait for 11:15. Do NOT rest a limit at the signal close (script 86: worse) |
+| ~10:48 (early look, standup still running) | `python3 38_alarm_scan_1h_close.py` | reads the 10:15-10:45 candle only (the 10:45-10:50 bar isn't closed yet) -- same information as the 10:45 alarm itself, not yet benefiting from the dead/chase filter. Use for an early read / start of chart-checking, not necessarily the entry |
+| ~10:50-10:52, as soon as standup ends (by 11:05: the scan drops the 10:45 candle 20 min after it closes) | `python3 38_alarm_scan_1h_close.py` | the real second checkpoint: full 10:45-10:50 bar now closed, dead/2:1-gone setups are filtered out automatically. ENTER = short now at market. SKIP / DEAD = no 10:45 trade, wait for 11:15. Do NOT rest a limit at the signal close (script 86: worse). **Re-verify status again right before the actual fill** if any time passed since this check -- see the 2026-10-05 J&KBANK watch item below |
 | 11:16-11:20, only if no trade yet | `python3 38_alarm_scan_1h_close.py` | 11:15 check = the FULL 10:15-11:15 hourly bar, stop = hour high |
 | 11:46-11:50, only if still no trade | `python3 38_alarm_scan_1h_close.py` | half-hour check; skips a shallow pullback after a strong green 10:15 hour (printed as "skipped, would otherwise qualify"). Last trade window of the day |
 | after 15:30 | `./eod_checklist.sh` (from the repo root) | shared with Primed BC: Part A data + health check, Part B trading |
 | after `eod_checklist.sh` | `python3 89_eod_review.py` | EOD REVIEW (continuous improvement): replays the day's alarms (10:50 / 11:16 / 11:46 / 12:16) and logs what EVERY setup would have done -- plan pick, ENTERs not taken, and each skip type (EMA8 zone, chased, dead, green hour, stop > 0.5%) -- to `eod_review_log.csv`, then prints the running summary by category. Report: the day's pick vs what the user actually did, then the summary. `--summary` = summary only. Replaces the manual EMA8-zone telemetry step |
 
 - If the scan prints DATA NOT READY, Yahoo is lagging: wait a minute and run again.
+- **Watch item (2026-10-05, don't act on a stale ENTER read):** J&KBANK's stop was already touched by 10:50 (the
+  10:45-10:50 bar spiked above it), but the user had committed to the trade at 10:48 (before the spike was visible)
+  and filled at ~10:55 without re-checking -- a strict re-check right before the fill would have said skip. Worked
+  out this time (target hit); the backtest says re-checking immediately before every late fill is still the right
+  discipline, not something to skip because it worked once. ~20 live cases before revisiting.
 - How to report a scan:
   - summary first: the FIRST COME pick (ticker, entry, stop, stop %, target) and its status;
   - then the full table;
