@@ -1509,3 +1509,98 @@ this project's robustness bar.** This is the first real, 3pm-entry-specific, for
 piece of entry logic for a realistic (can't-watch-all-day) execution constraint. Not yet a
 complete strategy -- still missing the stop/invalidation convention (Rule #20, still open from the
 critic's confidence re-tag above) -- but a genuine, validated building block for one.
+
+## Critic review + literature check on RQ-EMAPB-3PM-01 (2026-10-06)
+
+Critic read the finding with an explicit high bar ("the result is attractive enough that we should
+actively try to break it"). Verdict: plausible, not theoretically weird -- two literature-backed
+mechanisms both predict it: (1) intraday return reversal from temporary liquidity imbalances
+(Heston, Korajczyk & Sadka; effects documented as lasting under an hour, stronger in less-liquid/
+more-volatile names), and (2) the breakout-pullback/retest structure is a recognized, named TA
+pattern (old resistance tested as new support). The overlap of both mechanisms is a coherent
+explanation for "big early breakout -> gives back some/all by 3pm -> subsequent continuation beats
+buying the still-extended price."
+
+**Mechanical audit requested, run immediately, passed clean**: verified in the actual code
+(`21_rq_emapb_3pm_entry.py`) that `box_high` is frozen from the pre-resumption box period (computed
+well before the entry-day search even starts), `entry_price` is exactly the 14:15 bar's Close
+(nothing else), `d1_close_ret` is measured from that exact price (not the day's open or `box_high`),
+and the extension classification (`already_run_pct`) only touches `entry_price` and `box_high` --
+no information from after 14:15 leaks into either the classification or the outcome. No RQ-10B-style
+overlap bug here.
+
+**Critic's substantive pushback, three points**:
+1. "Below box_high at 3pm" may not mean "cheaper is better" -- it may be measuring PULLBACK QUALITY
+   (a same-day retest of the broken level as new support) rather than mere extension/cheapness. The
+   aggregate bucket conflates a healthy, orderly retest with an outright failed breakdown under the
+   same label.
+2. The 3pm clock itself may be doing real work via well-documented intraday liquidity seasonality
+   (U-shaped volume/spread patterns on NSE) rather than "breakout psychology" specifically -- noted
+   for a future OOS test of whether 3pm itself is special, explicitly NOT to be tested now (would be
+   clock-time fishing).
+3. The strategy has quietly changed character: no longer "buy the first-hour breakout," now "at 3pm,
+   inspect how the morning breakout evolved, then decide if the resulting state is attractive" -- a
+   state-at-3pm strategy, not a breakout-entry-timing strategy. Explicit instruction: do NOT now sweep
+   extension-bucket granularity, clock times, EMA variants, or CLV combinations -- that would be
+   exactly the overfitting trap already flagged this week.
+
+**Confidence tag applied to this finding specifically**: green (confirmed empirical building block),
+yellow (mechanistically plausible per literature), red (not yet a defined-risk strategy).
+
+**Next step specified**: RQ-12, decompose the shape of the 3pm state (not another predictor) --
+specifically whether, within the below-box_high group, there's a difference between "merely drifted
+down from the morning high" (still falling into 3pm) vs "broke back through box_high and then
+recovered/held around it." User explicitly deferred bringing EMA8 into this (despite a real,
+previously-observed chart pattern) per critic's instruction to keep this decomposition clean first.
+
+## RQ-EMAPB-12 -- 3pm state decomposition, closed mostly negative + a real illiquidity catch (2026-10-06)
+
+Built the critic-specified test: within the below-box_high-at-3pm group (n=3,881), split by whether
+the 3pm close is at/near the day's own low-so-far ("still falling") vs meaningfully above a lower
+point reached earlier ("already bounced").
+
+**The critic's actual question came back weak and counter to the hypothesis**: "still falling"
+66.2% D1-close positive vs "already bounced" 61.4% -- opposite direction from the Story
+1 (healthy pullback)/Story 2 (failed breakdown) prediction, and only marginally significant
+(+4.80pp observed vs 4.36pp null p95, **p=0.0400** -- barely clears, not a clean confirmation).
+**Not promoted.** The secondary retracement-from-morning-high tercile check showed no clean
+pattern either (64.1% / 60.6% / 61.3%, non-monotonic U-shape) -- no formal test run, inconclusive.
+
+**A serendipitous falsification check produced a spectacular-looking number that turned out to be a
+pure data artifact -- caught before it went anywhere (Rule #22 in action)**: running the same
+still-falling-vs-bounced split on the ABOVE-box_high group (sanity-checking whether the feature
+means anything generally) showed a huge, clean-looking effect -- "still falling" (n=373, 2.6% of
+that group) at 67.6% D1-close positive vs "already bounced" at 49.7%, +17.90pp observed vs 5.23pp
+null p95, p=0.0000. **Hand-verification of 5 real examples before trusting it** found real problems
+in 3 of 5: PVP showed ZERO intraday range (morning_high == day_low_so_far, a frozen/illiquid name
+where "at session low" is a meaningless label); EMCURE and AKUMS showed `box_high` sitting 40-50%
+below the entry price, an implausible same-episode move. Quantified: **56% of the n=373 "finding"
+group (209 cases) has near-zero intraday range** -- thinly-traded/frozen-price names, not genuine
+price action. Re-running the test after excluding near-zero-range names across the whole
+population: the effect **collapsed to p=0.1575** (+5.84pp observed vs 7.69pp null p95) -- not
+significant. **CLOSED: this was a pure illiquidity artifact, not a market phenomenon.** The
+below-box_high group's original test was unaffected by this same cleaning (identical counts,
+517/3,364, same p=0.0400) -- it was never contaminated by this issue, it's just independently weak.
+
+**A separate, real methodological issue surfaced during hand-verification, not yet fixed**: the
+entry-day search window (up to ~300 bars / ~50 trading days forward from box confirmation) can, in
+rare cases, find a qualifying cross long after the box confirmed -- distribution has a real tail
+(median gap 1 day, 90th pctile 10 days, but 99th pctile 463 days, max 953 days) -- raising the
+question of whether some long-delayed crosses are actually unrelated later rallies being
+mis-attributed to a stale box, not genuine continuations of the same episode. Flagged, not fixed.
+
+**Checked whether this affects the core RQ-EMAPB-3PM-01 finding -- it does not, and the result is if
+anything slightly reassuring**: the long-delay ("stale") rate is low and similar (6.3-9.2%) across
+the below/0-1/1-2/2-3/3-5 buckets -- the main, formally-tested below-vs-rest contrast is
+unaffected. Only the 5%+-above bucket shows meaningfully elevated staleness (20.9% with gap>10
+days). Split that bucket directly: clean (fresh, gap<=10 days, n=1,416) shows D1-close 45.6%
+positive; stale (gap>10 days, n=374) shows 51.9% positive -- the stale cases were performing
+slightly BETTER, meaning they were diluting the "don't chase extension" signal toward a less
+dramatic number, not inflating it. **The core finding is intact and the chase-penalty is if
+anything understated, not overstated, by the uncleaned bucket.** The search-window scope issue
+remains a real cleanup item for any future RQ built on this same population, but it is not a threat
+to RQ-EMAPB-3PM-01's practical conclusion.
+
+**Net status**: RQ-12 closed, mostly negative (the specific healthy-pullback/failed-breakdown
+distinction critic asked for was not confirmed). RQ-EMAPB-3PM-01 stands, unaffected, and the
+illiquidity catch is a logged process win, not just a dead end.
