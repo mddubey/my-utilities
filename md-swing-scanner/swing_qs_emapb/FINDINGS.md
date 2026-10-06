@@ -1604,3 +1604,40 @@ to RQ-EMAPB-3PM-01's practical conclusion.
 **Net status**: RQ-12 closed, mostly negative (the specific healthy-pullback/failed-breakdown
 distinction critic asked for was not confirmed). RQ-EMAPB-3PM-01 stands, unaffected, and the
 illiquidity catch is a logged process win, not just a dead end.
+
+## Critic's final verdict on RQ-12 + standing guardrail adopted (2026-10-06)
+
+**RQ-12: CLOSED NEGATIVE, confirmed.** Critic explicitly praised the process, not just the
+outcome: the attractive-looking above-box_high result was correctly rejected as a data artifact
+after raw hand-verification, and the stale-box tail is a real population-definition weakness worth
+guarding against going forward.
+
+**Ledger distinction, important, recorded verbatim per critic's framing** -- do not let RQ-12's
+failure weaken RQ-EMAPB-3PM-01, because they asked different questions:
+- RQ-12 asked: *why* is the below-box_high group better? -- failed to establish the proposed
+  explanation (healthy-pullback-vs-failed-breakdown didn't hold up).
+- RQ-EMAPB-3PM-01 asked: *is* the below-box_high state better at the 3pm decision point? -- this
+  remains supported, independently of RQ-12's failed explanation.
+
+**Status tag: "3pm retracement state: empirical finding = green-ish / explanation = unresolved."**
+Explicitly do NOT invent a causal story for this effect just because it's attractive -- the
+literature-backed mechanisms (intraday reversal, breakout-pullback-retest) remain plausible
+background context, not a proven causal account.
+
+**New standing guardrail adopted for this subproject (not yet a CLAUDE.md-level rule, scoped to
+the EMAPB resumption-episode machinery specifically)**: any future RQ using this population must
+explicitly control for and report the age of the daily box at the eventual 1H cross --
+at minimum: the gap-days distribution, what fresh-vs-stale definition was used (no fixed cutoff
+established yet -- "10 days" was a working boundary for this one check, not a permanent rule), and
+whether the tested effect survives a freshness restriction. The 99th-percentile 463-day / max
+953-day tail is extreme enough that no future qualifying cross should be casually described as "a
+continuation of the original setup" without checking this first.
+
+**Next step, per critic, explicit**: do NOT launch another explanatory RQ -- enough time has gone
+into "why." The next useful step is turning the surviving 3pm finding into an actual candidate
+trade: at ~3pm, after a valid EMAPB resumption, what exactly constitutes an EXECUTABLE ENTRY, and
+what constitutes FAILURE/INVALIDATION. This is the same missing piece flagged by the earlier
+"structurally plausible, unvalidated" confidence re-tag (Rule #20 still open) -- now concretely
+motivated by a real, surviving entry-side signal instead of an abstract requirement. The
+search-window scope issue should be fixed/guarded before the next population is generated for this
+work, not silently carried forward.
