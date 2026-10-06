@@ -66,3 +66,9 @@ options_momentum/panel_chunk_*.pkl
 options_momentum/panel_full.pkl
 options_momentum/reversal_chunk_*.pkl
 options_momentum/reversal_panel_full.pkl
+
+# swing_qs_emapb -- 100% regeneratable derived CSVs + chart-audit PNGs from the
+# numbered scripts + data/; findings/specs/reports are tracked, data artifacts are not
+swing_qs_emapb/*.csv
+swing_qs_emapb/*.txt
+swing_qs_emapb/visual_audit/
