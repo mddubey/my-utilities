@@ -1641,3 +1641,64 @@ what constitutes FAILURE/INVALIDATION. This is the same missing piece flagged by
 motivated by a real, surviving entry-side signal instead of an abstract requirement. The
 search-window scope issue should be fixed/guarded before the next population is generated for this
 work, not silently carried forward.
+
+## RQ-EMAPB-13 / 13v2 -- predictive execution feasibility, CLOSED NEGATIVE (2026-10-06)
+
+User's operational question, not a performance question: can EMAPB move from reactive (3pm
+check-in) to predictive (T-1 or early-same-day IOC), the way Prime BC already operates -- since
+continuously watching for "it just broke out" isn't viable. Critic specified one bounded,
+pre-registered test (RQ-13), explicitly NOT a discovery program: by ~10:15 (our data's closest
+honest approximation to critic's 9:45-10:00, since intraday is hourly -- stated explicitly, not
+hidden), can a simple state separate today's eventual later-day resolutions from the rest of the
+primed population well enough to justify an IOC?
+
+**RQ-13, first pass (resumption-only population, n=47,307 primed mornings)**: rule = first-hour
+High comes within 1% of box_high. Coverage 71.1%, precision 36.1% vs 14.76% base rate (+21.3pp
+lift). Looked promising, but user immediately flagged suspicion of look-ahead. Mechanical audit
+confirmed the predictor itself is clean (T-1 close + that day's own 09:15 bar only, nothing leaks
+forward) -- the real issue was survivorship bias: the population only contained episodes already
+known to eventually resolve (`outcome=='consolidation_resumption'`), missing all boxes that form
+and never break out at all.
+
+**RQ-13v2, full denominator (critic's required next step, same FROZEN rule, no threshold change)**:
+rebuilt including `consolidation_failure` episodes (22,697, vs 19,182 resumption) in the same
+primed-morning panel, capped at a 20-trading-day window per episode (the population-construction
+guardrail adopted after RQ-12's stale-box finding -- not the frozen rule itself). Combined panel:
+513,896 primed-morning rows, 69.1% of which come from episodes that never resolve.
+
+| metric | resumption-only | full denominator |
+|---|---|---|
+| Live base rate | 14.76% | **1.33%** |
+| Coverage | 71.1% | 71.7% (holds) |
+| **Precision** | 36.1% | **5.21%** |
+| False-positive rate | 63.9% | **94.79%** |
+
+**Precision collapsed from 36.1% to 5.21% once failure episodes are included** -- coverage survives
+(the early-session proximity condition still catches most true same-day resolutions), and the
+relative lift over the live base rate is still real (~3.9x, 5.21% vs 1.33%), but 94.79% of flags
+would be wrong. Not operationally useful for an automated, unmonitored IOC -- firing on noise 19
+times out of 20.
+
+**CLOSED per critic's own pre-declared decision tree** ("if precision collapses -> close
+predictive automation and use T-1 shortlist + 3pm check-in"). EMAPB does not get a predictive/
+IOC-automated execution path -- the project defaults to the already-validated reactive approach
+(RQ-EMAPB-3PM-01's T-1-shortlist + 3pm check-in), which doesn't have this problem since it confirms
+an ACTUAL breakout at 3pm rather than predicting one in the morning. Do not reopen predictive
+automation for EMAPB without a materially different signal than first-hour proximity -- this one
+test, done properly with the full denominator, answered the question.
+
+## EMA8 "touch and run" -- second independent disconfirmation, CLOSED NEGATIVE (2026-10-06)
+
+User recalled from past chart review that most EMAPB breakouts happen with the 1H EMA8 nearby, and
+that price typically touches it and then runs -- asked for a full-population re-check (previously
+only checked on 5 anecdotal charts). Tested properly: at the actual resolution bar, across all
+17,969 episodes with EMA8 coverage, median distance from the bar's Low to its own 1H EMA8 is
+**+0.61% (above it, not touching)**. Only 20.4% of resolution bars touch EMA8 at all (Low<=EMA8).
+**Touching it is associated with WORSE reliability, not better**: 40.1% hold_3bars for touches vs
+48.5% for non-touches, formally confirmed (-8.39pp observed vs 1.76pp null p95, p=0.0000).
+
+**This is the second independent test with the same directional conclusion** -- RQ-11A already
+found waiting for an EMA8 pullback selects a materially weaker population (72.1% vs 89.8% hold).
+**CLOSED NEGATIVE, per critic**: EMA8 proximity/touch as a strength signal is rejected twice now.
+Do not reopen this from chart memory/anecdote again without a materially different framing than
+"proximity to EMA8 at or around the breakout."
