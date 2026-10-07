@@ -1702,3 +1702,51 @@ found waiting for an EMA8 pullback selects a materially weaker population (72.1%
 **CLOSED NEGATIVE, per critic**: EMA8 proximity/touch as a strength signal is rejected twice now.
 Do not reopen this from chart memory/anecdote again without a materially different framing than
 "proximity to EMA8 at or around the breakout."
+
+## Critic's final verdict + the research queue is now intentionally short (2026-10-06)
+
+**RQ-13v2 verdict, critic**: predictive/IOC automation CLOSED. Confirmed the result is informative,
+not a pure null -- real predictive information exists (coverage held at 71.7%, ~3.9x relative lift)
+but fails the operational bar in absolute terms (5.21% precision, 94.79% false positives). The
+pre-registered decision tree resolved exactly as designed: morning prediction closed -> T-1
+shortlist + 3pm confirmation is the operational path. No classifier, no threshold rescue, no second
+morning predictor.
+
+**EMA8: permanently closed per critic** -- three facts now on record (RQ-11A pullback-selects-
+weaker; full-population touch test 40.1% vs 48.5%, p=0.0000; only 20.4% of resolutions even touch
+it). Explicit instruction: a future chart that appears to contradict this is an anecdotal challenge
+requiring a genuinely new hypothesis, not grounds to reopen the old one.
+
+**Where EMAPB now stands, the surviving operational concept**:
+```
+T-1    -> identify valid/primed boxes, build a manageable shortlist
+T morning -> no automated prediction, no universe-wide watching
+~3pm   -> inspect the shortlist, require the actual qualifying state,
+          enter only when the real resumption condition is present,
+          don't chase excessive extension
+```
+A reactive confirmation strategy, but operationally manageable -- the expensive part (continuous
+universe-wide monitoring) has been eliminated by the T-1 shortlist. The 3pm below-box_high result
+(RQ-EMAPB-3PM-01) remains the strongest entry-side empirical finding and must not be discarded just
+because the predictive-automation attempt failed -- they are independent results.
+
+**Next and only open item: RQ-14 -- EMAPB 3PM Executable Entry & Structural Invalidation.** Not
+another predictor search. Four things to settle, in order:
+1. **Exact 3pm entry condition** -- what exactly qualifies at the decision point, what price is
+   realistically executable.
+2. **Structural failure** -- what price/action means the setup is genuinely broken; must be
+   structurally defensible, not "because the trade went down."
+3. **Stop/risk** -- fixed % vs structural level vs a bounded combination; matters because the user
+   sizes position from the risk, so it cannot be quietly widened just to improve historical win
+   rate.
+4. **Realized-R outcome** (only after 1-3 exist) -- MAE, MFE, +1R/+2R attainment, -1R loss
+   frequency, time to outcome, overnight gap behavior, slippage/transaction assumptions.
+
+Only once these exist does Candidate A become a strategy rather than a validated entry-side
+phenomenon. **Standing guardrail for RQ-14 and beyond**: every future RQ on this population must
+report box age/freshness (per the RQ-12 stale-box guardrail) -- report it and assess its structural
+meaning, do not introduce a new freshness cutoff yet.
+
+**Research queue, intentionally short**: predictive morning IOC closed; EMA8 closed; no more
+breakout predictors. -> Define 3pm entry + structural invalidation -> test realized R -> attack
+failure scenarios. This is the point to stop discovery and start trying to break the actual trade.
