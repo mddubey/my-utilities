@@ -226,17 +226,22 @@ if __name__ == "__main__":
         # "INFO (green candle)" and never picked; 89_eod_review.py logs their outcomes. Backtest: green net 30m -8 / 1H -43
         # vs red +45 / +21; as a later pick after red 30m +190 vs +181 but 1H +23 vs +32 -> decide on ~20 live cases.
         is_green = not checks["red"]
+        # 2026-10-08 (user, WARNING only, not a filter): median Rs per 5-min bar over the hour before the alarm, in lakh.
+        # Jumpy / slipping names (PNGJL 12.6, AMAGI 4.9, IPCALAB 12.7) vs smooth (TECHM 182, HINDCOPPER 229); THIN < 25.
+        _lh = g[(g.index >= cend - pd.Timedelta("60min")) & (g.index < cend)]
+        liq_L = round(float((_lh.Volume * _lh.Close).median()) / 1e5, 1) if len(_lh) else np.nan
+        warn = "THIN" if liq_L < 25 else ""
         _miss = [k for k, v in checks.items() if not v and k != "red"]
         if len(_miss) == 1:   # 2026-10-08 (user): near misses, INFO only -- exactly one non-colour check failed
             near.append(dict(ticker=t, missed=_miss[0], colour="red" if checks["red"] else "green", close=round(cl, 2),
                              stop_pct=round((hi - cl) / cl * 100, 2), below_ema_pct=round(dist, 2),
-                             ema8_vs_ema34_pct=round((E8 - E) / E * 100, 2), atr_pct=round(P.at[t, "atrp"], 2)))
+                             ema8_vs_ema34_pct=round((E8 - E) / E * 100, 2), atr_pct=round(P.at[t, "atrp"], 2), liq_L=liq_L, warn=warn))
         if all(v for k, v in checks.items() if k != "red"):
             rows.append(dict(ticker=t, candle=f"{last:%H:%M}-{cend:%H:%M}" + (" (full hour)" if cend - last == pd.Timedelta("60min") else ""), entry=round(cl, 2), stop=round(hi, 2), stop_pct=round((hi - cl) / cl * 100, 2),
                              target=round(cl * 0.99, 2), ema34_1h=round(E, 2), below_ema_pct=round(dist, 2), live_d8=round(live, 2),
                              day_high=round(day_hi, 2), adx=round(P.at[t, "adx"], 1), ema8_1h=round(E8, 2),
                              ema8_below_pct=round((cl - E8) / cl * 100, 2), green_skip=bool(strong_green_before),
-                             cend=f"{cend:%H:%M}", in_path=path_levels(t, cl, upto), **late_status(g, cend, hi)))
+                             cend=f"{cend:%H:%M}", liq_L=liq_L, warn=warn, in_path=path_levels(t, cl, upto), **late_status(g, cend, hi)))
             if strong_green_before: rows[-1]["status"] = "SKIP (strong green hour before)"
             if is_green: rows[-1]["status"] = f"INFO (green candle; {rows[-1]['status']})"
     R = pd.DataFrame(rows)
@@ -275,7 +280,7 @@ if __name__ == "__main__":
     R.insert(0, "pick", ["FIRST COME" if i == (live_ix[0] if live_ix else -1) else "" for i in range(len(R))])
     print(f"\n{len(R)} SHORT setup(s), all equal quality after the filters. status = where it stands NOW; enter only 'ENTER' ones,"
           f" target = your fill - 1%. FIRST COME = first ENTER, the one-trade-a-day choice:\n")
-    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "below_ema_pct", "ema8_below_pct", "in_path"]
+    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "below_ema_pct", "ema8_below_pct", "liq_L", "warn", "in_path"]
     pd.set_option("display.width", 200)
     print(R[show].rename(columns={"risk_now_pct": "stop%_now", "target_now": "target", "entry": "candle_close", "below_ema_pct": "below_ema%", "ema8_below_pct": "ema8_below%"}).to_string(index=False))
     R.to_csv(out, index=False); print(f"saved {out.name}")

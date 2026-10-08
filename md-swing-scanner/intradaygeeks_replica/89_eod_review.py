@@ -106,7 +106,7 @@ if __name__ == "__main__":
         rec = dict(date=D, alarm=r.alarm, ticker=r.ticker, category=r.category, status=r.status, entry=r.entry, stop=r.stop,
                    stop_pct=r.stop_pct, ema8_below_pct=r.get("ema8_below_pct", np.nan), below_ema_pct=r.below_ema_pct,
                    outcome=o, ret=round(ret, 3), exit_at=at, look_price=r.now,
-                   in_path=r.get("in_path", np.nan))
+                   in_path=r.get("in_path", np.nan), liq_L=r.get("liq_L", np.nan), warn=r.get("warn", np.nan))
         if r.alarm == "10:45" and r.category == "ENTER":      # plan B trades the 10:45 candle at the look price
             o2, ret2, at2 = walk(m, day, day + pd.Timedelta("10h50min"), r.now, r.stop)
             rec.update(outcome_plan=o2, ret_plan=round(ret2, 3))
