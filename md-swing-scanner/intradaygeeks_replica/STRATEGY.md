@@ -229,6 +229,11 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 - The full 30m-EMA / 4H-EMA structure. The 10:15 30-minute alarm. Alarms from 13:15 on.
 - Prior-candle trailing stops for manual trading (5 / 15 / 30 min). VWAP breadth as a Nifty-bias call.
 - Daily-chart or 1H-chart entries with a ~1% target and no extra filters (about 0 gross).
+- (2026-10-08, script 96) **Green rejection candles** (TECHM live, green hour wicked into EMA34 and closed under it). The red rule
+  came from the channel's Chartink query, never tested alone. Current rules, red dropped: GREEN all 30m net -8 vs RED +45,
+  1H -43 vs +21 (shuffle p 0.32 / 0.031); green shooting star (close in bottom half) 30m +79 (n=69, p 0.65) but 1H -44,
+  2 of 3 years negative; green closing in the top half worst (72-77% stopped). One-a-day plan net per trade: red only
+  30m +181 / 1H +32, + green +126 / +7, + green-SS +166 / +3. Red rule KEPT.
 - (2026-10-04, scripts 67-71) **Stop-rate filters:** "stop inside the noise" (stop / typical candle range >= 1; the 2:1 cap
   makes this nearly impossible) and "close in the bottom third of the candle" -- both only select wider stops; with a
   fixed 1% target, tight stops get hit more but lose less, so ~56% stopped is built into the setup.
