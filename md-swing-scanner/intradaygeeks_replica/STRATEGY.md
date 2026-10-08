@@ -39,6 +39,8 @@ candle close (on all setups this zone lost in both sets: 1H net Rs-20 / -99 per 
 plan the effect is within noise). The scan marks it `SKIP (EMA8 0.4-0.6% below)` and FIRST COME passes to the next
 ENTER; skipped setups are logged with their would-be outcome. Review after ~20 cases.
 
+**Info rows in the scan (never auto-picked; the user may take them after a chart look):** green-candle rejections (`INFO (green candle; ...)`, script 96) and, from 2026-10-09, OPENING REJECTION + LOWER HIGH (`INFO (opening rejection; ...)`, script 112): the 09:15 hour's high reached the live daily 8-EMA and closed below it, then a red candle (from the 10:45 check on) rejects the 1H EMA8 (close below it by <= 0.5%) with a high below the opening hour's high; EMA8 < EMA34, below yesterday's daily 8-EMA, below VWAP, same 2:1 and daily filters. A stock that also qualifies as a regular EMA34 setup shows as the regular row. Backtest: setups 1H +31 net every year, 30m +13; best at 10:45 / 11:15. EOD review logs it as 'info: opening rejection'.
+
 **Checks at the moment of entry:**
 - close below the daily 8-EMA;
 - the day's high so far has pierced the live daily 8-EMA;

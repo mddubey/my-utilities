@@ -250,6 +250,24 @@ if __name__ == "__main__":
                              cend=f"{cend:%H:%M}", liq_L=liq_L, warn=warn, in_path=path_levels(t, cl, upto), **late_status(g, cend, hi)))
             if strong_green_before: rows[-1]["status"] = "SKIP (strong green hour before)"
             if is_green: rows[-1]["status"] = f"INFO (green candle; {rows[-1]['status']})"
+        elif cend >= TODAY + pd.Timedelta("10h45min") and not strong_green_before:
+            # 2026-10-09 (user, INFO only -- user may still take it after a chart look; script 112): OPENING REJECTION +
+            # LOWER HIGH. The 09:15 hour's high reached the live daily 8-EMA and that hour closed below it (opening spike
+            # rejected at daily resistance); now a red candle rejects the 1H EMA8 (close below it by <= 0.5%) with a high
+            # below the opening hour's high; EMA8 < EMA34, below yesterday's daily 8-EMA, below VWAP. Backtest (setups):
+            # 1H +31 net every year (n 1817), 30m +13; best at the 10:45 / 11:15 signals (+44..+63).
+            oh = g[(g.index >= TODAY + pd.Timedelta("9h15min")) & (g.index < TODAY + pd.Timedelta("10h15min"))]
+            if len(oh) >= 10:
+                ohi, ocl = oh.High.max(), oh.Close.iloc[-1]; olive = A8 * ocl + (1 - A8) * d8y
+                d8 = (E8 - cl) / E8 * 100
+                if (ohi >= olive and ocl < olive and cl < o and hi >= E8 and 0 < d8 <= 0.5 and hi < ohi and E8 < E
+                        and cl < d8y and cl < vwap):
+                    rows.append(dict(ticker=t, candle=f"{last:%H:%M}-{cend:%H:%M}" + (" (full hour)" if cend - last == pd.Timedelta("60min") else ""), entry=round(cl, 2), stop=round(hi, 2), stop_pct=round((hi - cl) / cl * 100, 2),
+                                     target=round(cl * 0.99, 2), ema34_1h=round(E, 2), below_ema_pct=round(dist, 2), live_d8=round(live, 2),
+                                     day_high=round(day_hi, 2), adx=round(P.at[t, "adx"], 1), ema8_1h=round(E8, 2),
+                                     ema8_below_pct=round((cl - E8) / cl * 100, 2), green_skip=False,
+                                     cend=f"{cend:%H:%M}", liq_L=liq_L, warn=warn, in_path=path_levels(t, cl, upto), **late_status(g, cend, hi)))
+                    rows[-1]["status"] = f"INFO (opening rejection; {rows[-1]['status']})"
     R = pd.DataFrame(rows)
     if skipped_green:
         _rr = float(sys.argv[sys.argv.index("--rr") + 1]) if "--rr" in sys.argv else 2.0
