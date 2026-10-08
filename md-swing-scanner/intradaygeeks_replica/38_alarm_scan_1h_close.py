@@ -222,13 +222,18 @@ if __name__ == "__main__":
                       trend_1h=E8 < E, below_daily8=cl < d8y, wick_through_live_d8=day_hi >= live, below_vwap=cl < vwap)
         if all(checks.values()) and strong_green_before:
             skipped_green.append(f"{t} (stop {(hi - cl) / cl * 100:.2f}%)")
-        if all(checks.values()):
+        # 2026-10-08 (user, INFO only, script 96): GREEN rejection candles (every check except red) are shown with status
+        # "INFO (green candle)" and never picked; 89_eod_review.py logs their outcomes. Backtest: green net 30m -8 / 1H -43
+        # vs red +45 / +21; as a later pick after red 30m +190 vs +181 but 1H +23 vs +32 -> decide on ~20 live cases.
+        is_green = not checks["red"]
+        if all(v for k, v in checks.items() if k != "red"):
             rows.append(dict(ticker=t, candle=f"{last:%H:%M}-{cend:%H:%M}" + (" (full hour)" if cend - last == pd.Timedelta("60min") else ""), entry=round(cl, 2), stop=round(hi, 2), stop_pct=round((hi - cl) / cl * 100, 2),
                              target=round(cl * 0.99, 2), ema34_1h=round(E, 2), below_ema_pct=round(dist, 2), live_d8=round(live, 2),
                              day_high=round(day_hi, 2), adx=round(P.at[t, "adx"], 1), ema8_1h=round(E8, 2),
                              ema8_below_pct=round((cl - E8) / cl * 100, 2), green_skip=bool(strong_green_before),
                              cend=f"{cend:%H:%M}", in_path=path_levels(t, cl, upto), **late_status(g, cend, hi)))
             if strong_green_before: rows[-1]["status"] = "SKIP (strong green hour before)"
+            if is_green: rows[-1]["status"] = f"INFO (green candle; {rows[-1]['status']})"
     R = pd.DataFrame(rows)
     if skipped_green:
         _rr = float(sys.argv[sys.argv.index("--rr") + 1]) if "--rr" in sys.argv else 2.0

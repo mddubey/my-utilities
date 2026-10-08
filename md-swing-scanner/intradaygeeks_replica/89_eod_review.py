@@ -42,6 +42,7 @@ def walk(m, day, t_from, px, stop):
 
 def category(r):
     s = str(r.status)
+    if s.startswith("INFO (green"): return "info: green candle" if r.stop_pct <= 0.5 else "info: green candle, stop > 0.5%"
     if r.stop_pct > 0.5: return "skip: stop > 0.5% (2:1 rule)"
     if s.startswith("SKIP (strong green"): return "skip: strong green hour"
     if s.startswith("SKIP (EMA8"): return "skip: EMA8 0.4-0.6% zone"
