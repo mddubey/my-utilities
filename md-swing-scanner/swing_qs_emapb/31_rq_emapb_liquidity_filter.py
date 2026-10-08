@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PRICE_FLOOR = 20.0
+PRICE_FLOOR = 50.0  # user's call, 2026-10-07: below this is too easy to manipulate
 TURNOVER_FLOOR_CR = 1.0  # Rs crore/day
 
 
