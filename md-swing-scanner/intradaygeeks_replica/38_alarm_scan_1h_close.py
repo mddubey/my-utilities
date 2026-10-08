@@ -285,7 +285,7 @@ if __name__ == "__main__":
     R.insert(0, "pick", ["FIRST COME" if i == (live_ix[0] if live_ix else -1) else "" for i in range(len(R))])
     print(f"\n{len(R)} SHORT setup(s), all equal quality after the filters. status = where it stands NOW; enter only 'ENTER' ones,"
           f" target = your fill - 1%. FIRST COME = first ENTER, the one-trade-a-day choice:\n")
-    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "below_ema_pct", "ema8_below_pct", "in_path"]
+    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "in_path"]
     pd.set_option("display.width", 200)
     print(R[show].rename(columns={"risk_now_pct": "stop%_now", "target_now": "target", "entry": "candle_close", "below_ema_pct": "below_ema%", "ema8_below_pct": "ema8_below%"}).to_string(index=False))
     R.to_csv(out, index=False); print(f"saved {out.name}")
