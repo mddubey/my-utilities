@@ -347,3 +347,35 @@ date,alarm,ticker,category,status,entry,stop,stop_pct,ema8_below_pct,below_ema_p
 2026-10-06,12:15,CCAVENUE,near: wick_through_live_d8,NEAR (red),15.25,15.32,0.46,,0.34,stop,-0.459,12:45,15.25,,,False,,3.6,THIN,red,-0.88,False
 2026-10-06,12:15,TANLA,near: wick_through_ema,NEAR (green),489.0,490.35,0.28,,0.42,stop,-0.276,12:40,489.0,,,False,,5.2,THIN,green,-0.47,True
 2026-10-06,12:15,IPCALAB,near: wick_through_ema,NEAR (green),1940.0,1941.6,0.08,,0.48,stop,-0.082,14:45,1940.0,,,False,,22.7,THIN,green,-0.06,True
+2026-10-08,10:45,INFY,skip: EMA8 0.4-0.6% zone,SKIP (EMA8 0.4-0.6% below),1006.0,1009.4,0.34,0.47,0.09,target,1.0,14:25,1006.3,,,False,wS1 998.60 | dPP 997.03 | DL 996.75,823.1,,,,
+2026-10-08,11:15,THANGAMAYL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4838.0,4900.0,1.28,0.27,0.45,stall,0.682,15:15,4838.0,,,False,DL 4794.00,41.8,,,,
+2026-10-08,11:45,IPCALAB,ENTER,ENTER,1945.5,1952.3,0.35,-0.03,0.05,target,1.0,15:10,1945.5,,,True,dPP 1943.40 | DL 1939.90 | wPP 1936.30 | SW 1929.80 | PDL 1928.00,17.1,THIN,,,
+2026-10-08,11:45,INFY,ENTER,ENTER,1003.0,1007.8,0.48,0.04,0.39,stall,0.678,15:15,1003.0,,,False,wS1 998.60 | dPP 997.03 | DL 996.75,1895.4,,,,
+2026-10-08,11:45,CEMPRO,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1165.3,1175.9,0.91,0.81,0.45,target,1.0,13:00,1165.3,,,False,DL 1162.60 | SW 1153.80,60.1,,,,
+2026-10-08,12:15,IPCALAB,ENTER,ENTER,1945.1,1952.3,0.37,-0.05,0.07,target,1.0,15:10,1945.1,,,False,dPP 1943.40 | DL 1939.90 | wPP 1936.30 | SW 1929.80 | PDL 1928.00,12.7,THIN,,,
+2026-10-08,12:15,CEMPRO,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1166.4,1175.9,0.81,0.9,0.36,target,1.0,13:00,1166.4,,,False,DL 1157.30,52.2,,,,
+2026-10-08,10:45,HINDCOPPER,near: trend_1h,NEAR (red),478.9,480.1,0.25,,0.03,stop,-0.251,10:50,478.9,,,False,,228.6,,red,0.28,True
+2026-10-08,10:45,ETERNAL,near: trend_1h,NEAR (red),325.2,326.75,0.48,,0.04,target,1.0,12:50,325.2,,,False,,338.7,,red,0.72,True
+2026-10-08,10:45,ECLERX,near: trend_1h,NEAR (red),1872.0,1877.0,0.27,,0.07,target,1.0,12:35,1872.0,,,False,,6.3,THIN,red,0.83,True
+2026-10-08,10:45,EQUITASBNK,near: trend_1h,NEAR (red),68.27,68.52,0.37,,0.17,target,1.0,11:25,68.27,,,False,,5.3,THIN,red,0.16,True
+2026-10-08,10:45,TECHM,near: wick_through_ema,NEAR (red),1512.6,1515.8,0.21,,0.24,stop,-0.212,10:50,1512.6,,,False,,185.7,,red,-0.96,False
+2026-10-08,10:45,FORCEMOT,near: wick_through_ema,NEAR (red),16874.0,16914.0,0.24,,0.36,target,1.0,13:15,16874.0,,,False,,74.3,,red,-0.03,True
+2026-10-08,10:45,AMAGI,near: wick_through_ema,NEAR (red),560.4,562.1,0.3,,0.41,stall,0.928,15:15,560.4,,,False,,4.7,THIN,red,-0.16,False
+2026-10-08,11:15,ECLERX,near: trend_1h,NEAR (red),1873.2,1877.0,0.2,,0.0,target,1.0,12:35,1873.2,,,False,,3.3,THIN,red,0.83,True
+2026-10-08,11:15,TECHM,near: below_vwap,NEAR (green),1515.9,1519.0,0.2,,0.02,target,1.0,12:35,1515.9,,,False,,182.2,,green,-0.96,False
+2026-10-08,11:15,APOLLOTYRE,near: trend_1h,NEAR (red),402.0,403.9,0.47,,0.08,stop,-0.473,11:55,402.0,,,False,,5.7,THIN,red,0.54,True
+2026-10-08,11:15,DBL,near: trend_1h,NEAR (green),402.45,403.8,0.34,,0.27,target,1.0,14:25,402.45,,,False,,2.6,THIN,green,0.46,True
+2026-10-08,11:15,GVT&D,near: trend_1h,NEAR (red),4250.1,4265.0,0.35,,0.32,target,1.0,12:00,4250.1,,,False,,137.0,,red,0.56,True
+2026-10-08,11:15,AIIL,near: trend_1h,NEAR (red),547.2,549.55,0.43,,0.36,stop,-0.429,11:50,547.2,,,False,,1.6,THIN,red,0.3,False
+2026-10-08,11:15,AMAGI,near: wick_through_ema,NEAR (red),560.2,562.1,0.34,,0.44,stall,0.893,15:15,560.2,,,False,,2.1,THIN,red,-0.16,False
+2026-10-08,11:45,BSOFT,near: trend_1h,NEAR (red),275.95,277.3,0.49,,0.15,target,1.0,12:05,275.95,,,False,,72.8,,red,0.57,True
+2026-10-08,11:45,ETERNAL,near: trend_1h,NEAR (red),324.45,325.9,0.45,,0.26,target,1.0,13:05,324.45,,,False,,291.1,,red,0.54,True
+2026-10-08,11:45,ASAHIINDIA,near: trend_1h,NEAR (red),953.85,958.1,0.45,,0.28,target,1.0,15:05,953.85,,,False,,4.1,THIN,red,0.74,True
+2026-10-08,11:45,TECHM,near: wick_through_ema,NEAR (red),1511.9,1516.2,0.28,,0.28,target,1.0,14:25,1511.9,,,False,,178.8,,red,-0.75,False
+2026-10-08,11:45,RATEGAIN,near: trend_1h,NEAR (red),845.65,849.75,0.48,,0.35,target,1.0,12:40,845.65,,,False,,11.0,THIN,red,0.38,True
+2026-10-08,11:45,EXCELSOFT,near: wick_through_ema,NEAR (green),81.16,81.4,0.3,,0.37,stop,-0.296,12:30,81.16,,,False,,1.7,THIN,green,-0.09,True
+2026-10-08,12:15,AIIL,near: trend_1h,NEAR (green),548.15,549.9,0.32,,0.16,stop,-0.319,12:45,548.15,,,False,,3.8,THIN,green,0.18,True
+2026-10-08,12:15,LTM,near: wick_through_live_d8,NEAR (red),3983.0,3996.1,0.33,,0.29,target,1.0,13:00,3983.0,,,False,,202.8,,red,-0.7,False
+2026-10-08,12:15,FORCEMOT,near: wick_through_ema,NEAR (green),16859.0,16873.0,0.08,,0.41,target,1.0,13:15,16859.0,,,False,,74.5,,green,-0.12,True
+2026-10-08,12:15,ECLERX,near: trend_1h,NEAR (red),1865.0,1874.0,0.48,,0.44,target,1.0,12:50,1865.0,,,False,,5.4,THIN,red,0.65,True
+2026-10-08,12:15,EXCELSOFT,near: wick_through_ema,NEAR (green),81.09,81.4,0.38,,0.46,stop,-0.382,12:30,81.09,,,False,,2.3,THIN,green,-0.09,True
