@@ -268,6 +268,7 @@ if __name__ == "__main__":
         N = N.sort_values(["_ok", "_d"], ascending=[False, True]).drop(columns=["_ok", "_d"])
         N.to_csv(out.with_name("near_" + out.name), index=False)   # read by 89_eod_review.py
         N = N.drop(columns=["cend", "high", "ema8_falling", "liq_L", "warn"])
+        if "--near" not in sys.argv: return   # 2026-10-08 (user): hidden by default; csv still saved for the EOD review
         print(f"\nNEAR MISSES (info only, never a pick): failed exactly one check; stop <= 0.5% first, then closest to the EMA34."
               f" ema8_vs_ema34 > 0 = 1H uptrend\n" + N.head(25).to_string(index=False))
     if R.empty: print("no setups at this alarm"); print_near(); sys.exit()

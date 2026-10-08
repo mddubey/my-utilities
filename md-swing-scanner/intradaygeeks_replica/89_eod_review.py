@@ -75,10 +75,7 @@ def summary():
                  f"{(g.outcome == 'stop').mean()*100:.0f}", f"{g.ret.mean()*1000:+.0f}", f"{(g.ret.mean() - COST)*1000:+.0f}"]
                 for k, g in frame.groupby(key)]
         if rows: print(title); print(pd.DataFrame(rows, columns=["group", "n", "target%", "stall%", "stop%", "Rs gross", "Rs net"]).to_string(index=False))
-    # 2026-10-08 (user): rolling-over question -- trend misses split by whether the 1H EMA8 was falling
-    if "ema8_falling" in L:
-        t = L[(L.category == "near: trend_1h") & L.ema8_falling.notna()]
-        _split("trend misses (EMA8 above EMA34) by EMA8 direction:", t, t.ema8_falling.astype(bool), {True: "EMA8 falling", False: "EMA8 rising/flat"})
+    # EMA8-direction split removed 2026-10-08 (user; script 75 closed it); ema8_falling still in the log
     # THIN split removed 2026-10-08 (user: nothing actionable); liq_L / warn still in the log
     pk = L[L.plan_pick == True]
     if len(pk):
