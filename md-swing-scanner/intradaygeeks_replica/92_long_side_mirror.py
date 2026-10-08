@@ -24,7 +24,7 @@ from data.paths import INTRADAY_5M_DIR
 
 spec = importlib.util.spec_from_file_location("gen60", HERE / "60_filter_ablation.py")
 gen60 = importlib.util.module_from_spec(spec); spec.loader.exec_module(gen60)
-read, hour_key, daily_inputs, A8 = gen60.read, gen60.hour_key, gen60.daily_inputs, gen60.A8
+read, hour_key, daily_inputs, A8, seeded_hourly = gen60.read, gen60.hour_key, gen60.daily_inputs, gen60.A8, gen60.seeded_hourly
 gen60.END = pd.Timestamp("2026-10-07")   # include today (10-06), not just through yesterday
 
 
@@ -47,7 +47,7 @@ def gen_a_long(t):
     except Exception: return []
     m = read(p)
     if len(m) < 1500: return []
-    hc = m.Close.groupby(hour_key(m.index)).last()
+    hc = seeded_hourly(t, m)
     e34 = hc.ewm(span=34, adjust=False).mean().shift(1); e8 = hc.ewm(span=8, adjust=False).mean().shift(1)
     atrp = (d.atr14 / d.Close * 100).shift(1); rows = []
     for day, g in m.groupby(m.index.normalize()):

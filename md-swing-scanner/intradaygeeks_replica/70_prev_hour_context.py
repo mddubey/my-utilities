@@ -22,7 +22,14 @@ def hourly(t, src):
     """hourly O/C (09:15 grid) + for set a the 5-min closes (to read the close at any alarm time)"""
     if src == "a":
         m = pd.read_csv(INTRADAY_5M_DIR / f"{t}.csv", index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None)
-        return m.groupby(hour_key(m.index)).agg(O=("Open", "first"), C=("Close", "last")), m.Close
+        H = m.groupby(hour_key(m.index)).agg(O=("Open", "first"), C=("Close", "last"))
+        # 2026-10-08 warm-up fix: seed with h1_cache hours before the first 5-min bar (EMA34 is computed from H.C)
+        h = pd.read_csv(HERE / "h1_cache" / f"{t}.csv", index_col=0, parse_dates=True) if (HERE / "h1_cache" / f"{t}.csv").exists() else None
+        if h is not None and len(H):
+            h.index = pd.to_datetime(h.index, utc=True).tz_convert("Asia/Kolkata").tz_localize(None)
+            h = h[h.index < H.index[0]].rename(columns={"Open": "O", "Close": "C"})[["O", "C"]]
+            H = pd.concat([h, H])
+        return H, m.Close
     h = pd.read_csv(HERE / "h1_cache" / f"{t}.csv", index_col=0, parse_dates=True)
     h.index = pd.to_datetime(h.index, utc=True).tz_convert("Asia/Kolkata").tz_localize(None)
     return h.rename(columns={"Open": "O", "Close": "C"})[["O", "C"]], None

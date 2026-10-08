@@ -32,7 +32,7 @@ def gen(t):
     if atrp is None: return []
     m = read(p)
     if len(m) < 1500: return []
-    hc = m.Close.groupby(hour_key(m.index)).last()
+    hc = seeded_hourly(t, m)
     e34 = hc.ewm(span=34, adjust=False).mean().shift(1); e8 = hc.ewm(span=8, adjust=False).mean().shift(1)
     rows = []
     for day, g in m.groupby(m.index.normalize()):

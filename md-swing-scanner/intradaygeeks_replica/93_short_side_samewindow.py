@@ -25,6 +25,21 @@ def hour_key(idx):
     d = idx.normalize(); return d + pd.Timedelta("9h15min") + ((idx - d - pd.Timedelta("9h15min")) // pd.Timedelta("60min")) * pd.Timedelta("60min")
 
 
+def seeded_hourly(t, m):
+    """2026-10-08 warm-up fix: 1H closes for the EMA34/EMA8, from the 5-min bars, SEEDED with h1_cache closes before the first
+    5-min bar. The 5-min cache starts 2026-06-10 (Nifty 500) / 2026-07-09 (rest), so EMAs built from it alone were unconverged
+    for the first ~15 trading days (21% of the 30m set's setups). h1_cache (Yahoo 60m, 09:15 grid, 2023-10 on) is the same
+    hour grid; overlap check in STRATEGY 8g."""
+    hc = m.Close.groupby(hour_key(m.index)).last()
+    p = Path(__file__).resolve().parent / "h1_cache" / f"{t}.csv" if "__file__" in globals() else None
+    p = p if p is not None and p.exists() else Path("/Users/mdubey/workspace/personal/my-utilities/md-swing-scanner/intradaygeeks_replica/h1_cache") / f"{t}.csv"
+    if len(hc) and p.exists():
+        h = pd.read_csv(p, index_col=0); h.index = pd.to_datetime(h.index, utc=True).tz_convert("Asia/Kolkata").tz_localize(None)
+        h = h.Close.dropna(); h = h[h.index < hc.index[0]]
+        hc = pd.concat([h, hc])
+    return hc
+
+
 def daily_inputs(t):
     d = load(t); d = d[d.index < END]
     return d, d.Close.ewm(span=8, adjust=False).mean().shift(1), _compute_adx(d)[0].shift(1), d.traded_value_sma20.shift(1)
@@ -49,7 +64,7 @@ def gen_a(t):
     except Exception: return []
     m = read(p)
     if len(m) < 1500: return []
-    hc = m.Close.groupby(hour_key(m.index)).last()
+    hc = seeded_hourly(t, m)
     e34 = hc.ewm(span=34, adjust=False).mean().shift(1); e8 = hc.ewm(span=8, adjust=False).mean().shift(1)
     atrp = (d.atr14 / d.Close * 100).shift(1); rows = []
     for day, g in m.groupby(m.index.normalize()):
