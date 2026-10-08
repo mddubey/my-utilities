@@ -49,6 +49,36 @@ def late_status(g, cend, stop):
     return dict(now=round(now, 2), now_at=now_t, risk_now_pct=round(risk_now, 2), target_now=round(now * 0.99, 2), status=st)
 
 
+def path_levels(t, entry, upto):
+    """2026-10-08 (user, INFO column, not a tested filter): every support / pivot sitting between the entry and the 1%
+    target. Pivots = classic (PP, S1, S2) from yesterday (d), last completed week (w) and month (m) -- the sets
+    TradingView 'Auto' draws on <=15m / 1H / daily charts. PDL = previous day's low, DL = today's low so far,
+    SW = daily swing low of the last 60 sessions (lower than the 2 days on each side)."""
+    tgt = entry * 0.99
+    try: d = load(t)[["High", "Low", "Close"]].dropna()
+    except Exception: return "?"
+    d = d[d.index < TODAY]
+    if len(d) < 5: return "?"
+    lv = []
+    def piv(tag, h, l, c):
+        p = (h + l + c) / 3; lv.extend([(f"{tag}PP", p), (f"{tag}S1", 2 * p - h), (f"{tag}S2", p - (h - l))])
+    piv("d", *d.iloc[-1][["High", "Low", "Close"]])
+    wk = d[d.index < TODAY - pd.Timedelta(days=TODAY.weekday())]           # weeks finished before this Monday
+    if len(wk):
+        w = wk[wk.index >= wk.index[-1] - pd.Timedelta(days=wk.index[-1].weekday())]
+        piv("w", w.High.max(), w.Low.min(), w.Close.iloc[-1])
+    mo = d[d.index < TODAY.replace(day=1)]
+    if len(mo):
+        m = mo[mo.index >= mo.index[-1].replace(day=1)]
+        piv("m", m.High.max(), m.Low.min(), m.Close.iloc[-1])
+    lv.append(("PDL", d.Low.iloc[-1]))
+    if len(upto): lv.append(("DL", upto.Low.min()))
+    s = d.Low.tail(60).values
+    lv += [("SW", s[i]) for i in range(2, len(s) - 2) if s[i] < min(s[i-2], s[i-1], s[i+1], s[i+2])]
+    hits = sorted(((n, v) for n, v in lv if tgt < v < entry), key=lambda x: -x[1])
+    return " | ".join(f"{n} {v:.2f}" for n, v in hits) or "-"
+
+
 def read5(t):
     p = M5 / f"{t}.csv"
     if not p.exists(): return pd.DataFrame()
@@ -101,9 +131,11 @@ if __name__ == "__main__":
         if not REPLAY: P.to_csv(PREP)
     stale = int((~P.data_ok).sum())
     if "--prep" in sys.argv:
-        print(f"prep for {TODAY:%Y-%m-%d} (previous session {PREV_DAY:%Y-%m-%d}): {len(P)} liquid stocks, {int(P.candidate.sum())} candidates "
-              f"(1H trend down, within {SCREEN_DIST:g}% of 1H EMA34, daily ADX <= 25, daily range >= {MIN_ATR_PCT}%), breadth sample {int(P.breadth.sum())} "
-              f"| {time.time() - _t0:.0f}s")
+        _wl = int(((P.adx <= 25) & (P.atrp >= MIN_ATR_PCT) & P.data_ok).sum())   # same mask as the live watchlist below
+        print(f"prep for {TODAY:%Y-%m-%d} (previous session {PREV_DAY:%Y-%m-%d}): {len(P)} liquid stocks, {_wl} on the watchlist "
+              f"(daily ADX <= 25, daily range >= {MIN_ATR_PCT}%; 1H trend and EMA34 distance checked live at each alarm), "
+              f"breadth sample {int(P.breadth.sum())} | old screen, info only: {int(P.candidate.sum())} already in a 1H downtrend "
+              f"within {SCREEN_DIST:g}% of the EMA34 at yesterday's close | {time.time() - _t0:.0f}s")
         if stale: print(f"STALE DATA: {stale} stocks' caches end before {PREV_DAY:%Y-%m-%d} -- run eod_checklist.sh (excluded until then)")
         sys.exit()
     # 2026-10-04 (user): the watchlist uses only the DAILY filters (liquid, daily ADX <= 25, daily ATR >= 2.56%, fresh data)
@@ -195,7 +227,7 @@ if __name__ == "__main__":
                              target=round(cl * 0.99, 2), ema34_1h=round(E, 2), below_ema_pct=round(dist, 2), live_d8=round(live, 2),
                              day_high=round(day_hi, 2), adx=round(P.at[t, "adx"], 1), ema8_1h=round(E8, 2),
                              ema8_below_pct=round((cl - E8) / cl * 100, 2), green_skip=bool(strong_green_before),
-                             cend=f"{cend:%H:%M}", **late_status(g, cend, hi)))
+                             cend=f"{cend:%H:%M}", in_path=path_levels(t, cl, upto), **late_status(g, cend, hi)))
             if strong_green_before: rows[-1]["status"] = "SKIP (strong green hour before)"
     R = pd.DataFrame(rows)
     if skipped_green:
@@ -227,7 +259,7 @@ if __name__ == "__main__":
     R.insert(0, "pick", ["FIRST COME" if i == (live_ix[0] if live_ix else -1) else "" for i in range(len(R))])
     print(f"\n{len(R)} SHORT setup(s), all equal quality after the filters. status = where it stands NOW; enter only 'ENTER' ones,"
           f" target = your fill - 1%. FIRST COME = first ENTER, the one-trade-a-day choice:\n")
-    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "below_ema_pct", "ema8_below_pct"]
+    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "below_ema_pct", "ema8_below_pct", "in_path"]
     pd.set_option("display.width", 200)
     print(R[show].rename(columns={"risk_now_pct": "stop%_now", "target_now": "target", "entry": "candle_close", "below_ema_pct": "below_ema%", "ema8_below_pct": "ema8_below%"}).to_string(index=False))
     R.to_csv(out, index=False); print(f"saved {out.name}")

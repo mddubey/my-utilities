@@ -59,6 +59,16 @@ def summary():
         rows.append([k, len(g), f"{(g.outcome == 'target').mean()*100:.0f}", f"{(g.outcome == 'stall').mean()*100:.0f}",
                      f"{(g.outcome == 'stop').mean()*100:.0f}", f"{g.ret.mean()*1000:+.0f}", f"{(g.ret.mean() - COST)*1000:+.0f}"])
     print(pd.DataFrame(rows, columns=["category", "n", "target%", "stall%", "stop%", "Rs gross", "Rs net"]).to_string(index=False))
+    # 2026-10-08 (user): clear path vs a support / pivot between entry and the 1% target (scan column in_path, telemetry)
+    if "in_path" in L and L.in_path.notna().any():
+        p = L[L.in_path.notna() & (L.in_path != "?")]
+        rows = []
+        for k, g in p.groupby(p.in_path == "-"):
+            rows.append(["clear path" if k else "level in the way", len(g), f"{(g.outcome == 'target').mean()*100:.0f}",
+                         f"{(g.outcome == 'stall').mean()*100:.0f}", f"{(g.outcome == 'stop').mean()*100:.0f}",
+                         f"{g.ret.mean()*1000:+.0f}", f"{(g.ret.mean() - COST)*1000:+.0f}"])
+        print("by path (all categories):")
+        print(pd.DataFrame(rows, columns=["path", "n", "target%", "stall%", "stop%", "Rs gross", "Rs net"]).to_string(index=False))
     pk = L[L.plan_pick == True]
     if len(pk):
         r = pk.ret_plan.fillna(pk.ret)
@@ -94,7 +104,8 @@ if __name__ == "__main__":
         o, ret, at = walk(m, day, cend, r.entry, r.stop)
         rec = dict(date=D, alarm=r.alarm, ticker=r.ticker, category=r.category, status=r.status, entry=r.entry, stop=r.stop,
                    stop_pct=r.stop_pct, ema8_below_pct=r.get("ema8_below_pct", np.nan), below_ema_pct=r.below_ema_pct,
-                   outcome=o, ret=round(ret, 3), exit_at=at, look_price=r.now)
+                   outcome=o, ret=round(ret, 3), exit_at=at, look_price=r.now,
+                   in_path=r.get("in_path", np.nan))
         if r.alarm == "10:45" and r.category == "ENTER":      # plan B trades the 10:45 candle at the look price
             o2, ret2, at2 = walk(m, day, day + pd.Timedelta("10h50min"), r.now, r.stop)
             rec.update(outcome_plan=o2, ret_plan=round(ret2, 3))
@@ -106,7 +117,7 @@ if __name__ == "__main__":
         c = T[(T.alarm == al) & (T.category == "ENTER")].sort_values("below_ema_pct")
         if len(c): T.loc[c.index[0], "plan_pick"] = True; break
     show = T.assign(Rs=(T.ret * 1000).round(0).astype(int)).sort_values(["alarm", "category"])
-    print(show[["alarm", "ticker", "category", "plan_pick", "entry", "stop", "stop_pct", "ema8_below_pct", "outcome", "exit_at", "Rs"]].to_string(index=False))
+    print(show[["alarm", "ticker", "category", "plan_pick", "entry", "stop", "stop_pct", "ema8_below_pct", "in_path", "outcome", "exit_at", "Rs"]].to_string(index=False))
     pk = T[T.plan_pick]
     if len(pk):
         r = pk.iloc[0]; rp = r.get("ret_plan", np.nan)
