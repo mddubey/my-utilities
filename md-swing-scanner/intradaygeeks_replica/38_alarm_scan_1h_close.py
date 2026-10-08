@@ -170,7 +170,7 @@ if __name__ == "__main__":
     tag = "bullish" if BREADTH > 0.65 else ("bearish" if BREADTH < 0.35 else "mixed")
     print(f"BREADTH (info only, no consistent effect on this setup): {BREADTH*100:.0f}% of {len(up)} most liquid stocks above "
           f"yesterday's close -> {tag}", flush=True)
-    rows = []; not_ready = 0; skipped_green = []
+    rows = []; not_ready = 0; skipped_green = []; near = []
     for t in C.index:
         g = today_bars(t)
         if len(g) < 12: continue
@@ -226,6 +226,11 @@ if __name__ == "__main__":
         # "INFO (green candle)" and never picked; 89_eod_review.py logs their outcomes. Backtest: green net 30m -8 / 1H -43
         # vs red +45 / +21; as a later pick after red 30m +190 vs +181 but 1H +23 vs +32 -> decide on ~20 live cases.
         is_green = not checks["red"]
+        _miss = [k for k, v in checks.items() if not v and k != "red"]
+        if len(_miss) == 1:   # 2026-10-08 (user): near misses, INFO only -- exactly one non-colour check failed
+            near.append(dict(ticker=t, missed=_miss[0], colour="red" if checks["red"] else "green", close=round(cl, 2),
+                             stop_pct=round((hi - cl) / cl * 100, 2), below_ema_pct=round(dist, 2),
+                             ema8_vs_ema34_pct=round((E8 - E) / E * 100, 2), atr_pct=round(P.at[t, "atrp"], 2)))
         if all(v for k, v in checks.items() if k != "red"):
             rows.append(dict(ticker=t, candle=f"{last:%H:%M}-{cend:%H:%M}" + (" (full hour)" if cend - last == pd.Timedelta("60min") else ""), entry=round(cl, 2), stop=round(hi, 2), stop_pct=round((hi - cl) / cl * 100, 2),
                              target=round(cl * 0.99, 2), ema34_1h=round(E, 2), below_ema_pct=round(dist, 2), live_d8=round(live, 2),
@@ -250,7 +255,13 @@ if __name__ == "__main__":
     if len(R): R["breadth_pct"] = round(BREADTH * 100)
     outdir = HERE / "replays" if REPLAY else HERE; outdir.mkdir(exist_ok=True)   # replays never overwrite live alarm files
     out = outdir / f"alarm_scan_{'30m_' if TF == 30 else ''}{ASOF:%Y%m%d_%H%M}.csv"; R.to_csv(out, index=False)
-    if R.empty: print("no setups at this alarm"); sys.exit()
+    def print_near():
+        if not near: return
+        N = pd.DataFrame(near); N["_ok"] = N.stop_pct <= 0.5; N["_d"] = N.below_ema_pct.abs()
+        N = N.sort_values(["_ok", "_d"], ascending=[False, True]).drop(columns=["_ok", "_d"])
+        print(f"\nNEAR MISSES (info only, never a pick): failed exactly one check; stop <= 0.5% first, then closest to the EMA34."
+              f" ema8_vs_ema34 > 0 = 1H uptrend\n" + N.head(25).to_string(index=False))
+    if R.empty: print("no setups at this alarm"); print_near(); sys.exit()
     R = R.sort_values("below_ema_pct")
     # 2026-10-03 (56): after the checklist + 2:1 rule no further filter reliably separates better from worse setups,
     # so every qualifying setup is shown (user: equal quality -> show them all, watch them, learn). The first-come one
@@ -268,3 +279,4 @@ if __name__ == "__main__":
     pd.set_option("display.width", 200)
     print(R[show].rename(columns={"risk_now_pct": "stop%_now", "target_now": "target", "entry": "candle_close", "below_ema_pct": "below_ema%", "ema8_below_pct": "ema8_below%"}).to_string(index=False))
     R.to_csv(out, index=False); print(f"saved {out.name}")
+    print_near()
