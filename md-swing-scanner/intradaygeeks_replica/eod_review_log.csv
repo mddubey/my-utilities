@@ -1,138 +1,349 @@
-date,alarm,ticker,category,status,entry,stop,stop_pct,ema8_below_pct,below_ema_pct,outcome,ret,exit_at,look_price,outcome_plan,ret_plan,plan_pick,in_path
-2026-09-30,10:45,VIMTALABS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),598.45,604.1,0.94,0.64,0.01,stop,-0.944,15:15,596.55,,,False,DL 597.35
-2026-09-30,10:45,AARTIIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),483.4,486.85,0.71,0.96,0.05,target,1.0,12:15,484.1,,,False,SW 480.55 | wS1 478.60
-2026-09-30,10:45,MASTEK,skip: chased (2:1 gone at look),SKIP (2:1 gone at this price),1552.8,1559.5,0.43,0.87,0.1,target,1.0,11:25,1549.4,,,False,-
-2026-09-30,10:45,KAPSTON,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),556.1,563.3,1.29,0.18,0.14,target,1.0,12:00,556.65,,,False,wPP 555.63 | mPP 555.20 | DL 555.05 | dPP 554.58 | SW 552.30
-2026-09-30,10:45,PITTIENG,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1142.3,1152.0,0.85,0.35,0.14,stall,0.359,15:15,1144.1,,,False,dPP 1133.10 | DL 1131.50
-2026-09-30,10:45,PARAS,skip: stop > 0.5% (2:1 rule),SKIP (EMA8 0.4-0.6% below),1332.7,1342.7,0.75,0.57,0.16,stop,-0.75,10:55,1337.6,,,False,DL 1322.60
-2026-09-30,10:45,JUSTDIAL,ENTER,ENTER,664.55,667.0,0.37,0.87,0.2,target,1.0,13:45,664.55,target,1.0,True,DL 658.65
-2026-09-30,10:45,GARUDA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),177.62,178.98,0.77,0.1,0.21,target,1.0,13:55,177.89,,,False,DL 177.45 | dPP 176.48
-2026-09-30,10:45,KPRMILL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1103.6,1109.8,0.56,0.79,0.24,target,1.0,11:50,1102.0,,,False,SW 1100.60 | SW 1100.10
-2026-09-30,10:45,ATLANTAELE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1613.7,1631.4,1.1,-0.17,0.28,stop,-1.097,13:35,1611.4,,,False,DL 1612.70
-2026-09-30,10:45,NUVAMA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1663.8,1675.2,0.69,0.47,0.29,stall,0.817,15:15,1658.1,,,False,DL 1661.30 | wS1 1654.27 | SW 1649.80 | dPP 1648.33
-2026-09-30,10:45,SCHNEIDER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1202.8,1213.2,0.86,0.2,0.29,stall,-0.366,15:15,1203.6,,,False,DL 1199.50 | dPP 1196.37 | wS1 1191.03
-2026-09-30,10:45,SFL,skip: chased (2:1 gone at look),SKIP (2:1 gone at this price),634.4,637.45,0.48,0.39,0.32,stop,-0.481,13:45,634.2,,,False,DL 634.35 | dPP 629.13
-2026-09-30,10:45,BFUTILITIE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),517.6,522.0,0.85,0.86,0.36,stop,-0.85,10:55,519.0,,,False,SW 516.05 | wS1 513.67
-2026-09-30,10:45,JISLJALEQS,skip: stop > 0.5% (2:1 rule),ENTER,28.85,29.01,0.55,-0.22,0.47,target,1.0,14:20,28.87,,,False,dPP 28.81 | SW 28.58
-2026-09-30,10:45,INDUSTOWER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),370.55,373.15,0.7,0.29,0.48,stop,-0.702,11:40,370.65,,,False,DL 369.30 | wS1 369.05 | mS1 368.77 | SW 368.70 | SW 367.35
-2026-09-30,11:15,ATLANTAELE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1617.5,1631.4,0.86,0.07,0.04,stop,-0.859,13:35,1617.5,,,False,SW 1614.90 | DL 1611.30
-2026-09-30,11:15,ADANIENT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),2900.9,2927.1,0.9,0.28,0.06,stall,0.51,15:15,2900.9,,,False,DL 2900.00
-2026-09-30,11:15,PARAS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1333.5,1344.0,0.79,0.63,0.1,target,1.0,14:25,1333.5,,,False,DL 1322.60
-2026-09-30,11:15,MOSCHIP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),201.88,204.27,1.18,0.82,0.12,stop,-1.184,14:35,201.88,,,False,SW 201.40
-2026-09-30,11:15,ASIANTILES,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),50.05,50.5,0.9,0.19,0.13,stall,0.539,15:15,50.05,,,False,dPP 49.97
-2026-09-30,11:15,AARTIIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),482.55,486.85,0.89,0.79,0.23,target,1.0,13:45,482.55,,,False,SW 480.55 | wS1 478.60
-2026-09-30,11:15,PNBHOUSING,ENTER,ENTER,1102.6,1107.4,0.44,0.16,0.28,stop,-0.435,11:50,1102.6,,,False,SW 1098.40 | dPP 1098.37 | DL 1097.00
-2026-09-30,11:15,TATATECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),705.05,719.7,2.08,1.11,0.28,stall,-0.142,15:15,705.05,,,False,-
-2026-09-30,11:15,TCS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),2072.5,2100.5,1.35,0.55,0.31,target,1.0,14:45,2072.5,,,False,DL 2055.00
-2026-09-30,11:15,RBLBANK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),408.0,410.2,0.54,0.56,0.37,stop,-0.539,12:05,408.0,,,False,DL 405.15
-2026-09-30,11:15,SFL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),634.1,637.45,0.53,0.34,0.37,stop,-0.528,13:45,634.1,,,False,DL 633.25 | dPP 629.13 | SW 627.80
-2026-09-30,11:15,CENTENKA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),557.95,565.6,1.37,0.52,0.38,stall,0.233,15:15,557.95,,,False,DL 553.00
-2026-09-30,11:15,LTM,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4082.4,4138.0,1.36,0.53,0.4,target,1.0,13:05,4082.4,,,False,-
-2026-09-30,11:15,PITTIENG,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1139.1,1152.0,1.13,0.07,0.42,stall,0.079,15:15,1139.1,,,False,dPP 1133.10 | DL 1131.50
-2026-09-30,11:15,JISLJALEQS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),28.86,29.01,0.52,-0.18,0.43,target,1.0,14:20,28.86,,,False,dPP 28.81 | DL 28.79 | SW 28.58
-2026-09-30,11:15,BFUTILITIE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),517.1,522.0,0.95,0.77,0.45,target,1.0,14:45,517.1,,,False,SW 516.05 | wS1 513.67 | SW 512.00
-2026-09-30,11:15,HINDOILEXP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),173.71,174.6,0.51,-0.4,0.46,target,1.0,14:30,173.71,,,False,DL 172.40
-2026-09-30,11:15,SCHNEIDER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1200.6,1213.2,1.05,0.01,0.48,stall,-0.55,15:15,1200.6,,,False,DL 1199.50 | dPP 1196.37 | wS1 1191.03
-2026-09-30,11:15,MOBIKWIK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),198.69,200.16,0.74,1.11,0.49,stop,-0.74,13:10,198.69,,,False,SW 198.08 | SW 196.80
-2026-09-30,11:15,JUSTDIAL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),662.6,667.0,0.66,0.58,0.49,target,1.0,14:15,662.6,,,False,DL 658.65 | wS1 656.80
-2026-09-30,11:45,UNIPARTS,ENTER,ENTER,847.7,848.7,0.12,0.2,0.02,target,1.0,14:30,847.7,,,False,wPP 846.63 | dPP 840.20 | DL 839.60
-2026-09-30,11:45,BAJAJCON,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),495.95,498.65,0.54,0.23,0.1,stop,-0.544,13:00,495.95,,,False,DL 494.00 | SW 493.05 | mPP 491.63
-2026-09-30,11:45,NETWEB,ENTER,ENTER,4610.0,4625.5,0.34,-0.17,0.27,target,1.0,14:45,4610.0,,,False,DL 4603.00 | dPP 4576.67
-2026-09-30,11:45,AIIL,ENTER,ENTER,547.75,550.0,0.41,-0.0,0.37,stop,-0.411,12:10,547.75,,,False,SW 547.15 | wS1 545.17 | dPP 544.90 | SW 544.15 | DL 543.35
-2026-09-30,11:45,PARAS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1328.7,1335.9,0.54,0.13,0.45,target,1.0,14:25,1328.7,,,False,DL 1322.60 | dPP 1316.67
-2026-09-30,12:15,VIMTALABS,skip: EMA8 0.4-0.6% zone,SKIP (EMA8 0.4-0.6% below),598.2,600.95,0.46,0.42,0.06,stop,-0.46,13:35,598.2,,,False,DL 596.55
-2026-09-30,12:15,BAJAJCON,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),495.9,498.65,0.55,0.22,0.11,stop,-0.555,13:00,495.9,,,False,DL 494.00 | SW 493.05 | mPP 491.63
-2026-09-30,12:15,UNIPARTS,ENTER,ENTER,844.65,848.7,0.48,-0.16,0.38,stall,0.681,15:15,844.65,,,False,dPP 840.20 | DL 839.60
-2026-09-30,12:15,SCHNEIDER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1200.4,1207.3,0.57,-0.01,0.47,stop,-0.575,14:50,1200.4,,,False,DL 1199.50 | dPP 1196.37 | wS1 1191.03
-2026-10-01,10:45,MOBIKWIK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),199.11,201.02,0.96,0.62,0.03,target,1.0,11:30,199.09,,,False,SW 198.08 | dPP 197.89
-2026-10-01,10:45,SOBHA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1214.9,1224.8,0.81,-0.07,0.14,target,1.0,12:55,1212.4,,,False,-
-2026-10-01,10:45,BEPL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),125.89,126.76,0.69,0.34,0.23,target,1.0,10:55,125.1,,,False,dPP 125.11 | SW 125.01
-2026-10-01,10:45,GABRIEL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1343.0,1365.0,1.64,0.51,0.37,target,1.0,10:55,1336.1,,,False,dPP 1336.60 | SW 1335.10
-2026-10-01,11:15,TANLA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),493.45,496.6,0.64,-0.25,0.27,target,1.0,12:25,493.45,,,False,DL 490.85 | PDL 490.35
-2026-10-01,11:15,SOBHA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1212.8,1224.8,0.99,-0.24,0.31,target,1.0,12:55,1212.8,,,False,wS1 1201.07 | DL 1201.00
-2026-10-01,11:15,KNACK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),179.02,180.43,0.79,-0.3,0.36,stop,-0.788,11:55,179.02,,,False,DL 178.01
-2026-10-01,11:15,PHOENIXLTD,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1938.1,1958.4,1.05,-0.36,0.49,target,1.0,13:45,1938.1,,,False,mPP 1930.27 | DL 1921.50
-2026-10-01,11:45,EMBDL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),56.97,57.39,0.74,-0.1,0.14,target,1.0,12:15,56.97,,,False,SW 56.85
-2026-10-01,11:45,ZENSARTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),429.6,435.0,1.26,-0.05,0.31,target,1.0,12:30,429.6,,,False,dPP 427.07
-2026-10-01,11:45,EXIDEIND,ENTER,ENTER,414.05,415.75,0.41,0.28,0.36,target,1.0,12:15,414.05,,,True,dPP 412.62
-2026-10-01,11:45,BSOFT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),273.5,276.1,0.95,-0.43,0.5,target,1.0,12:25,273.5,,,False,DL 271.95
-2026-10-01,12:15,APARINDS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),17620.0,17868.0,1.41,0.41,0.06,target,1.0,13:40,17620.0,,,False,mPP 17554.67 | dPP 17519.00
-2026-10-01,12:15,HCLTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1241.3,1249.7,0.68,0.15,0.21,stall,-0.499,15:15,1241.3,,,False,DL 1238.80 | dPP 1237.07 | SW 1235.30 | wS1 1233.03
-2026-10-05,10:45,INDOBORAX,ENTER,ENTER,471.0,472.65,0.35,0.07,0.15,stop,-0.35,11:10,470.35,stop,-0.489,True,dPP 469.93 | DL 467.20
-2026-10-05,10:45,J&KBANK,dead at look time,DEAD (stop touched),141.62,141.98,0.25,0.75,0.16,stop,-0.254,10:50,141.94,,,False,wPP 140.89 | DL 140.38
-2026-10-05,10:45,CRISIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4483.0,4523.7,0.91,0.62,0.22,stall,-0.607,15:15,4482.1,,,False,-
-2026-10-05,10:45,SOLARINDS,ENTER,ENTER,19335.0,19420.0,0.44,0.21,0.23,stop,-0.44,11:05,19373.0,stop,-0.243,False,wPP 19290.00 | dPP 19286.33 | DL 19281.00 | SW 19190.00
-2026-10-05,10:45,KTKBANK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),325.3,327.25,0.6,0.34,0.26,stop,-0.599,14:45,325.2,,,False,wPP 325.18 | DL 324.20 | SW 324.20 | dPP 322.82
-2026-10-05,10:45,KFINTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),853.9,861.9,0.94,1.79,0.29,stop,-0.937,13:55,855.0,,,False,wPP 845.90
-2026-10-05,10:45,RPOWER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),19.9,20.02,0.6,1.32,0.33,target,1.0,11:40,19.82,,,False,-
-2026-10-05,10:45,TIMKEN,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),3125.0,3142.5,0.56,0.4,0.34,stop,-0.56,14:35,3126.4,,,False,SW 3120.00 | SW 3110.20 | DL 3103.80 | dPP 3101.37
-2026-10-05,10:45,SKIPPER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),541.45,545.65,0.78,0.03,0.35,target,1.0,11:40,540.0,,,False,wPP 540.93 | dPP 540.75 | DL 540.65 | SW 538.10
-2026-10-05,10:45,KRN,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1414.1,1437.3,1.64,-0.4,0.4,target,1.0,12:30,1414.5,,,False,dPP 1413.57 | DL 1405.70
-2026-10-05,10:45,QUESS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),339.25,343.7,1.31,0.68,0.47,stall,-0.678,15:15,337.7,,,False,wPP 337.60
-2026-10-05,11:15,HONAUT,ENTER,ENTER,33710.0,33815.0,0.31,0.37,0.01,stop,-0.311,11:25,33710.0,,,False,DL 33620.00 | SW 33500.00 | dPP 33418.33
-2026-10-05,11:15,CRISIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4489.1,4523.7,0.77,0.75,0.09,stall,-0.47,15:15,4489.1,,,False,-
-2026-10-05,11:15,TATACOMM,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1662.7,1676.8,0.85,-0.11,0.13,stop,-0.848,14:05,1662.7,,,False,DL 1662.30 | SW 1650.00
-2026-10-05,11:15,INDOBORAX,ENTER,ENTER,470.8,472.85,0.44,0.03,0.2,target,1.0,13:25,470.8,,,False,dPP 469.93 | DL 467.20
-2026-10-05,11:15,MAHABANK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),80.63,82.09,1.81,0.15,0.3,stall,0.161,15:15,80.63,,,False,DL 80.60 | dPP 80.17
-2026-10-05,11:15,AIIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),544.1,547.5,0.62,0.44,0.36,stop,-0.625,11:20,544.1,,,False,wPP 541.83 | mPP 540.53 | dPP 540.27 | DL 539.00
-2026-10-05,11:15,KFINTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),853.2,861.9,1.02,1.71,0.37,stop,-1.02,13:55,853.2,,,False,wPP 845.90
-2026-10-05,11:15,TIMKEN,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),3123.2,3142.5,0.62,0.34,0.4,stop,-0.618,14:35,3123.2,,,False,SW 3120.00 | SW 3110.20 | DL 3103.80 | dPP 3101.37
-2026-10-05,11:15,KTKBANK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),324.8,327.25,0.75,0.19,0.42,stop,-0.754,14:45,324.8,,,False,DL 324.20 | SW 324.20 | dPP 322.82
-2026-10-05,11:15,TATATECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),702.8,714.45,1.66,-0.16,0.42,stall,0.413,15:15,702.8,,,False,DL 701.40 | dPP 701.12 | wPP 700.75
-2026-10-05,11:15,TBOTEK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1680.4,1692.0,0.69,-0.2,0.42,target,1.0,12:05,1680.4,,,False,mPP 1678.40 | DL 1672.10
-2026-10-05,11:15,SKIPPER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),541.0,545.65,0.86,-0.05,0.43,target,1.0,11:50,541.0,,,False,wPP 540.93 | dPP 540.75 | DL 538.20 | SW 538.10
-2026-10-05,11:45,AVL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),589.1,605.55,2.79,1.33,0.16,stall,-1.944,15:15,589.1,,,False,wPP 584.23
-2026-10-05,11:45,TRIVENI,ENTER,ENTER,236.84,237.87,0.43,0.82,0.29,stop,-0.435,13:45,236.84,,,False,DL 235.80
-2026-10-05,11:45,EMCURE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1937.5,1948.7,0.58,-0.23,0.34,stall,-0.021,15:15,1937.5,,,False,DL 1918.90
-2026-10-05,12:15,FEDFINA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),150.29,151.13,0.56,0.05,0.05,stop,-0.559,12:45,150.29,,,False,SW 150.00 | DL 149.53 | wPP 149.35 | dPP 149.33 | SW 149.04
-2026-10-05,12:15,TORNTPOWER,ENTER,ENTER,1234.5,1239.0,0.36,0.02,0.22,stop,-0.365,13:05,1234.5,,,False,SW 1233.00 | SW 1232.00 | DL 1231.10
-2026-10-05,12:15,BAJAJHIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),19.74,20.03,1.47,1.14,0.35,stop,-1.469,13:45,19.74,,,False,DL 19.70 | SW 19.70 | wPP 19.68
-2026-10-05,12:15,SOLARINDS,ENTER,ENTER,19303.0,19385.0,0.42,-0.05,0.4,stop,-0.425,13:05,19303.0,,,False,wPP 19290.00 | dPP 19286.33 | DL 19275.00 | SW 19190.00
-2026-10-06,10:45,GVT&D,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4242.8,4274.5,0.75,-0.0,0.04,stop,-0.747,11:50,4232.2,,,False,DL 4233.10 | wPP 4232.70
-2026-10-06,10:45,PNGJL,ENTER,ENTER,581.9,583.75,0.32,0.72,0.26,stop,-0.318,11:25,582.7,stop,-0.18,True,SW 581.55 | dPP 577.38
-2026-10-06,10:45,VOLTAMP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),10519.0,10580.0,0.58,-0.25,0.26,stop,-0.58,11:00,10520.0,,,False,wPP 10502.33 | DL 10486.00 | dS1 10442.00 | PDL 10421.00
-2026-10-06,11:15,VOLTAMP,ENTER,ENTER,10542.0,10580.0,0.36,-0.03,0.04,stop,-0.36,13:10,10542.0,,,False,dPP 10540.00 | wPP 10502.33 | DL 10486.00 | dS1 10442.00
-2026-10-06,11:15,KALYANKJIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),556.8,562.75,1.07,0.45,0.1,target,1.0,12:20,556.8,,,False,SW 556.50 | DL 555.05
-2026-10-06,11:15,SAIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),178.75,180.3,0.87,1.19,0.13,target,1.0,14:10,178.75,,,False,wPP 177.80
-2026-10-06,11:15,GVT&D,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4236.6,4274.5,0.89,-0.15,0.19,stop,-0.895,11:50,4236.6,,,False,wPP 4232.70 | DL 4231.70
-2026-10-06,11:15,UNIPARTS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),830.8,837.95,0.86,0.38,0.33,stall,0.379,15:15,830.8,,,False,dPP 828.47 | wPP 826.67 | DL 825.85
-2026-10-06,11:15,JKCEMENT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4960.0,4993.5,0.68,-0.28,0.34,stall,0.081,15:15,4960.0,,,False,wPP 4959.83 | dS1 4918.50
-2026-10-06,11:15,ITCHOTELS,ENTER,ENTER,159.34,160.1,0.48,0.08,0.39,stop,-0.477,13:20,159.34,,,False,dPP 159.29 | DL 159.07 | SW 158.40 | PDL 158.11 | dS1 157.78
-2026-10-06,11:15,PNGJL,skip: EMA8 0.4-0.6% zone,SKIP (EMA8 0.4-0.6% below),581.1,583.75,0.46,0.58,0.4,stop,-0.456,11:25,581.1,,,False,dPP 577.38
-2026-10-06,11:45,KIRLOSIND,skip: stop > 0.5% (2:1 rule),SKIP (strong green hour before),3543.3,3568.8,0.72,0.76,0.01,stop,-0.72,12:55,3543.3,,,False,wPP 3530.37
-2026-10-06,11:45,LANDMARK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),477.2,480.8,0.75,0.9,0.04,stop,-0.754,14:55,477.2,,,False,-
-2026-10-06,11:45,VOLTAMP,ENTER,ENTER,10532.0,10549.0,0.16,-0.12,0.13,stop,-0.161,12:35,10532.0,,,False,wPP 10502.33 | DL 10486.00 | dS1 10442.00
-2026-10-06,11:45,CHOICEIN,ENTER,ENTER,731.3,734.55,0.44,0.32,0.19,stall,0.67,15:15,731.3,,,False,dPP 727.13 | DL 725.05
-2026-10-06,11:45,SAIL,ENTER,ENTER,178.47,179.1,0.35,0.77,0.28,target,1.0,14:10,178.47,,,False,wPP 177.80 | dPP 176.89 | DL 176.77
-2026-10-06,12:15,IGARASHI,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),402.9,416.9,3.47,1.48,0.04,stall,0.062,15:15,402.9,,,False,wPP 402.33 | SW 402.05
-2026-10-06,12:15,JWL,ENTER,ENTER,224.43,225.05,0.28,0.4,0.05,stop,-0.276,13:15,224.43,,,False,dPP 223.01
-2026-10-06,12:15,RCF,skip: chased (2:1 gone at look),SKIP (2:1 gone at this price),107.9,108.44,0.5,0.46,0.14,stop,-0.5,14:50,107.9,,,False,SW 107.45 | SW 107.27 | dPP 107.15 | DL 107.00
-2026-10-06,12:15,VOLTAMP,ENTER,ENTER,10525.0,10549.0,0.23,-0.19,0.2,stop,-0.228,12:35,10525.0,,,False,wPP 10502.33 | DL 10486.00 | dS1 10442.00 | PDL 10421.00
-2026-10-06,12:15,CHOICEIN,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),730.8,734.55,0.51,0.26,0.26,stall,0.602,15:15,730.8,,,False,dPP 727.13 | DL 725.05
-2026-10-06,12:15,TIMKEN,ENTER,ENTER,3123.3,3137.8,0.46,-0.09,0.29,stop,-0.464,13:45,3123.3,,,False,SW 3120.00 | DL 3111.00 | SW 3110.20 | dS1 3107.43 | PDL 3103.80
-2026-10-06,12:15,KIRLOSIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),3531.6,3568.8,1.05,0.43,0.34,stop,-1.053,12:55,3531.6,,,False,wPP 3530.37
-2026-10-06,12:15,NATIONALUM,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),340.9,342.85,0.57,0.27,0.36,target,1.0,12:45,340.9,,,False,DL 340.75 | wPP 339.72 | dPP 339.47 | SW 338.05
-2026-10-06,12:15,SAIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),178.16,179.1,0.53,0.6,0.46,target,1.0,14:15,178.16,,,False,wPP 177.80 | dPP 176.89 | DL 176.77
-2026-10-07,10:45,SWANCORP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),272.95,274.8,0.68,1.75,0.11,target,1.0,13:00,272.1,,,False,-
-2026-10-07,10:45,SHYAMMETL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1045.1,1055.0,0.95,0.35,0.31,stop,-0.947,10:55,1044.5,,,False,dPP 1044.23 | DL 1043.70
-2026-10-07,11:15,LANDMARK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),477.55,480.05,0.52,0.06,0.01,stop,-0.524,12:30,477.55,,,False,DL 474.20
-2026-10-07,11:15,KIRLOSIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),3541.5,3576.9,1.0,0.1,0.05,stall,-0.175,15:15,3541.5,,,False,dPP 3538.00 | wPP 3530.37 | DL 3520.20
-2026-10-07,11:15,ATGL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),588.1,591.65,0.6,0.06,0.39,target,1.0,13:10,588.1,,,False,DL 583.80 | dS1 583.73 | PDL 583.60
-2026-10-07,11:15,WABAG,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),2005.8,2019.7,0.69,0.03,0.45,stop,-0.693,12:40,2005.8,,,False,DL 2005.00 | PDL 1991.20
-2026-10-07,11:15,SWANCORP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),272.0,274.8,1.03,1.4,0.46,target,1.0,13:10,272.0,,,False,-
-2026-10-07,11:15,GARUDA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),172.86,173.79,0.54,0.05,0.48,stop,-0.538,12:45,172.86,,,False,SW 172.37 | DL 172.01 | dS1 171.61 | PDL 171.30
-2026-10-07,11:45,IGARASHI,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),402.9,405.35,0.61,-0.08,0.15,stop,-0.608,14:35,402.9,,,False,dPP 402.82 | wPP 402.33 | SW 402.05
-2026-10-07,11:45,LANDMARK,ENTER,ENTER,476.85,477.95,0.23,-0.1,0.16,stop,-0.231,12:05,476.85,,,True,DL 474.20 | dS1 472.30
-2026-10-07,11:45,IPCALAB,ENTER,ENTER,1943.9,1947.7,0.2,-0.06,0.18,stop,-0.195,12:35,1943.9,,,False,DL 1937.00 | wPP 1936.30 | PDL 1932.00 | dS1 1930.00 | SW 1929.80
-2026-10-07,11:45,ZYDUSLIFE,ENTER,ENTER,1156.8,1160.9,0.35,0.02,0.19,stop,-0.354,12:35,1156.8,,,False,dPP 1156.43 | DL 1150.00 | dS1 1148.07
-2026-10-07,11:45,RCF,ENTER,ENTER,107.71,108.13,0.39,-0.28,0.33,stall,0.074,15:15,107.71,,,False,DL 107.50 | dS1 107.50 | SW 107.45 | SW 107.27 | PDL 107.00 | SW 106.70
-2026-10-07,11:45,TATATECH,ENTER,ENTER,700.05,703.15,0.44,-0.2,0.4,stop,-0.443,12:05,700.05,,,False,DL 699.05 | dS1 696.78 | PDL 695.80
-2026-10-07,12:15,FORCEMOT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),16915.0,17001.0,0.51,-0.12,0.14,stall,-0.272,15:15,16915.0,,,False,DL 16809.00 | dS1 16775.33
-2026-10-07,12:15,VIJAYA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1448.2,1458.9,0.74,-0.2,0.2,stop,-0.739,13:05,1448.2,,,False,wPP 1446.83 | DL 1445.40 | SW 1440.00
-2026-10-07,12:15,IPCALAB,ENTER,ENTER,1942.3,1947.7,0.28,-0.14,0.26,stop,-0.278,12:35,1942.3,,,False,DL 1937.00 | wPP 1936.30 | PDL 1932.00 | dS1 1930.00 | SW 1929.80
-2026-10-07,12:15,ZYDUSLIFE,ENTER,ENTER,1156.0,1160.9,0.42,-0.04,0.26,stop,-0.424,12:35,1156.0,,,False,DL 1150.00 | dS1 1148.07 | PDL 1145.00
-2026-10-07,12:15,RCF,ENTER,ENTER,107.77,108.13,0.33,-0.23,0.27,stall,0.13,15:15,107.77,,,False,DL 107.50 | dS1 107.50 | SW 107.45 | SW 107.27 | PDL 107.00 | SW 106.70
-2026-10-07,12:15,TATATECH,ENTER,ENTER,700.4,703.35,0.42,-0.15,0.35,stop,-0.421,13:40,700.4,,,False,DL 699.05 | dS1 696.78 | PDL 695.80
-2026-10-07,12:15,IGARASHI,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),401.95,405.35,0.85,-0.32,0.39,stop,-0.846,14:35,401.95,,,False,DL 398.30
-2026-10-07,12:15,SWANCORP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),272.1,273.7,0.59,1.13,0.4,target,1.0,13:10,272.1,,,False,-
-2026-10-07,12:15,EQUITASBNK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),68.01,68.51,0.74,-0.29,0.48,stop,-0.735,13:55,68.01,,,False,PDL 67.84 | wPP 67.41 | dS1 67.39 | DL 67.36
+date,alarm,ticker,category,status,entry,stop,stop_pct,ema8_below_pct,below_ema_pct,outcome,ret,exit_at,look_price,outcome_plan,ret_plan,plan_pick,in_path,liq_L,warn,colour,ema8_vs_ema34_pct,ema8_falling
+2026-10-07,10:45,SWANCORP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),272.95,274.8,0.68,1.75,0.11,target,1.0,13:00,272.1,,,False,-,70.5,,,,
+2026-10-07,10:45,ATGL,info: green candle,INFO (green candle; ENTER),589.15,591.65,0.42,0.24,0.21,target,1.0,13:10,589.05,,,False,wPP 588.87 | dPP 588.32 | DL 583.80 | dS1 583.73 | PDL 583.60,26.3,,,,
+2026-10-07,10:45,SHYAMMETL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1045.1,1055.0,0.95,0.35,0.31,stop,-0.947,10:55,1044.5,,,False,dPP 1044.23 | DL 1043.70,40.3,,,,
+2026-10-07,10:45,GARUDA,info: green candle,INFO (green candle; SKIP (2:1 gone at this price)),173.04,173.79,0.43,0.15,0.37,stop,-0.433,12:45,172.62,,,False,SW 172.37 | DL 172.01 | dS1 171.61,3.4,THIN,,,
+2026-10-07,11:15,LANDMARK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),477.55,480.05,0.52,0.06,0.01,stop,-0.524,12:30,477.55,,,False,DL 474.20,0.9,THIN,,,
+2026-10-07,11:15,AGARWALEYE,info: green candle,INFO (green candle; ENTER),484.8,486.2,0.29,0.39,0.04,target,1.0,12:30,484.8,,,False,SW 484.15 | dPP 483.28 | DL 480.30,0.5,THIN,,,
+2026-10-07,11:15,TECHNOE,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),992.7,999.1,0.64,0.34,0.04,target,1.0,13:10,992.7,,,False,SW 985.50 | SW 985.40 | DL 984.00 | dS1 983.60,4.6,THIN,,,
+2026-10-07,11:15,KIRLOSIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),3541.5,3576.9,1.0,0.1,0.05,stall,-0.175,15:15,3541.5,,,False,dPP 3538.00 | wPP 3530.37 | DL 3520.20,0.8,THIN,,,
+2026-10-07,11:15,IPCALAB,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),1946.3,1960.0,0.7,0.09,0.06,stall,0.416,15:15,1946.3,,,False,DL 1937.00 | wPP 1936.30 | PDL 1932.00 | dS1 1930.00 | SW 1929.80,15.3,THIN,,,
+2026-10-07,11:15,PRIVISCL,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),3508.0,3525.9,0.51,0.36,0.26,stop,-0.51,11:40,3508.0,,,False,SW 3500.00 | dPP 3495.97 | SW 3491.00 | DL 3482.00,21.5,THIN,,,
+2026-10-07,11:15,ATGL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),588.1,591.65,0.6,0.06,0.39,target,1.0,13:10,588.1,,,False,DL 583.80 | dS1 583.73 | PDL 583.60,12.8,THIN,,,
+2026-10-07,11:15,WABAG,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),2005.8,2019.7,0.69,0.03,0.45,stop,-0.693,12:40,2005.8,,,False,DL 2005.00 | PDL 1991.20,72.7,,,,
+2026-10-07,11:15,SWANCORP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),272.0,274.8,1.03,1.4,0.46,target,1.0,13:10,272.0,,,False,-,25.6,,,,
+2026-10-07,11:15,GARUDA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),172.86,173.79,0.54,0.05,0.48,stop,-0.538,12:45,172.86,,,False,SW 172.37 | DL 172.01 | dS1 171.61 | PDL 171.30,1.5,THIN,,,
+2026-10-07,11:45,IGARASHI,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),402.9,405.35,0.61,-0.08,0.15,stop,-0.608,14:35,402.9,,,False,dPP 402.82 | wPP 402.33 | SW 402.05,0.7,THIN,,,
+2026-10-07,11:45,LANDMARK,ENTER,ENTER,476.85,477.95,0.23,-0.1,0.16,stop,-0.231,12:05,476.85,,,True,DL 474.20 | dS1 472.30,0.8,THIN,,,
+2026-10-07,11:45,IPCALAB,ENTER,ENTER,1943.9,1947.7,0.2,-0.06,0.18,stop,-0.195,12:35,1943.9,,,False,DL 1937.00 | wPP 1936.30 | PDL 1932.00 | dS1 1930.00 | SW 1929.80,12.7,THIN,,,
+2026-10-07,11:45,ZYDUSLIFE,ENTER,ENTER,1156.8,1160.9,0.35,0.02,0.19,stop,-0.354,12:35,1156.8,,,False,dPP 1156.43 | DL 1150.00 | dS1 1148.07,153.9,,,,
+2026-10-07,11:45,RCF,ENTER,ENTER,107.71,108.13,0.39,-0.28,0.33,stall,0.074,15:15,107.71,,,False,DL 107.50 | dS1 107.50 | SW 107.45 | SW 107.27 | PDL 107.00 | SW 106.70,3.9,THIN,,,
+2026-10-07,11:45,TATATECH,ENTER,ENTER,700.05,703.15,0.44,-0.2,0.4,stop,-0.443,12:05,700.05,,,False,DL 699.05 | dS1 696.78 | PDL 695.80,19.6,THIN,,,
+2026-10-07,12:15,PRIVISCL,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),3515.0,3543.6,0.81,0.48,0.04,stall,-0.026,15:15,3515.0,,,False,SW 3500.00 | dPP 3495.97 | SW 3491.00 | DL 3482.00,29.2,,,,
+2026-10-07,12:15,FORCEMOT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),16915.0,17001.0,0.51,-0.12,0.14,stall,-0.272,15:15,16915.0,,,False,DL 16809.00 | dS1 16775.33,85.5,,,,
+2026-10-07,12:15,ZAGGLE,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),172.38,174.55,1.26,0.47,0.17,stall,0.017,15:15,172.38,,,False,dPP 172.02,15.3,THIN,,,
+2026-10-07,12:15,VIJAYA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1448.2,1458.9,0.74,-0.2,0.2,stop,-0.739,13:05,1448.2,,,False,wPP 1446.83 | DL 1445.40 | SW 1440.00,3.1,THIN,,,
+2026-10-07,12:15,IPCALAB,ENTER,ENTER,1942.3,1947.7,0.28,-0.14,0.26,stop,-0.278,12:35,1942.3,,,False,DL 1937.00 | wPP 1936.30 | PDL 1932.00 | dS1 1930.00 | SW 1929.80,8.6,THIN,,,
+2026-10-07,12:15,WABAG,info: green candle,INFO (green candle; ENTER),2009.2,2014.7,0.27,0.19,0.26,stop,-0.274,12:25,2009.2,,,False,DL 2002.60 | PDL 1991.20,29.0,,,,
+2026-10-07,12:15,ZYDUSLIFE,ENTER,ENTER,1156.0,1160.9,0.42,-0.04,0.26,stop,-0.424,12:35,1156.0,,,False,DL 1150.00 | dS1 1148.07 | PDL 1145.00,165.6,,,,
+2026-10-07,12:15,RCF,ENTER,ENTER,107.77,108.13,0.33,-0.23,0.27,stall,0.13,15:15,107.77,,,False,DL 107.50 | dS1 107.50 | SW 107.45 | SW 107.27 | PDL 107.00 | SW 106.70,2.5,THIN,,,
+2026-10-07,12:15,TATATECH,ENTER,ENTER,700.4,703.35,0.42,-0.15,0.35,stop,-0.421,13:40,700.4,,,False,DL 699.05 | dS1 696.78 | PDL 695.80,12.8,THIN,,,
+2026-10-07,12:15,IGARASHI,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),401.95,405.35,0.85,-0.32,0.39,stop,-0.846,14:35,401.95,,,False,DL 398.30,0.7,THIN,,,
+2026-10-07,12:15,SWANCORP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),272.1,273.7,0.59,1.13,0.4,target,1.0,13:10,272.1,,,False,-,17.7,THIN,,,
+2026-10-07,12:15,EQUITASBNK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),68.01,68.51,0.74,-0.29,0.48,stop,-0.735,13:55,68.01,,,False,PDL 67.84 | wPP 67.41 | dS1 67.39 | DL 67.36,7.9,THIN,,,
+2026-10-07,10:45,RCF,near: below_vwap,NEAR (green),108.03,108.4,0.34,,0.03,stall,0.37,15:15,108.03,,,False,,9.5,THIN,green,-0.07,True
+2026-10-07,10:45,EIHOTEL,near: trend_1h,NEAR (red),298.85,299.9,0.35,,0.06,stall,0.719,15:15,298.85,,,False,,2.1,THIN,red,0.17,True
+2026-10-07,10:45,INOXINDIA,near: below_daily8,NEAR (green),2095.9,2102.0,0.29,,0.07,stop,-0.291,11:00,2095.9,,,False,,79.7,,green,-0.35,False
+2026-10-07,10:45,VOLTAMP,near: below_vwap,NEAR (green),10536.0,10548.0,0.11,,0.09,stop,-0.114,11:00,10536.0,,,False,,5.2,THIN,green,-0.03,True
+2026-10-07,10:45,YATRA,near: wick_through_live_d8,NEAR (green),100.96,101.41,0.45,,0.12,stop,-0.446,12:05,100.96,,,False,,1.4,THIN,green,-0.02,True
+2026-10-07,10:45,GRAUWEIL,near: below_vwap,NEAR (red),82.65,83.01,0.44,,0.16,target,1.0,11:00,82.65,,,False,,1.0,THIN,red,-0.36,False
+2026-10-07,10:45,POLYMED,near: wick_through_live_d8,NEAR (red),1636.4,1639.8,0.21,,0.2,stop,-0.208,10:55,1636.4,,,False,,4.1,THIN,red,-0.51,False
+2026-10-07,10:45,PRIVISCL,near: below_vwap,NEAR (green),3509.6,3525.8,0.46,,0.21,stop,-0.462,10:55,3509.6,,,False,,21.0,THIN,green,-0.62,False
+2026-10-07,10:45,AMAGI,near: trend_1h,NEAR (red),561.7,563.7,0.36,,0.32,stall,-0.036,15:15,561.7,,,False,,4.9,THIN,red,0.09,True
+2026-10-07,10:45,APLLTD,near: wick_through_ema,NEAR (red),830.15,832.65,0.3,,0.34,target,1.0,13:15,830.15,,,False,,11.9,THIN,red,-0.23,True
+2026-10-07,10:45,DATAPATTNS,near: wick_through_ema,NEAR (red),4253.1,4273.0,0.47,,0.47,stall,0.332,15:15,4253.1,,,False,,105.2,,red,-0.14,True
+2026-10-07,11:15,YATRA,near: wick_through_live_d8,NEAR (green),101.0,101.41,0.41,,0.08,stop,-0.406,12:05,101.0,,,False,,1.3,THIN,green,-0.02,True
+2026-10-07,11:15,POLYMED,near: wick_through_live_d8,NEAR (red),1636.3,1640.0,0.23,,0.21,target,1.0,12:30,1636.3,,,False,,4.1,THIN,red,-0.51,False
+2026-10-07,11:15,HONAUT,near: trend_1h,NEAR (red),33660.0,33825.0,0.49,,0.22,target,1.0,12:30,33660.0,,,False,,2.7,THIN,red,0.04,True
+2026-10-07,11:15,JMFINANCIL,near: below_vwap,NEAR (green),124.48,124.91,0.35,,0.29,stop,-0.345,14:30,124.48,,,False,,7.8,THIN,green,-0.61,True
+2026-10-07,11:15,AMAGI,near: trend_1h,NEAR (red),561.7,563.7,0.36,,0.32,stall,-0.036,15:15,561.7,,,False,,6.1,THIN,red,0.09,True
+2026-10-07,11:15,TCIEXP,near: wick_through_ema,NEAR (red),501.0,503.3,0.46,,0.5,stall,-0.02,15:15,501.0,,,False,,0.8,THIN,red,-0.77,False
+2026-10-07,11:45,KTKBANK,near: below_vwap,NEAR (red),325.35,326.8,0.45,,0.03,stop,-0.446,12:15,325.35,,,False,,38.2,,red,-0.17,False
+2026-10-07,11:45,ALLCARGO,near: trend_1h,NEAR (red),10.32,10.36,0.39,,0.09,stall,0.484,15:15,10.32,,,False,,1.9,THIN,red,0.11,True
+2026-10-07,11:45,APOLLOTYRE,near: trend_1h,NEAR (red),400.75,402.35,0.4,,0.09,stop,-0.399,12:15,400.75,,,False,,9.4,THIN,red,0.11,False
+2026-10-07,11:45,FEDFINA,near: trend_1h,NEAR (red),150.32,150.81,0.33,,0.18,target,1.0,13:10,150.32,,,False,,8.0,THIN,red,0.15,True
+2026-10-07,11:45,HONAUT,near: wick_through_ema,NEAR (red),33640.0,33700.0,0.18,,0.27,target,1.0,12:40,33640.0,,,False,,3.0,THIN,red,-0.01,True
+2026-10-07,11:45,TCIEXP,near: wick_through_ema,NEAR (green),502.0,502.95,0.19,,0.27,stall,0.179,15:15,502.0,,,False,,0.3,THIN,green,-0.68,False
+2026-10-07,11:45,AUBANK,near: trend_1h,NEAR (red),1012.5,1016.5,0.4,,0.29,target,1.0,12:30,1012.5,,,False,,205.1,,red,0.57,True
+2026-10-07,11:45,DATAPATTNS,near: wick_through_ema,NEAR (red),4258.4,4271.0,0.3,,0.33,stall,0.456,15:15,4258.4,,,False,,52.4,,red,-0.16,True
+2026-10-07,11:45,LODHA,near: trend_1h,NEAR (red),1123.6,1128.5,0.44,,0.34,stop,-0.436,12:10,1123.6,,,False,,198.0,,red,0.38,True
+2026-10-07,11:45,SWANCORP,near: wick_through_ema,NEAR (red),271.9,272.4,0.18,,0.47,stop,-0.184,11:55,271.9,,,False,,24.4,THIN,red,-1.52,False
+2026-10-07,11:45,TECHNOE,near: wick_through_ema,NEAR (red),988.4,992.3,0.39,,0.48,stop,-0.395,15:15,988.4,,,False,,2.6,THIN,red,-0.3,False
+2026-10-07,11:45,WABAG,near: wick_through_ema,NEAR (red),2004.6,2007.9,0.16,,0.48,stop,-0.165,11:55,2004.6,,,False,,28.1,,red,-0.45,False
+2026-10-07,11:45,GARUDA,near: wick_through_ema,NEAR (red),172.79,173.03,0.14,,0.49,stop,-0.139,12:00,172.79,,,False,,0.9,THIN,red,-0.49,False
+2026-10-07,12:15,VADILALIND,near: trend_1h,NEAR (red),7253.0,7274.5,0.3,,0.05,stall,0.455,15:15,7253.0,,,False,,0.7,THIN,red,0.11,True
+2026-10-07,12:15,ALLCARGO,near: trend_1h,NEAR (red),10.32,10.36,0.39,,0.09,stall,0.484,15:15,10.32,,,False,,2.4,THIN,red,0.11,True
+2026-10-07,12:15,LODHA,near: trend_1h,NEAR (green),1125.9,1128.6,0.24,,0.13,target,1.0,13:55,1125.9,,,False,,189.3,,green,0.38,True
+2026-10-07,12:15,POKARNA,near: wick_through_live_d8,NEAR (red),705.55,708.95,0.48,,0.18,stall,-0.05,15:15,705.55,,,False,,0.6,THIN,red,-0.17,False
+2026-10-07,12:15,TECHNOE,near: wick_through_ema,NEAR (red),989.9,992.3,0.24,,0.32,stop,-0.242,15:15,989.9,,,False,,3.2,THIN,red,-0.3,False
+2026-10-07,12:15,DATAPATTNS,near: wick_through_ema,NEAR (red),4255.9,4271.0,0.35,,0.39,stall,0.397,15:15,4255.9,,,False,,32.8,,red,-0.16,True
+2026-10-07,12:15,TCIEXP,near: wick_through_ema,NEAR (green),501.2,502.95,0.35,,0.43,stall,0.02,15:15,501.2,,,False,,0.2,THIN,green,-0.68,False
+2026-09-30,10:45,VIMTALABS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),598.45,604.1,0.94,0.64,0.01,stop,-0.944,15:15,596.55,,,False,DL 597.35,31.5,,,,
+2026-09-30,10:45,AARTIIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),483.4,486.85,0.71,0.96,0.05,target,1.0,12:15,484.1,,,False,SW 480.55 | wS1 478.60,34.0,,,,
+2026-09-30,10:45,MASTEK,skip: chased (2:1 gone at look),SKIP (2:1 gone at this price),1552.8,1559.5,0.43,0.87,0.1,target,1.0,11:25,1549.4,,,False,-,16.0,THIN,,,
+2026-09-30,10:45,KAPSTON,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),556.1,563.3,1.29,0.18,0.14,target,1.0,12:00,556.65,,,False,wPP 555.63 | mPP 555.20 | DL 555.05 | dPP 554.58 | SW 552.30,4.1,THIN,,,
+2026-09-30,10:45,PITTIENG,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1142.3,1152.0,0.85,0.35,0.14,stall,0.359,15:15,1144.1,,,False,dPP 1133.10 | DL 1131.50,5.4,THIN,,,
+2026-09-30,10:45,PARAS,skip: stop > 0.5% (2:1 rule),SKIP (EMA8 0.4-0.6% below),1332.7,1342.7,0.75,0.57,0.16,stop,-0.75,10:55,1337.6,,,False,DL 1322.60,73.4,,,,
+2026-09-30,10:45,MOBIKWIK,info: green candle,INFO (green candle; ENTER),199.32,200.16,0.42,1.42,0.17,stop,-0.421,13:10,199.37,,,False,SW 198.08,13.0,THIN,,,
+2026-09-30,10:45,JUSTDIAL,ENTER,ENTER,664.55,667.0,0.37,0.87,0.2,target,1.0,13:45,664.55,target,1.0,True,DL 658.65,2.7,THIN,,,
+2026-09-30,10:45,GARUDA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),177.62,178.98,0.77,0.1,0.21,target,1.0,13:55,177.89,,,False,DL 177.45 | dPP 176.48,3.8,THIN,,,
+2026-09-30,10:45,KPRMILL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1103.6,1109.8,0.56,0.79,0.24,target,1.0,11:50,1102.0,,,False,SW 1100.60 | SW 1100.10,5.4,THIN,,,
+2026-09-30,10:45,ATLANTAELE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1613.7,1631.4,1.1,-0.17,0.28,stop,-1.097,13:35,1611.4,,,False,DL 1612.70,8.8,THIN,,,
+2026-09-30,10:45,NUVAMA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1663.8,1675.2,0.69,0.47,0.29,stall,0.817,15:15,1658.1,,,False,DL 1661.30 | wS1 1654.27 | SW 1649.80 | dPP 1648.33,14.7,THIN,,,
+2026-09-30,10:45,SCHNEIDER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1202.8,1213.2,0.86,0.2,0.29,stall,-0.366,15:15,1203.6,,,False,DL 1199.50 | dPP 1196.37 | wS1 1191.03,17.0,THIN,,,
+2026-09-30,10:45,SFL,skip: chased (2:1 gone at look),SKIP (2:1 gone at this price),634.4,637.45,0.48,0.39,0.32,stop,-0.481,13:45,634.2,,,False,DL 634.35 | dPP 629.13,3.7,THIN,,,
+2026-09-30,10:45,BFUTILITIE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),517.6,522.0,0.85,0.86,0.36,stop,-0.85,10:55,519.0,,,False,SW 516.05 | wS1 513.67,2.4,THIN,,,
+2026-09-30,10:45,JISLJALEQS,skip: stop > 0.5% (2:1 rule),ENTER,28.85,29.01,0.55,-0.22,0.47,target,1.0,14:20,28.87,,,False,dPP 28.81 | SW 28.58,2.0,THIN,,,
+2026-09-30,10:45,INDUSTOWER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),370.55,373.15,0.7,0.29,0.48,stop,-0.702,11:40,370.65,,,False,DL 369.30 | wS1 369.05 | mS1 368.77 | SW 368.70 | SW 367.35,200.8,,,,
+2026-09-30,10:45,RICOAUTO,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),127.64,129.0,1.07,0.78,0.48,stop,-1.065,14:05,127.8,,,False,DL 126.50,8.7,THIN,,,
+2026-09-30,11:15,ATLANTAELE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1617.5,1631.4,0.86,0.07,0.04,stop,-0.859,13:35,1617.5,,,False,SW 1614.90 | DL 1611.30,8.6,THIN,,,
+2026-09-30,11:15,ADANIENT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),2900.9,2927.1,0.9,0.28,0.06,stall,0.51,15:15,2900.9,,,False,DL 2900.00,279.8,,,,
+2026-09-30,11:15,PARAS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1333.5,1344.0,0.79,0.63,0.1,target,1.0,14:25,1333.5,,,False,DL 1322.60,75.9,,,,
+2026-09-30,11:15,MOSCHIP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),201.88,204.27,1.18,0.82,0.12,stop,-1.184,14:35,201.88,,,False,SW 201.40,17.5,THIN,,,
+2026-09-30,11:15,ASIANTILES,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),50.05,50.5,0.9,0.19,0.13,stall,0.539,15:15,50.05,,,False,dPP 49.97,3.2,THIN,,,
+2026-09-30,11:15,AARTIIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),482.55,486.85,0.89,0.79,0.23,target,1.0,13:45,482.55,,,False,SW 480.55 | wS1 478.60,24.2,THIN,,,
+2026-09-30,11:15,PNBHOUSING,ENTER,ENTER,1102.6,1107.4,0.44,0.16,0.28,stop,-0.435,11:50,1102.6,,,False,SW 1098.40 | dPP 1098.37 | DL 1097.00,21.9,THIN,,,
+2026-09-30,11:15,TATATECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),705.05,719.7,2.08,1.11,0.28,stall,-0.142,15:15,705.05,,,False,-,94.5,,,,
+2026-09-30,11:15,TCS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),2072.5,2100.5,1.35,0.55,0.31,target,1.0,14:45,2072.5,,,False,DL 2055.00,1216.3,,,,
+2026-09-30,11:15,RBLBANK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),408.0,410.2,0.54,0.56,0.37,stop,-0.539,12:05,408.0,,,False,DL 405.15,160.4,,,,
+2026-09-30,11:15,SFL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),634.1,637.45,0.53,0.34,0.37,stop,-0.528,13:45,634.1,,,False,DL 633.25 | dPP 629.13 | SW 627.80,3.3,THIN,,,
+2026-09-30,11:15,CENTENKA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),557.95,565.6,1.37,0.52,0.38,stall,0.233,15:15,557.95,,,False,DL 553.00,1.0,THIN,,,
+2026-09-30,11:15,LTM,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4082.4,4138.0,1.36,0.53,0.4,target,1.0,13:05,4082.4,,,False,-,269.1,,,,
+2026-09-30,11:15,PITTIENG,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1139.1,1152.0,1.13,0.07,0.42,stall,0.079,15:15,1139.1,,,False,dPP 1133.10 | DL 1131.50,3.9,THIN,,,
+2026-09-30,11:15,JISLJALEQS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),28.86,29.01,0.52,-0.18,0.43,target,1.0,14:20,28.86,,,False,dPP 28.81 | DL 28.79 | SW 28.58,1.8,THIN,,,
+2026-09-30,11:15,BFUTILITIE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),517.1,522.0,0.95,0.77,0.45,target,1.0,14:45,517.1,,,False,SW 516.05 | wS1 513.67 | SW 512.00,1.7,THIN,,,
+2026-09-30,11:15,HINDOILEXP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),173.71,174.6,0.51,-0.4,0.46,target,1.0,14:30,173.71,,,False,DL 172.40,3.4,THIN,,,
+2026-09-30,11:15,SCHNEIDER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1200.6,1213.2,1.05,0.01,0.48,stall,-0.55,15:15,1200.6,,,False,DL 1199.50 | dPP 1196.37 | wS1 1191.03,15.4,THIN,,,
+2026-09-30,11:15,MOBIKWIK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),198.69,200.16,0.74,1.11,0.49,stop,-0.74,13:10,198.69,,,False,SW 198.08 | SW 196.80,9.0,THIN,,,
+2026-09-30,11:15,JUSTDIAL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),662.6,667.0,0.66,0.58,0.49,target,1.0,14:15,662.6,,,False,DL 658.65 | wS1 656.80,2.5,THIN,,,
+2026-09-30,11:45,UNIPARTS,ENTER,ENTER,847.7,848.7,0.12,0.2,0.02,target,1.0,14:30,847.7,,,False,wPP 846.63 | dPP 840.20 | DL 839.60,1.6,THIN,,,
+2026-09-30,11:45,SCHNEIDER,info: green candle,INFO (green candle; ENTER),1205.0,1207.3,0.19,0.38,0.09,stop,-0.191,14:50,1205.0,,,False,DL 1199.50 | dPP 1196.37,10.3,THIN,,,
+2026-09-30,11:45,AARTIIND,info: green candle,INFO (green candle; ENTER),483.1,485.2,0.43,0.73,0.1,target,1.0,12:15,483.1,,,False,SW 480.55 | wS1 478.60,20.1,THIN,,,
+2026-09-30,11:45,BAJAJCON,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),495.95,498.65,0.54,0.23,0.1,stop,-0.544,13:00,495.95,,,False,DL 494.00 | SW 493.05 | mPP 491.63,9.6,THIN,,,
+2026-09-30,11:45,SUDARSCHEM,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),1210.3,1220.0,0.8,0.81,0.19,target,1.0,12:35,1210.3,,,False,-,9.4,THIN,,,
+2026-09-30,11:45,NETWEB,ENTER,ENTER,4610.0,4625.5,0.34,-0.17,0.27,target,1.0,14:45,4610.0,,,False,DL 4603.00 | dPP 4576.67,300.6,,,,
+2026-09-30,11:45,MASTEK,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),1548.6,1556.8,0.53,0.58,0.32,target,1.0,12:45,1548.6,,,False,dPP 1536.80,7.3,THIN,,,
+2026-09-30,11:45,AIIL,ENTER,ENTER,547.75,550.0,0.41,-0.0,0.37,stop,-0.411,12:10,547.75,,,False,SW 547.15 | wS1 545.17 | dPP 544.90 | SW 544.15 | DL 543.35,2.1,THIN,,,
+2026-09-30,11:45,PARAS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1328.7,1335.9,0.54,0.13,0.45,target,1.0,14:25,1328.7,,,False,DL 1322.60 | dPP 1316.67,83.4,,,,
+2026-09-30,12:15,VIMTALABS,skip: EMA8 0.4-0.6% zone,SKIP (EMA8 0.4-0.6% below),598.2,600.95,0.46,0.42,0.06,stop,-0.46,13:35,598.2,,,False,DL 596.55,2.1,THIN,,,
+2026-09-30,12:15,BFUTILITIE,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),518.85,521.55,0.52,0.93,0.09,target,1.0,14:45,518.85,,,False,SW 516.05 | wS1 513.67,0.3,THIN,,,
+2026-09-30,12:15,BAJAJCON,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),495.9,498.65,0.55,0.22,0.11,stop,-0.555,13:00,495.9,,,False,DL 494.00 | SW 493.05 | mPP 491.63,4.3,THIN,,,
+2026-09-30,12:15,CENTENKA,info: green candle,INFO (green candle; ENTER),559.35,560.55,0.21,0.66,0.11,stop,-0.215,12:45,559.35,,,False,wS1 557.97,0.8,THIN,,,
+2026-09-30,12:15,KNRCON,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),119.03,119.75,0.6,0.4,0.21,stall,0.277,15:15,119.03,,,False,dPP 118.62 | SW 118.51 | DL 118.40,5.2,THIN,,,
+2026-09-30,12:15,WALCHANNAG,info: green candle,INFO (green candle; ENTER),204.65,205.4,0.37,0.57,0.22,target,1.0,13:50,204.65,,,False,SW 204.20 | dPP 202.81,4.3,THIN,,,
+2026-09-30,12:15,IGIL,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),322.6,324.7,0.65,-0.04,0.38,target,1.0,13:40,322.6,,,False,DL 320.40,2.9,THIN,,,
+2026-09-30,12:15,UNIPARTS,ENTER,ENTER,844.65,848.7,0.48,-0.16,0.38,stall,0.681,15:15,844.65,,,False,dPP 840.20 | DL 839.60,1.2,THIN,,,
+2026-09-30,12:15,SCHNEIDER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1200.4,1207.3,0.57,-0.01,0.47,stop,-0.575,14:50,1200.4,,,False,DL 1199.50 | dPP 1196.37 | wS1 1191.03,7.6,THIN,,,
+2026-09-30,10:45,AIIL,near: below_daily8,NEAR (red),549.8,552.55,0.5,,0.0,target,1.0,12:05,549.8,,,False,,5.9,THIN,red,-0.47,False
+2026-09-30,10:45,GRANULES,near: trend_1h,NEAR (red),862.0,865.1,0.36,,0.02,stop,-0.36,11:05,862.0,,,False,,56.4,,red,0.27,True
+2026-09-30,10:45,EPL,near: wick_through_ema,NEAR (red),234.85,234.95,0.04,,0.17,stop,-0.043,10:50,234.85,,,False,,54.0,,red,-0.63,False
+2026-09-30,11:15,TORNTPOWER,near: wick_through_ema,NEAR (red),1236.0,1239.9,0.32,,0.44,stop,-0.316,11:20,1236.0,,,False,,8.5,THIN,red,-0.92,False
+2026-09-30,11:15,VIKRAMSOLR,near: wick_through_ema,NEAR (green),160.22,160.3,0.05,,0.44,stop,-0.05,12:00,160.22,,,False,,7.0,THIN,green,-0.49,True
+2026-09-30,11:45,JTLIND,near: below_daily8,NEAR (green),89.69,90.03,0.38,,0.02,stop,-0.379,11:50,89.69,,,False,,11.4,THIN,green,-0.29,False
+2026-09-30,11:45,ATLANTAELE,near: wick_through_ema,NEAR (green),1617.7,1617.7,0.0,,0.03,stop,0.0,,1617.7,,,False,,4.4,THIN,green,-0.09,False
+2026-09-30,11:45,AGIIL,near: below_vwap,NEAR (green),266.95,268.15,0.45,,0.12,target,1.0,14:45,266.95,,,False,,2.9,THIN,green,-0.52,False
+2026-09-30,11:45,PNBHOUSING,near: wick_through_ema,NEAR (green),1103.7,1104.0,0.03,,0.16,stop,-0.027,11:50,1103.7,,,False,,19.1,THIN,green,-0.39,False
+2026-09-30,11:45,UTKARSHBNK,near: wick_through_ema,NEAR (green),13.76,13.79,0.22,,0.3,stop,-0.218,11:55,13.76,,,False,,2.8,THIN,green,-0.11,True
+2026-09-30,11:45,TCS,near: wick_through_ema,NEAR (red),2071.0,2073.0,0.1,,0.37,stop,-0.097,12:05,2071.0,,,False,,759.4,,red,-0.72,False
+2026-09-30,11:45,GARUDA,near: wick_through_ema,NEAR (green),177.26,177.26,0.0,,0.38,stop,0.0,,177.26,,,False,,4.4,THIN,green,-0.36,True
+2026-09-30,11:45,JUSTDIAL,near: wick_through_ema,NEAR (green),663.1,664.15,0.16,,0.39,stop,-0.158,12:00,663.1,,,False,,2.5,THIN,green,-0.91,False
+2026-09-30,11:45,SFL,near: wick_through_ema,NEAR (green),633.75,634.9,0.18,,0.4,stop,-0.181,12:25,633.75,,,False,,1.7,THIN,green,-0.61,False
+2026-09-30,11:45,SHAKTIPUMP,near: wick_through_ema,NEAR (green),462.85,463.45,0.13,,0.42,stop,-0.13,11:50,462.85,,,False,,12.2,THIN,green,-0.64,False
+2026-09-30,11:45,VIKRAMSOLR,near: wick_through_ema,NEAR (green),160.19,160.24,0.03,,0.43,stop,-0.031,11:50,160.19,,,False,,10.5,THIN,green,-0.46,False
+2026-09-30,11:45,PNGJL,near: wick_through_ema,NEAR (green),588.65,589.2,0.09,,0.44,stop,-0.093,11:50,588.65,,,False,,4.3,THIN,green,-0.66,False
+2026-09-30,11:45,HINDOILEXP,near: wick_through_ema,NEAR (red),173.68,174.13,0.26,,0.45,target,1.0,14:30,173.68,,,False,,2.2,THIN,red,-0.12,True
+2026-09-30,11:45,CENTENKA,near: wick_through_ema,NEAR (green),557.35,558.35,0.18,,0.46,stop,-0.179,11:50,557.35,,,False,,0.8,THIN,green,-0.76,False
+2026-09-30,11:45,LXCHEM,near: wick_through_ema,NEAR (green),178.35,179.08,0.41,,0.49,stop,-0.409,13:15,178.35,,,False,,9.2,THIN,green,-0.59,False
+2026-09-30,12:15,GAEL,near: trend_1h,NEAR (red),161.25,162.0,0.47,,0.09,target,1.0,15:15,161.25,,,False,,1.4,THIN,red,0.09,False
+2026-09-30,12:15,KRSNAA,near: trend_1h,NEAR (red),546.9,548.2,0.24,,0.09,stop,-0.238,12:25,546.9,,,False,,2.8,THIN,red,0.36,False
+2026-09-30,12:15,AIIL,near: below_daily8,NEAR (red),548.95,550.0,0.19,,0.16,stop,-0.191,12:25,548.95,,,False,,3.4,THIN,red,-0.37,False
+2026-09-30,12:15,RBLBANK,near: below_vwap,NEAR (green),408.6,410.35,0.43,,0.2,stop,-0.428,12:40,408.6,,,False,,112.9,,green,-0.78,False
+2026-09-30,12:15,NUVAMA,near: wick_through_ema,NEAR (green),1662.7,1665.4,0.16,,0.31,stall,0.752,15:15,1662.7,,,False,,10.8,THIN,green,-0.74,True
+2026-09-30,12:15,SCI,near: below_vwap,NEAR (green),273.05,274.0,0.35,,0.34,stop,-0.348,12:40,273.05,,,False,,22.3,THIN,green,-0.7,True
+2026-09-30,12:15,GLENMARK,near: wick_through_ema,NEAR (green),2375.5,2376.0,0.02,,0.37,stop,-0.021,12:20,2375.5,,,False,,170.4,,green,-0.54,False
+2026-09-30,12:15,NETWORK18,near: wick_through_live_d8,NEAR (green),26.24,26.34,0.38,,0.37,stop,-0.381,12:25,26.24,,,False,,3.7,THIN,green,-1.17,False
+2026-09-30,12:15,TCS,near: wick_through_ema,NEAR (red),2070.9,2074.0,0.15,,0.37,stall,0.734,15:15,2070.9,,,False,,420.5,,red,-0.72,False
+2026-09-30,12:15,MOBIKWIK,near: wick_through_ema,NEAR (green),198.85,199.0,0.08,,0.38,stop,-0.075,13:10,198.85,,,False,,2.5,THIN,green,-1.32,False
+2026-09-30,12:15,PNGJL,near: wick_through_ema,NEAR (green),589.0,590.65,0.28,,0.38,stop,-0.28,12:40,589.0,,,False,,3.6,THIN,green,-0.66,False
+2026-09-30,12:15,BHEL,near: wick_through_ema,NEAR (green),414.1,414.85,0.18,,0.39,stop,-0.181,12:25,414.1,,,False,,163.9,,green,-0.65,True
+2026-09-30,12:15,HONAUT,near: wick_through_ema,NEAR (red),33720.0,33760.0,0.12,,0.44,stop,-0.119,12:30,33720.0,,,False,,2.4,THIN,red,-0.22,True
+2026-09-30,12:15,JUSTDIAL,near: wick_through_ema,NEAR (green),662.7,664.25,0.23,,0.45,target,1.0,13:50,662.7,,,False,,1.5,THIN,green,-0.91,False
+2026-09-30,12:15,UTKARSHBNK,near: wick_through_ema,NEAR (green),13.74,13.8,0.44,,0.45,stop,-0.437,12:40,13.74,,,False,,3.4,THIN,green,-0.11,True
+2026-09-30,12:15,SFL,near: wick_through_ema,NEAR (green),633.3,634.9,0.25,,0.47,stop,-0.253,12:25,633.3,,,False,,1.7,THIN,green,-0.61,False
+2026-09-30,12:15,ATLANTAELE,near: wick_through_ema,NEAR (red),1610.4,1617.7,0.45,,0.48,stop,-0.453,12:30,1610.4,,,False,,2.9,THIN,red,-0.09,False
+2026-09-30,12:15,VIKRAMSOLR,near: wick_through_ema,NEAR (green),160.12,160.32,0.12,,0.48,stop,-0.125,13:10,160.12,,,False,,9.1,THIN,green,-0.46,False
+2026-10-01,10:45,MOBIKWIK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),199.11,201.02,0.96,0.62,0.03,target,1.0,11:30,199.09,,,False,SW 198.08 | dPP 197.89,19.4,THIN,,,
+2026-10-01,10:45,SOBHA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1214.9,1224.8,0.81,-0.07,0.14,target,1.0,12:55,1212.4,,,False,-,2.7,THIN,,,
+2026-10-01,10:45,BEPL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),125.89,126.76,0.69,0.34,0.23,target,1.0,10:55,125.1,,,False,dPP 125.11 | SW 125.01,22.5,THIN,,,
+2026-10-01,10:45,GABRIEL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1343.0,1365.0,1.64,0.51,0.37,target,1.0,10:55,1336.1,,,False,dPP 1336.60 | SW 1335.10,72.2,,,,
+2026-10-01,11:15,TANLA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),493.45,496.6,0.64,-0.25,0.27,target,1.0,12:25,493.45,,,False,DL 490.85 | PDL 490.35,6.9,THIN,,,
+2026-10-01,11:15,SOBHA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1212.8,1224.8,0.99,-0.24,0.31,target,1.0,12:55,1212.8,,,False,wS1 1201.07 | DL 1201.00,1.4,THIN,,,
+2026-10-01,11:15,KNACK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),179.02,180.43,0.79,-0.3,0.36,stop,-0.788,11:55,179.02,,,False,DL 178.01,1.3,THIN,,,
+2026-10-01,11:15,PHOENIXLTD,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1938.1,1958.4,1.05,-0.36,0.49,target,1.0,13:45,1938.1,,,False,mPP 1930.27 | DL 1921.50,104.6,,,,
+2026-10-01,11:45,EMBDL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),56.97,57.39,0.74,-0.1,0.14,target,1.0,12:15,56.97,,,False,SW 56.85,9.0,THIN,,,
+2026-10-01,11:45,ZENSARTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),429.6,435.0,1.26,-0.05,0.31,target,1.0,12:30,429.6,,,False,dPP 427.07,96.5,,,,
+2026-10-01,11:45,EXIDEIND,ENTER,ENTER,414.05,415.75,0.41,0.28,0.36,target,1.0,12:15,414.05,,,True,dPP 412.62,79.2,,,,
+2026-10-01,11:45,BSOFT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),273.5,276.1,0.95,-0.43,0.5,target,1.0,12:25,273.5,,,False,DL 271.95,17.8,THIN,,,
+2026-10-01,12:15,APARINDS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),17620.0,17868.0,1.41,0.41,0.06,target,1.0,13:40,17620.0,,,False,mPP 17554.67 | dPP 17519.00,161.6,,,,
+2026-10-01,12:15,HCLTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1241.3,1249.7,0.68,0.15,0.21,stall,-0.499,15:15,1241.3,,,False,DL 1238.80 | dPP 1237.07 | SW 1235.30 | wS1 1233.03,265.8,,,,
+2026-10-01,10:45,ALIVUS,near: trend_1h,NEAR (green),1366.5,1369.5,0.22,,0.04,target,1.0,11:40,1366.5,,,False,,3.6,THIN,green,0.31,True
+2026-10-01,10:45,AMAGI,near: below_vwap,NEAR (green),562.55,563.9,0.24,,0.04,stop,-0.24,10:50,562.55,,,False,,123.2,,green,-1.73,True
+2026-10-01,10:45,TANLA,near: below_daily8,NEAR (red),494.5,496.6,0.42,,0.06,target,1.0,12:15,494.5,,,False,,7.9,THIN,red,-0.02,False
+2026-10-01,10:45,JMFINANCIL,near: trend_1h,NEAR (red),126.72,127.07,0.28,,0.08,target,1.0,12:05,126.72,,,False,,5.7,THIN,red,0.75,True
+2026-10-01,10:45,SUDARSCHEM,near: below_vwap,NEAR (green),1207.3,1212.6,0.44,,0.31,stop,-0.439,11:10,1207.3,,,False,,11.7,THIN,green,-0.47,True
+2026-10-01,10:45,MOSCHIP,near: wick_through_live_d8,NEAR (red),201.2,202.0,0.4,,0.38,target,1.0,12:25,201.2,,,False,,23.1,THIN,red,-0.32,False
+2026-10-01,10:45,EXIDEIND,near: wick_through_ema,NEAR (green),413.5,413.85,0.08,,0.5,stop,-0.085,10:50,413.5,,,False,,72.5,,green,-0.82,False
+2026-10-01,11:45,TATATECH,near: below_vwap,NEAR (green),707.4,709.25,0.26,,0.01,target,1.0,12:30,707.4,,,False,,38.5,,green,-0.06,False
+2026-10-01,11:45,TANLA,near: wick_through_ema,NEAR (green),493.55,494.0,0.09,,0.23,target,1.0,12:25,493.55,,,False,,5.6,THIN,green,-0.06,True
+2026-10-01,11:45,DLF,near: wick_through_ema,NEAR (green),664.55,664.85,0.05,,0.24,stop,-0.045,11:50,664.55,,,False,,250.7,,green,-0.04,True
+2026-10-01,11:45,HEXT,near: below_vwap,NEAR (green),491.45,493.3,0.38,,0.35,target,1.0,12:15,491.45,,,False,,9.1,THIN,green,-0.28,True
+2026-10-05,10:45,INDOBORAX,ENTER,ENTER,471.0,472.65,0.35,0.07,0.15,stop,-0.35,11:10,470.35,stop,-0.489,True,dPP 469.93 | DL 467.20,2.8,THIN,,,
+2026-10-05,10:45,J&KBANK,dead at look time,DEAD (stop touched),141.62,141.98,0.25,0.75,0.16,stop,-0.254,10:50,141.94,,,False,wPP 140.89 | DL 140.38,35.9,,,,
+2026-10-05,10:45,CRISIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4483.0,4523.7,0.91,0.62,0.22,stall,-0.607,15:15,4482.1,,,False,-,13.0,THIN,,,
+2026-10-05,10:45,SOLARINDS,ENTER,ENTER,19335.0,19420.0,0.44,0.21,0.23,stop,-0.44,11:05,19373.0,stop,-0.243,False,wPP 19290.00 | dPP 19286.33 | DL 19281.00 | SW 19190.00,219.9,,,,
+2026-10-05,10:45,KTKBANK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),325.3,327.25,0.6,0.34,0.26,stop,-0.599,14:45,325.2,,,False,wPP 325.18 | DL 324.20 | SW 324.20 | dPP 322.82,29.4,,,,
+2026-10-05,10:45,KFINTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),853.9,861.9,0.94,1.79,0.29,stop,-0.937,13:55,855.0,,,False,wPP 845.90,113.0,,,,
+2026-10-05,10:45,RPOWER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),19.9,20.02,0.6,1.32,0.33,target,1.0,11:40,19.82,,,False,-,122.8,,,,
+2026-10-05,10:45,TIMKEN,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),3125.0,3142.5,0.56,0.4,0.34,stop,-0.56,14:35,3126.4,,,False,SW 3120.00 | SW 3110.20 | DL 3103.80 | dPP 3101.37,3.1,THIN,,,
+2026-10-05,10:45,SKIPPER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),541.45,545.65,0.78,0.03,0.35,target,1.0,11:40,540.0,,,False,wPP 540.93 | dPP 540.75 | DL 540.65 | SW 538.10,17.1,THIN,,,
+2026-10-05,10:45,KRN,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1414.1,1437.3,1.64,-0.4,0.4,target,1.0,12:30,1414.5,,,False,dPP 1413.57 | DL 1405.70,45.3,,,,
+2026-10-05,10:45,QUESS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),339.25,343.7,1.31,0.68,0.47,stall,-0.678,15:15,337.7,,,False,wPP 337.60,17.7,THIN,,,
+2026-10-05,11:15,HONAUT,ENTER,ENTER,33710.0,33815.0,0.31,0.37,0.01,stop,-0.311,11:25,33710.0,,,False,DL 33620.00 | SW 33500.00 | dPP 33418.33,2.4,THIN,,,
+2026-10-05,11:15,SOLARINDS,info: green candle,INFO (green candle; ENTER),19376.0,19439.0,0.33,0.42,0.02,stop,-0.325,13:50,19376.0,,,False,wPP 19290.00 | dPP 19286.33 | DL 19281.00 | SW 19190.00,196.2,,,,
+2026-10-05,11:15,CRISIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4489.1,4523.7,0.77,0.75,0.09,stall,-0.47,15:15,4489.1,,,False,-,11.6,THIN,,,
+2026-10-05,11:15,TATACOMM,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1662.7,1676.8,0.85,-0.11,0.13,stop,-0.848,14:05,1662.7,,,False,DL 1662.30 | SW 1650.00,6.1,THIN,,,
+2026-10-05,11:15,PWL,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),125.28,126.88,1.28,2.67,0.15,target,1.0,12:05,125.28,,,False,SW 125.27 | SW 124.63,341.4,,,,
+2026-10-05,11:15,INDOBORAX,ENTER,ENTER,470.8,472.85,0.44,0.03,0.2,target,1.0,13:25,470.8,,,False,dPP 469.93 | DL 467.20,1.6,THIN,,,
+2026-10-05,11:15,MAHABANK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),80.63,82.09,1.81,0.15,0.3,stall,0.161,15:15,80.63,,,False,DL 80.60 | dPP 80.17,107.9,,,,
+2026-10-05,11:15,AIIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),544.1,547.5,0.62,0.44,0.36,stop,-0.625,11:20,544.1,,,False,wPP 541.83 | mPP 540.53 | dPP 540.27 | DL 539.00,6.8,THIN,,,
+2026-10-05,11:15,KFINTECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),853.2,861.9,1.02,1.71,0.37,stop,-1.02,13:55,853.2,,,False,wPP 845.90,41.9,,,,
+2026-10-05,11:15,TIMKEN,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),3123.2,3142.5,0.62,0.34,0.4,stop,-0.618,14:35,3123.2,,,False,SW 3120.00 | SW 3110.20 | DL 3103.80 | dPP 3101.37,3.9,THIN,,,
+2026-10-05,11:15,KTKBANK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),324.8,327.25,0.75,0.19,0.42,stop,-0.754,14:45,324.8,,,False,DL 324.20 | SW 324.20 | dPP 322.82,19.2,THIN,,,
+2026-10-05,11:15,TATATECH,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),702.8,714.45,1.66,-0.16,0.42,stall,0.413,15:15,702.8,,,False,DL 701.40 | dPP 701.12 | wPP 700.75,44.1,,,,
+2026-10-05,11:15,TBOTEK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1680.4,1692.0,0.69,-0.2,0.42,target,1.0,12:05,1680.4,,,False,mPP 1678.40 | DL 1672.10,1.6,THIN,,,
+2026-10-05,11:15,SKIPPER,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),541.0,545.65,0.86,-0.05,0.43,target,1.0,11:50,541.0,,,False,wPP 540.93 | dPP 540.75 | DL 538.20 | SW 538.10,18.3,THIN,,,
+2026-10-05,11:45,AVL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),589.1,605.55,2.79,1.33,0.16,stall,-1.944,15:15,589.1,,,False,wPP 584.23,54.1,,,,
+2026-10-05,11:45,TRIVENI,ENTER,ENTER,236.84,237.87,0.43,0.82,0.29,stop,-0.435,13:45,236.84,,,False,DL 235.80,7.8,THIN,,,
+2026-10-05,11:45,EMCURE,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),1937.5,1948.7,0.58,-0.23,0.34,stall,-0.021,15:15,1937.5,,,False,DL 1918.90,7.3,THIN,,,
+2026-10-05,12:15,FEDFINA,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),150.29,151.13,0.56,0.05,0.05,stop,-0.559,12:45,150.29,,,False,SW 150.00 | DL 149.53 | wPP 149.35 | dPP 149.33 | SW 149.04,6.1,THIN,,,
+2026-10-05,12:15,LXCHEM,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),178.47,179.4,0.52,-0.09,0.09,stop,-0.521,13:45,178.47,,,False,DL 178.01 | SW 177.10 | SW 177.10,7.5,THIN,,,
+2026-10-05,12:15,QUESS,info: green candle,INFO (green candle; ENTER),340.25,341.0,0.22,0.88,0.13,stop,-0.22,12:25,340.25,,,False,wPP 337.60,6.5,THIN,,,
+2026-10-05,12:15,TORNTPOWER,ENTER,ENTER,1234.5,1239.0,0.36,0.02,0.22,stop,-0.365,13:05,1234.5,,,False,SW 1233.00 | SW 1232.00 | DL 1231.10,13.7,THIN,,,
+2026-10-05,12:15,BAJAJHIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),19.74,20.03,1.47,1.14,0.35,stop,-1.469,13:45,19.74,,,False,DL 19.70 | SW 19.70 | wPP 19.68,21.4,THIN,,,
+2026-10-05,12:15,SOLARINDS,ENTER,ENTER,19303.0,19385.0,0.42,-0.05,0.4,stop,-0.425,13:05,19303.0,,,False,wPP 19290.00 | dPP 19286.33 | DL 19275.00 | SW 19190.00,204.9,,,,
+2026-10-05,12:15,MAPMYINDIA,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),858.0,863.2,0.61,0.72,0.47,stop,-0.606,12:35,858.0,,,False,wPP 857.97 | DL 853.45 | dPP 849.63,7.4,THIN,,,
+2026-10-05,10:45,HINDCOPPER,near: wick_through_live_d8,NEAR (green),475.6,476.6,0.21,,0.02,target,1.0,12:10,475.6,,,False,,263.1,,green,-2.13,False
+2026-10-05,10:45,TORNTPOWER,near: wick_through_ema,NEAR (green),1236.0,1237.0,0.08,,0.1,stop,-0.081,11:00,1236.0,,,False,,6.7,THIN,green,-0.31,False
+2026-10-05,10:45,HDFCLIFE,near: trend_1h,NEAR (red),528.55,529.65,0.21,,0.12,stop,-0.208,12:55,528.55,,,False,,250.4,,red,0.21,True
+2026-10-05,10:45,AIIL,near: below_vwap,NEAR (red),545.25,547.5,0.41,,0.15,stop,-0.413,11:20,545.25,,,False,,9.6,THIN,red,-0.8,False
+2026-10-05,10:45,APOLLO,near: below_daily8,NEAR (green),399.2,401.2,0.5,,0.15,stop,-0.501,12:45,399.2,,,False,,302.1,,green,-0.74,False
+2026-10-05,10:45,KMEW,near: below_daily8,NEAR (red),2967.0,2977.0,0.34,,0.25,target,1.0,10:50,2967.0,,,False,,27.3,,red,-0.07,True
+2026-10-05,10:45,NAUKRI,near: below_vwap,NEAR (red),1226.1,1231.9,0.47,,0.29,target,1.0,11:40,1226.1,,,False,,118.1,,red,-1.55,False
+2026-10-05,10:45,EIHOTEL,near: wick_through_ema,NEAR (red),298.1,298.9,0.27,,0.37,target,1.0,12:00,298.1,,,False,,4.8,THIN,red,-0.2,False
+2026-10-05,10:45,SOBHA,near: wick_through_ema,NEAR (red),1208.5,1213.4,0.41,,0.43,stop,-0.405,12:00,1208.5,,,False,,19.5,THIN,red,-0.3,False
+2026-10-05,11:15,CMRGREEN,near: below_vwap,NEAR (green),224.04,225.16,0.5,,0.1,target,1.0,15:15,224.04,,,False,,6.0,THIN,green,-0.57,True
+2026-10-05,11:15,HDFCLIFE,near: trend_1h,NEAR (red),528.55,529.65,0.21,,0.12,stop,-0.208,12:55,528.55,,,False,,224.6,,red,0.21,True
+2026-10-05,11:15,ALIVUS,near: wick_through_ema,NEAR (green),1362.3,1363.9,0.12,,0.16,stop,-0.117,12:50,1362.3,,,False,,11.1,THIN,green,-0.06,True
+2026-10-05,11:15,VEDPOWER,near: wick_through_ema,NEAR (green),32.61,32.68,0.21,,0.23,target,1.0,12:00,32.61,,,False,,35.0,,green,-0.01,True
+2026-10-05,11:15,JAINREC,near: wick_through_ema,NEAR (green),284.35,284.55,0.07,,0.46,stop,-0.07,11:20,284.35,,,False,,5.9,THIN,green,-0.59,False
+2026-10-05,11:45,FLUOROCHEM,near: below_vwap,NEAR (green),4394.2,4397.0,0.06,,0.03,stop,-0.064,11:50,4394.2,,,False,,56.1,,green,-0.91,False
+2026-10-05,11:45,AIIL,near: below_vwap,NEAR (green),545.75,547.9,0.39,,0.04,stop,-0.394,13:50,545.75,,,False,,3.8,THIN,green,-0.68,False
+2026-10-05,11:45,TORNTPOWER,near: below_vwap,NEAR (red),1236.8,1239.0,0.18,,0.04,stop,-0.178,13:05,1236.8,,,False,,7.7,THIN,red,-0.24,False
+2026-10-05,11:45,ADANIGREEN,near: trend_1h,NEAR (red),1272.8,1278.9,0.48,,0.15,stop,-0.479,13:25,1272.8,,,False,,67.4,,red,0.32,True
+2026-10-05,11:45,ALIVUS,near: wick_through_ema,NEAR (red),1360.1,1362.2,0.15,,0.31,stop,-0.154,12:25,1360.1,,,False,,5.8,THIN,red,-0.07,True
+2026-10-05,11:45,TATACOMM,near: wick_through_ema,NEAR (red),1659.0,1662.9,0.24,,0.34,stop,-0.235,12:25,1659.0,,,False,,11.6,THIN,red,-0.04,True
+2026-10-05,11:45,VEDPOWER,near: wick_through_ema,NEAR (red),32.56,32.64,0.25,,0.37,target,1.0,12:00,32.56,,,False,,21.5,THIN,red,-0.05,True
+2026-10-05,11:45,SOLARINDS,near: wick_through_ema,NEAR (red),19293.0,19380.0,0.45,,0.45,stop,-0.451,11:55,19293.0,,,False,,180.7,,red,-0.35,False
+2026-10-05,11:45,JAINREC,near: wick_through_ema,NEAR (red),284.25,284.8,0.19,,0.47,stop,-0.193,13:45,284.25,,,False,,5.5,THIN,red,-0.54,False
+2026-10-05,11:45,TATATECH,near: wick_through_ema,NEAR (red),702.25,703.5,0.18,,0.47,stop,-0.178,11:55,702.25,,,False,,33.2,,red,-0.27,True
+2026-10-05,11:45,TIMKEN,near: wick_through_ema,NEAR (red),3120.3,3128.0,0.25,,0.47,stop,-0.247,12:25,3120.3,,,False,,1.1,THIN,red,-0.64,False
+2026-10-05,12:15,AIIL,near: below_vwap,NEAR (green),545.55,547.9,0.43,,0.07,stop,-0.431,13:50,545.55,,,False,,4.2,THIN,green,-0.68,False
+2026-10-05,12:15,APOLLOTYRE,near: trend_1h,NEAR (red),400.6,402.35,0.44,,0.07,stop,-0.437,13:40,400.6,,,False,,7.8,THIN,red,0.27,True
+2026-10-05,12:15,BEPL,near: below_vwap,NEAR (green),124.89,125.44,0.44,,0.3,stop,-0.44,13:40,124.89,,,False,,9.6,THIN,green,-1.05,True
+2026-10-05,12:15,ALIVUS,near: wick_through_ema,NEAR (red),1359.6,1362.2,0.19,,0.35,stop,-0.191,12:25,1359.6,,,False,,5.9,THIN,red,-0.07,True
+2026-10-06,10:45,GVT&D,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4242.8,4274.5,0.75,-0.0,0.04,stop,-0.747,11:50,4232.2,,,False,DL 4233.10 | wPP 4232.70,172.8,,,,
+2026-10-06,10:45,ITCHOTELS,info: green candle,INFO (green candle; ENTER),159.77,160.1,0.21,0.35,0.12,stop,-0.207,13:20,159.58,,,False,dPP 159.29 | DL 159.27 | SW 158.40,13.5,THIN,,,
+2026-10-06,10:45,OSWALPUMPS,info: green candle,INFO (green candle; ENTER),267.05,267.6,0.21,0.57,0.17,stop,-0.206,11:05,267.25,,,False,SW 266.45 | wPP 266.08 | dPP 265.05,3.5,THIN,,,
+2026-10-06,10:45,MAHABANK,info: green candle,INFO (green candle; ENTER),80.62,80.84,0.27,0.02,0.2,stall,0.149,15:15,80.45,,,False,DL 80.39 | PDL 79.85,78.9,,,,
+2026-10-06,10:45,PNGJL,ENTER,ENTER,581.9,583.75,0.32,0.72,0.26,stop,-0.318,11:25,582.7,stop,-0.18,True,SW 581.55 | dPP 577.38,12.6,THIN,,,
+2026-10-06,10:45,VOLTAMP,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),10519.0,10580.0,0.58,-0.25,0.26,stop,-0.58,11:00,10520.0,,,False,wPP 10502.33 | DL 10486.00 | dS1 10442.00 | PDL 10421.00,8.4,THIN,,,
+2026-10-06,10:45,WABAG,info: green candle,INFO (green candle; ENTER),2012.4,2020.0,0.38,0.74,0.33,stall,0.308,15:15,2013.1,,,False,SW 2010.10 | dPP 1999.77 | DL 1997.70,106.9,,,,
+2026-10-06,11:15,VOLTAMP,ENTER,ENTER,10542.0,10580.0,0.36,-0.03,0.04,stop,-0.36,13:10,10542.0,,,False,dPP 10540.00 | wPP 10502.33 | DL 10486.00 | dS1 10442.00,7.1,THIN,,,
+2026-10-06,11:15,KALYANKJIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),556.8,562.75,1.07,0.45,0.1,target,1.0,12:20,556.8,,,False,SW 556.50 | DL 555.05,575.2,,,,
+2026-10-06,11:15,EMAMILTD,"info: green candle, stop > 0.5%",INFO (green candle; SKIP (2:1 gone at this price)),377.95,380.0,0.54,0.62,0.11,stop,-0.542,11:35,377.95,,,False,wPP 377.63 | dPP 375.75 | DL 374.30,28.0,,,,
+2026-10-06,11:15,TIMKEN,info: green candle,INFO (green candle; ENTER),3128.9,3133.4,0.14,0.11,0.12,stop,-0.144,11:20,3128.9,,,False,dPP 3128.67 | wPP 3128.30 | SW 3120.00 | DL 3111.00 | SW 3110.20 | dS1 3107.43 | PDL 3103.80,2.1,THIN,,,
+2026-10-06,11:15,SAIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),178.75,180.3,0.87,1.19,0.13,target,1.0,14:10,178.75,,,False,wPP 177.80,263.9,,,,
+2026-10-06,11:15,GVT&D,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4236.6,4274.5,0.89,-0.15,0.19,stop,-0.895,11:50,4236.6,,,False,wPP 4232.70 | DL 4231.70,188.1,,,,
+2026-10-06,11:15,MAHABANK,info: green candle,INFO (green candle; ENTER),80.6,80.84,0.3,-0.0,0.23,stall,0.124,15:15,80.6,,,False,DL 80.39 | PDL 79.85,59.0,,,,
+2026-10-06,11:15,UNIPARTS,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),830.8,837.95,0.86,0.38,0.33,stall,0.379,15:15,830.8,,,False,dPP 828.47 | wPP 826.67 | DL 825.85,4.0,THIN,,,
+2026-10-06,11:15,JKCEMENT,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),4960.0,4993.5,0.68,-0.28,0.34,stall,0.081,15:15,4960.0,,,False,wPP 4959.83 | dS1 4918.50,3.0,THIN,,,
+2026-10-06,11:15,WABAG,info: green candle,INFO (green candle; ENTER),2011.6,2020.0,0.42,0.7,0.37,stall,0.268,15:15,2011.6,,,False,SW 2010.10 | dPP 1999.77 | DL 1997.70,54.7,,,,
+2026-10-06,11:15,ITCHOTELS,ENTER,ENTER,159.34,160.1,0.48,0.08,0.39,stop,-0.477,13:20,159.34,,,False,dPP 159.29 | DL 159.07 | SW 158.40 | PDL 158.11 | dS1 157.78,13.3,THIN,,,
+2026-10-06,11:15,PNGJL,skip: EMA8 0.4-0.6% zone,SKIP (EMA8 0.4-0.6% below),581.1,583.75,0.46,0.58,0.4,stop,-0.456,11:25,581.1,,,False,dPP 577.38,6.7,THIN,,,
+2026-10-06,11:45,KIRLOSIND,skip: stop > 0.5% (2:1 rule),SKIP (strong green hour before),3543.3,3568.8,0.72,0.76,0.01,stop,-0.72,12:55,3543.3,,,False,wPP 3530.37,3.0,THIN,,,
+2026-10-06,11:45,LANDMARK,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),477.2,480.8,0.75,0.9,0.04,stop,-0.754,14:55,477.2,,,False,-,3.7,THIN,,,
+2026-10-06,11:45,VOLTAMP,ENTER,ENTER,10532.0,10549.0,0.16,-0.12,0.13,stop,-0.161,12:35,10532.0,,,False,wPP 10502.33 | DL 10486.00 | dS1 10442.00,4.1,THIN,,,
+2026-10-06,11:45,CHOICEIN,ENTER,ENTER,731.3,734.55,0.44,0.32,0.19,stall,0.67,15:15,731.3,,,False,dPP 727.13 | DL 725.05,38.2,,,,
+2026-10-06,11:45,SAIL,ENTER,ENTER,178.47,179.1,0.35,0.77,0.28,target,1.0,14:10,178.47,,,False,wPP 177.80 | dPP 176.89 | DL 176.77,250.1,,,,
+2026-10-06,12:15,IGARASHI,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),402.9,416.9,3.47,1.48,0.04,stall,0.062,15:15,402.9,,,False,wPP 402.33 | SW 402.05,11.0,THIN,,,
+2026-10-06,12:15,JWL,ENTER,ENTER,224.43,225.05,0.28,0.4,0.05,stop,-0.276,13:15,224.43,,,False,dPP 223.01,8.8,THIN,,,
+2026-10-06,12:15,RCF,skip: chased (2:1 gone at look),SKIP (2:1 gone at this price),107.9,108.44,0.5,0.46,0.14,stop,-0.5,14:50,107.9,,,False,SW 107.45 | SW 107.27 | dPP 107.15 | DL 107.00,1.7,THIN,,,
+2026-10-06,12:15,KTKBANK,info: green candle,INFO (green candle; ENTER),325.15,326.2,0.32,0.08,0.16,stop,-0.323,12:40,325.15,,,False,SW 324.20 | DL 323.15 | dS1 322.73 | PDL 322.30,20.5,THIN,,,
+2026-10-06,12:15,VOLTAMP,ENTER,ENTER,10525.0,10549.0,0.23,-0.19,0.2,stop,-0.228,12:35,10525.0,,,False,wPP 10502.33 | DL 10486.00 | dS1 10442.00 | PDL 10421.00,2.3,THIN,,,
+2026-10-06,12:15,CHOICEIN,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),730.8,734.55,0.51,0.26,0.26,stall,0.602,15:15,730.8,,,False,dPP 727.13 | DL 725.05,9.4,THIN,,,
+2026-10-06,12:15,TIMKEN,ENTER,ENTER,3123.3,3137.8,0.46,-0.09,0.29,stop,-0.464,13:45,3123.3,,,False,SW 3120.00 | DL 3111.00 | SW 3110.20 | dS1 3107.43 | PDL 3103.80,2.0,THIN,,,
+2026-10-06,12:15,KIRLOSIND,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),3531.6,3568.8,1.05,0.43,0.34,stop,-1.053,12:55,3531.6,,,False,wPP 3530.37,1.4,THIN,,,
+2026-10-06,12:15,NATIONALUM,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),340.9,342.85,0.57,0.27,0.36,target,1.0,12:45,340.9,,,False,DL 340.75 | wPP 339.72 | dPP 339.47 | SW 338.05,79.2,,,,
+2026-10-06,12:15,SAIL,skip: stop > 0.5% (2:1 rule),SKIP (2:1 gone at this price),178.16,179.1,0.53,0.6,0.46,target,1.0,14:15,178.16,,,False,wPP 177.80 | dPP 176.89 | DL 176.77,114.1,,,,
+2026-10-06,10:45,TIMKEN,near: below_vwap,NEAR (green),3130.5,3133.3,0.09,,0.07,stop,-0.089,10:50,3130.5,,,False,,3.0,THIN,green,-0.24,False
+2026-10-06,10:45,JAGSNPHARM,near: below_vwap,NEAR (green),233.69,234.74,0.45,,0.09,stop,-0.449,12:10,233.69,,,False,,1.5,THIN,green,-1.35,False
+2026-10-06,10:45,FORCEMOT,near: below_vwap,NEAR (red),16903.0,16935.0,0.19,,0.1,stop,-0.189,11:20,16903.0,,,False,,103.7,,red,-1.12,False
+2026-10-06,10:45,TMB,near: trend_1h,NEAR (red),879.5,882.25,0.31,,0.1,stop,-0.313,13:10,879.5,,,False,,16.5,THIN,red,0.77,True
+2026-10-06,10:45,J&KBANK,near: wick_through_ema,NEAR (green),141.35,141.53,0.13,,0.19,target,1.0,12:35,141.35,,,False,,6.9,THIN,green,-0.36,True
+2026-10-06,10:45,KTKBANK,near: wick_through_ema,NEAR (green),324.8,325.65,0.26,,0.28,stop,-0.262,12:10,324.8,,,False,,38.3,,green,-0.26,True
+2026-10-06,10:45,TANLA,near: wick_through_ema,NEAR (green),489.7,490.25,0.11,,0.31,stop,-0.112,11:50,489.7,,,False,,6.2,THIN,green,-0.49,False
+2026-10-06,10:45,ATGL,near: wick_through_live_d8,NEAR (red),589.55,591.8,0.38,,0.34,stall,0.17,15:15,589.55,,,False,,29.2,,red,-0.98,False
+2026-10-06,10:45,AMAGI,near: trend_1h,NEAR (red),561.55,563.95,0.43,,0.36,stop,-0.427,11:05,561.55,,,False,,10.3,THIN,red,0.48,True
+2026-10-06,10:45,TRUALT,near: wick_through_ema,NEAR (red),444.85,445.85,0.22,,0.39,stop,-0.225,11:00,444.85,,,False,,1.0,THIN,red,-0.65,False
+2026-10-06,10:45,MBAPL,near: wick_through_ema,NEAR (red),165.12,165.53,0.25,,0.42,stop,-0.248,10:50,165.12,,,False,,3.7,THIN,red,-1.16,False
+2026-10-06,10:45,APLLTD,near: wick_through_ema,NEAR (red),830.4,832.7,0.28,,0.45,stop,-0.277,14:25,830.4,,,False,,5.5,THIN,red,-0.57,False
+2026-10-06,10:45,RVNL,near: wick_through_ema,NEAR (red),199.18,199.56,0.19,,0.46,stop,-0.191,10:55,199.18,,,False,,99.2,,red,-1.23,False
+2026-10-06,10:45,IGIL,near: wick_through_ema,NEAR (green),316.25,316.45,0.06,,0.47,stop,-0.063,11:05,316.25,,,False,,10.0,THIN,green,-0.83,True
+2026-10-06,10:45,AEGISVOPAK,near: wick_through_ema,NEAR (red),292.7,294.0,0.44,,0.48,stop,-0.444,11:15,292.7,,,False,,16.5,THIN,red,-0.23,True
+2026-10-06,10:45,UNIPARTS,near: wick_through_ema,NEAR (red),829.55,832.5,0.36,,0.48,stop,-0.356,10:55,829.55,,,False,,9.7,THIN,red,-0.71,False
+2026-10-06,11:15,KRSNAA,near: trend_1h,NEAR (red),553.1,555.2,0.38,,0.01,stop,-0.38,11:40,553.1,,,False,,0.3,THIN,red,0.7,True
+2026-10-06,11:15,OSWALPUMPS,near: below_vwap,NEAR (green),267.4,268.15,0.28,,0.04,target,1.0,11:25,267.4,,,False,,3.8,THIN,green,-0.73,False
+2026-10-06,11:15,KAPSTON,near: below_vwap,NEAR (green),549.3,549.85,0.1,,0.05,target,1.0,13:40,549.3,,,False,,2.2,THIN,green,-0.34,False
+2026-10-06,11:15,TRUALT,near: below_daily8,NEAR (green),446.4,447.05,0.15,,0.05,target,1.0,12:05,446.4,,,False,,0.8,THIN,green,-0.65,False
+2026-10-06,11:15,ITDC,near: below_daily8,NEAR (green),671.3,673.25,0.29,,0.06,stop,-0.29,14:15,671.3,,,False,,3.8,THIN,green,-0.67,False
+2026-10-06,11:15,AMAGI,near: trend_1h,NEAR (red),563.1,564.9,0.32,,0.08,stop,-0.32,13:40,563.1,,,False,,11.2,THIN,red,0.48,True
+2026-10-06,11:15,FORCEMOT,near: below_vwap,NEAR (red),16889.0,16935.0,0.27,,0.19,stop,-0.272,11:20,16889.0,,,False,,54.2,,red,-1.12,False
+2026-10-06,11:15,KTKBANK,near: wick_through_ema,NEAR (green),324.85,325.65,0.25,,0.27,stop,-0.246,12:10,324.85,,,False,,19.9,THIN,green,-0.26,True
+2026-10-06,11:15,RVNL,near: below_vwap,NEAR (red),199.54,200.27,0.37,,0.28,stop,-0.366,11:50,199.54,,,False,,56.7,,red,-1.23,False
+2026-10-06,11:15,POWERMECH,near: below_daily8,NEAR (red),2434.0,2441.5,0.31,,0.3,stop,-0.308,15:15,2434.0,,,False,,3.7,THIN,red,-0.02,True
+2026-10-06,11:15,J&KBANK,near: wick_through_ema,NEAR (red),141.1,141.53,0.3,,0.36,target,1.0,14:55,141.1,,,False,,4.4,THIN,red,-0.36,True
+2026-10-06,11:15,HSCL,near: wick_through_ema,NEAR (red),665.5,667.8,0.35,,0.43,stop,-0.346,15:05,665.5,,,False,,52.9,,red,-0.76,False
+2026-10-06,11:15,ATGL,near: wick_through_live_d8,NEAR (red),588.85,591.8,0.5,,0.46,stall,0.051,15:15,588.85,,,False,,15.1,THIN,red,-0.98,False
+2026-10-06,11:15,MBAPL,near: wick_through_ema,NEAR (red),165.0,165.6,0.36,,0.49,stop,-0.364,13:30,165.0,,,False,,1.7,THIN,red,-1.16,False
+2026-10-06,11:45,AMAGI,near: trend_1h,NEAR (green),563.3,564.65,0.24,,0.04,stop,-0.24,13:40,563.3,,,False,,5.3,THIN,green,0.36,True
+2026-10-06,11:45,JKCEMENT,near: wick_through_ema,NEAR (green),4974.0,4974.0,0.0,,0.04,stop,0.0,,4974.0,,,False,,1.3,THIN,green,-0.11,True
+2026-10-06,11:45,AJANTPHARM,near: below_vwap,NEAR (green),3540.3,3549.0,0.25,,0.11,stop,-0.246,12:40,3540.3,,,False,,33.6,,green,-0.71,False
+2026-10-06,11:45,AVL,near: trend_1h,NEAR (red),591.75,593.75,0.34,,0.14,stop,-0.338,12:45,591.75,,,False,,3.1,THIN,red,0.23,True
+2026-10-06,11:45,HONAUT,near: wick_through_ema,NEAR (red),33675.0,33705.0,0.09,,0.16,stop,-0.089,11:50,33675.0,,,False,,5.0,THIN,red,-0.03,True
+2026-10-06,11:45,INOXINDIA,near: trend_1h,NEAR (red),2098.0,2103.0,0.24,,0.17,stop,-0.238,11:50,2098.0,,,False,,48.3,,red,0.17,True
+2026-10-06,11:45,KALYANKJIL,near: wick_through_ema,NEAR (red),556.1,557.1,0.18,,0.22,target,1.0,12:20,556.1,,,False,,419.3,,red,-0.44,False
+2026-10-06,11:45,ALIVUS,near: trend_1h,NEAR (red),1362.8,1368.9,0.45,,0.25,stop,-0.448,11:55,1362.8,,,False,,7.7,THIN,red,0.24,True
+2026-10-06,11:45,CUB,near: trend_1h,NEAR (red),224.68,225.66,0.44,,0.25,stop,-0.436,12:30,224.68,,,False,,26.5,,red,0.69,True
+2026-10-06,11:45,KAPSTON,near: wick_through_ema,NEAR (red),548.2,549.2,0.18,,0.25,stall,0.219,15:15,548.2,,,False,,1.0,THIN,red,-0.28,False
+2026-10-06,11:45,SONACOMS,near: below_vwap,NEAR (red),804.0,806.95,0.37,,0.28,stop,-0.367,12:00,804.0,,,False,,72.1,,red,-0.89,False
+2026-10-06,11:45,TMB,near: trend_1h,NEAR (red),877.35,880.4,0.35,,0.34,stop,-0.348,12:40,877.35,,,False,,5.7,THIN,red,0.6,True
+2026-10-06,11:45,POWERMECH,near: wick_through_ema,NEAR (red),2431.9,2437.4,0.23,,0.37,stop,-0.226,14:05,2431.9,,,False,,2.1,THIN,red,-0.06,True
+2026-10-06,11:45,ITDC,near: wick_through_ema,NEAR (red),668.9,671.3,0.36,,0.41,stop,-0.359,13:40,668.9,,,False,,4.4,THIN,red,-0.53,False
+2026-10-06,11:45,HSCL,near: wick_through_ema,NEAR (red),665.2,666.15,0.14,,0.45,stop,-0.143,12:45,665.2,,,False,,253.5,,red,-0.66,False
+2026-10-06,11:45,APLLTD,near: wick_through_ema,NEAR (green),829.95,830.35,0.05,,0.46,stop,-0.048,11:50,829.95,,,False,,5.5,THIN,green,-0.57,True
+2026-10-06,11:45,IPCALAB,near: wick_through_ema,NEAR (green),1940.5,1940.6,0.01,,0.46,stop,-0.005,11:50,1940.5,,,False,,23.2,THIN,green,-0.06,True
+2026-10-06,11:45,MAHABANK,near: wick_through_ema,NEAR (red),80.4,80.61,0.26,,0.46,stall,-0.124,15:15,80.4,,,False,,44.1,,red,-0.21,True
+2026-10-06,12:15,BAJAJCON,near: below_vwap,NEAR (red),492.15,493.7,0.31,,0.02,stop,-0.315,12:45,492.15,,,False,,4.2,THIN,red,-0.97,False
+2026-10-06,12:15,CUB,near: trend_1h,NEAR (red),225.17,225.66,0.22,,0.03,stop,-0.218,12:30,225.17,,,False,,22.0,THIN,red,0.69,True
+2026-10-06,12:15,IXIGO,near: below_vwap,NEAR (green),160.58,161.39,0.5,,0.03,target,1.0,12:40,160.58,,,False,,21.5,THIN,green,-0.18,True
+2026-10-06,12:15,AJANTPHARM,near: below_vwap,NEAR (green),3540.6,3549.0,0.24,,0.1,stop,-0.237,12:40,3540.6,,,False,,22.5,THIN,green,-0.71,False
+2026-10-06,12:15,BSOFT,near: trend_1h,NEAR (red),274.2,274.55,0.13,,0.1,stop,-0.128,13:45,274.2,,,False,,19.8,THIN,red,0.23,True
+2026-10-06,12:15,JKCEMENT,near: wick_through_ema,NEAR (green),4970.5,4974.0,0.07,,0.11,stop,-0.07,14:40,4970.5,,,False,,1.2,THIN,green,-0.11,True
+2026-10-06,12:15,RVNL,near: below_vwap,NEAR (green),199.78,200.37,0.3,,0.14,stall,0.38,15:15,199.78,,,False,,47.5,,green,-1.0,False
+2026-10-06,12:15,HONAUT,near: wick_through_ema,NEAR (red),33680.0,33710.0,0.09,,0.15,stop,-0.089,12:30,33680.0,,,False,,3.4,THIN,red,-0.03,True
+2026-10-06,12:15,AVL,near: trend_1h,NEAR (red),591.15,593.75,0.44,,0.24,stop,-0.44,12:45,591.15,,,False,,2.4,THIN,red,0.23,True
+2026-10-06,12:15,ADANIENT,near: wick_through_live_d8,NEAR (green),2862.0,2871.6,0.34,,0.28,stall,0.891,15:15,2862.0,,,False,,545.7,,green,-0.41,False
+2026-10-06,12:15,NORTHARC,near: wick_through_live_d8,NEAR (red),291.05,292.5,0.5,,0.32,stop,-0.498,12:20,291.05,,,False,,3.0,THIN,red,-0.52,False
+2026-10-06,12:15,CCAVENUE,near: wick_through_live_d8,NEAR (red),15.25,15.32,0.46,,0.34,stop,-0.459,12:45,15.25,,,False,,3.6,THIN,red,-0.88,False
+2026-10-06,12:15,TANLA,near: wick_through_ema,NEAR (green),489.0,490.35,0.28,,0.42,stop,-0.276,12:40,489.0,,,False,,5.2,THIN,green,-0.47,True
+2026-10-06,12:15,IPCALAB,near: wick_through_ema,NEAR (green),1940.0,1941.6,0.08,,0.48,stop,-0.082,14:45,1940.0,,,False,,22.7,THIN,green,-0.06,True

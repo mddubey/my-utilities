@@ -233,7 +233,9 @@ if __name__ == "__main__":
         warn = "THIN" if liq_L < 25 else ""
         _miss = [k for k, v in checks.items() if not v and k != "red"]
         if len(_miss) == 1:   # 2026-10-08 (user): near misses, INFO only -- exactly one non-colour check failed
-            near.append(dict(ticker=t, missed=_miss[0], colour="red" if checks["red"] else "green", close=round(cl, 2),
+            _e8p = closes.iloc[:-1].ewm(span=8, adjust=False).mean().iloc[-1]
+            near.append(dict(ticker=t, cend=f"{cend:%H:%M}", missed=_miss[0], colour="red" if checks["red"] else "green",
+                             ema8_falling=bool(E8 < _e8p), high=round(hi, 2), close=round(cl, 2),
                              stop_pct=round((hi - cl) / cl * 100, 2), below_ema_pct=round(dist, 2),
                              ema8_vs_ema34_pct=round((E8 - E) / E * 100, 2), atr_pct=round(P.at[t, "atrp"], 2), liq_L=liq_L, warn=warn))
         if all(v for k, v in checks.items() if k != "red"):
@@ -264,6 +266,8 @@ if __name__ == "__main__":
         if not near: return
         N = pd.DataFrame(near); N["_ok"] = N.stop_pct <= 0.5; N["_d"] = N.below_ema_pct.abs()
         N = N.sort_values(["_ok", "_d"], ascending=[False, True]).drop(columns=["_ok", "_d"])
+        N.to_csv(out.with_name("near_" + out.name), index=False)   # read by 89_eod_review.py
+        N = N.drop(columns=["cend", "high", "ema8_falling"])
         print(f"\nNEAR MISSES (info only, never a pick): failed exactly one check; stop <= 0.5% first, then closest to the EMA34."
               f" ema8_vs_ema34 > 0 = 1H uptrend\n" + N.head(25).to_string(index=False))
     if R.empty: print("no setups at this alarm"); print_near(); sys.exit()

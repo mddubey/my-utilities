@@ -70,6 +70,19 @@ def summary():
                          f"{g.ret.mean()*1000:+.0f}", f"{(g.ret.mean() - COST)*1000:+.0f}"])
         print("by path (all categories):")
         print(pd.DataFrame(rows, columns=["path", "n", "target%", "stall%", "stop%", "Rs gross", "Rs net"]).to_string(index=False))
+    def _split(title, frame, key, names):
+        rows = [[names[k], len(g), f"{(g.outcome == 'target').mean()*100:.0f}", f"{(g.outcome == 'stall').mean()*100:.0f}",
+                 f"{(g.outcome == 'stop').mean()*100:.0f}", f"{g.ret.mean()*1000:+.0f}", f"{(g.ret.mean() - COST)*1000:+.0f}"]
+                for k, g in frame.groupby(key)]
+        if rows: print(title); print(pd.DataFrame(rows, columns=["group", "n", "target%", "stall%", "stop%", "Rs gross", "Rs net"]).to_string(index=False))
+    # 2026-10-08 (user): rolling-over question -- trend misses split by whether the 1H EMA8 was falling
+    if "ema8_falling" in L:
+        t = L[(L.category == "near: trend_1h") & L.ema8_falling.notna()]
+        _split("trend misses (EMA8 above EMA34) by EMA8 direction:", t, t.ema8_falling.astype(bool), {True: "EMA8 falling", False: "EMA8 rising/flat"})
+    # 2026-10-08 (user): THIN warning (median Rs per 5-min bar < 25 lakh), scan setups only (not near misses)
+    if "warn" in L:
+        w = L[L.liq_L.notna() & ~L.category.str.startswith("near")]
+        _split("by liquidity (scan setups):", w, w.warn.eq("THIN"), {True: "THIN (< Rs25L / 5-min bar)", False: "liquid"})
     pk = L[L.plan_pick == True]
     if len(pk):
         r = pk.ret_plan.fillna(pk.ret)
@@ -82,7 +95,7 @@ if __name__ == "__main__":
     day = pd.Timestamp(args[0]) if args else read5("RELIANCE").index.max().normalize()
     D = f"{day:%Y-%m-%d}"
     print(f"EOD review {D}: replaying the scan at {', '.join(LOOKS)} (this takes ~1 min)...", flush=True)
-    frames = []
+    frames = []; nears = []
     for lk in LOOKS:
         subprocess.run([sys.executable, str(HERE / "38_alarm_scan_1h_close.py"), "--replay", D, lk, "--rr", "0"],
                        cwd=HERE, capture_output=True, text=True)
@@ -90,12 +103,25 @@ if __name__ == "__main__":
         if f.exists() and f.stat().st_size > 5:
             x = pd.read_csv(f)
             if len(x): frames.append(x.assign(look=lk))
-    if not frames:
+        fn = f.with_name("near_" + f.name)
+        if fn.exists() and fn.stat().st_size > 5:
+            y = pd.read_csv(fn)
+            if len(y): nears.append(y.assign(look=lk))
+    if not frames and not nears:
         print("no setups at any alarm today"); summary(); sys.exit()
-    R = pd.concat(frames, ignore_index=True)
+    R = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=["ticker", "cend", "status", "stop_pct"])
     R["alarm"] = R.cend
     R = R.drop_duplicates(["ticker", "alarm"])                 # one row per setup per alarm
-    R["category"] = R.apply(category, axis=1)
+    R["category"] = R.apply(category, axis=1) if len(R) else []
+    # 2026-10-08 (user): NEAR MISSES -- failed exactly one check (not colour), stop <= 0.5% only (tradeable under 2:1).
+    # Entry = candle close, stop = candle high, same walk. category "near: <check>"; ema8_falling kept for the
+    # rolling-over question (HINDCOPPER 10-08: trend miss, EMA8 0.28% above EMA34 and falling 8h, hit target).
+    if nears:
+        N = pd.concat(nears, ignore_index=True).drop_duplicates(["ticker", "cend"])
+        N = N[N.stop_pct <= 0.5].rename(columns={"close": "entry", "high": "stop"})
+        N["alarm"] = N.cend; N["status"] = "NEAR (" + N.colour + ")"; N["category"] = "near: " + N.missed
+        N["now"] = N.entry; N["ema8_below_pct"] = np.nan
+        R = pd.concat([R, N], ignore_index=True)
     cache = {}
     out = []
     for _, r in R.iterrows():
@@ -106,7 +132,9 @@ if __name__ == "__main__":
         rec = dict(date=D, alarm=r.alarm, ticker=r.ticker, category=r.category, status=r.status, entry=r.entry, stop=r.stop,
                    stop_pct=r.stop_pct, ema8_below_pct=r.get("ema8_below_pct", np.nan), below_ema_pct=r.below_ema_pct,
                    outcome=o, ret=round(ret, 3), exit_at=at, look_price=r.now,
-                   in_path=r.get("in_path", np.nan), liq_L=r.get("liq_L", np.nan), warn=r.get("warn", np.nan))
+                   in_path=r.get("in_path", np.nan), liq_L=r.get("liq_L", np.nan), warn=r.get("warn", np.nan),
+                   colour=r.get("colour", np.nan), ema8_vs_ema34_pct=r.get("ema8_vs_ema34_pct", np.nan),
+                   ema8_falling=r.get("ema8_falling", np.nan))
         if r.alarm == "10:45" and r.category == "ENTER":      # plan B trades the 10:45 candle at the look price
             o2, ret2, at2 = walk(m, day, day + pd.Timedelta("10h50min"), r.now, r.stop)
             rec.update(outcome_plan=o2, ret_plan=round(ret2, 3))
