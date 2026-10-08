@@ -1928,3 +1928,39 @@ classifier (RQ-14a, RQ-15B), but once the extra time-in-market required to wait 
 confirmation (up to D3) is accounted for, the simple time-based exit wins outright. Sent to critic
 -- may mean the candidate exit should flip: D1-close as the primary mechanism, structural failure
 as a secondary overlay rather than the main exit.
+
+## EMAPB Candidate v0.1 -- frozen for chart review, discovery phase stops here (2026-10-07)
+
+Critic's verdict on RQ-15C, explicit self-correction: enough discovery has happened -- stop
+inventing new exit experiments, put an actual candidate on the table and look at real trades.
+
+**Candidate EMAPB v0.1** (status: yellow, candidate strategy, not validated):
+```
+T-1   -> daily EMAPB box confirmed, candidate goes onto the primed shortlist.
+         No EMA8 condition, no predictive morning classifier, no extra volume/ADX filters.
+T 3pm -> the setup has produced the qualifying resumption state; do not chase excessive
+         extension above box_high; enter at the realistic 3pm executable price.
+Exit  -> D1 close. That's it. No B2 machinery in the primary strategy -- RQ-15C showed the
+         structural exit doesn't beat the simple D1 exit and carries materially worse tail risk.
+Stop  -> deliberately UNSPECIFIED. Not manufactured from the dataset before looking at real
+         trades -- candidate = defined entry + defined D1 exit + no forced stop yet.
+```
+The B2 signal stays logged as an observed failure classifier (RQ-14a/15B), not part of v0.1. D1
+close is "the best of the three tested policies," not declared final -- no further D1-vs-D2-vs-D3
+optimization until the candidate has actually been looked at.
+
+**Discovery phase summary, per critic**: predictive IOC doesn't work; EMA8 doesn't work; chasing
+extension doesn't work; price-depth stop doesn't separate winners from failures; B1 isn't real
+failure; B2 is a real failure classifier; but a B2-based exit loses to the simple D1 exit, which
+also has dramatically better tail behavior. That is enough discovery -- the next question is not
+"what other exit can we test," it's "what does this candidate actually look like as a trade."
+
+**Next: RQ-EMAPB-16 -- Candidate Trade Audit.** A small, predeclared, STRATIFIED sample (20-30
+real trades, not another population-wide sweep), deliberately including: clear winners, ordinary
+winners, small losers, large losers, B1 cases, B2 cases, highly-extended 3pm cases, below-box_high
+3pm cases, different box ages, different market regimes/years. For each: the real daily chart path
+(setup -> box -> breakout -> 3pm entry), the real 1H path (breakout/pullback -> entry -> D1 exit),
+and the outcome (MFE/MAE/D1 return). Explicitly hypothesis-generation and semantic validation, NOT
+statistical validation -- do not optimize from the 20-30 charts; if a recurring structural pattern
+emerges among the losers, formulate ONE stop hypothesis from it, don't immediately test five
+variants.
