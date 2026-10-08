@@ -1849,3 +1849,39 @@ every level tested.
 exit trigger, accepting that a winner can fully reverse to `box_high` before confirmation; or (2) a
 TIME-based cutoff rather than a price-depth one, since B1/B2 shows a genuine behavioral split by
 speed-to-failure, not depth. Sent to critic for the call before building either.
+
+## RQ-EMAPB-15B -- Exit-at-confirmation characterization, surfaces a B1-vs-B2 asymmetry (2026-10-07)
+
+Critic's explicit framing: measure the economics of exiting AT the moment structural failure
+confirms (assumed fill = box_high, modeling a resting stop at the level) before deciding anything
+about a price or time-based stop -- is the already-validated failure signal timely enough to
+function as the actual exit. Note: this run extended the observation window through D0-D3 (vs
+D0-D1 in RQ-15A) to allow after-confirmation tracking for B2 cases, so group composition shifted
+somewhat from RQ-15A (more retests now captured within the longer window) -- not a different
+result, a wider observation lens.
+
+| | B1 (fails same day, n=1,698) | B2 (fails next day, n=7,717) |
+|---|---|---|
+| Exit-at-confirmation return | **+0.64% median, 72.4% positive** | **-0.63% median, 25.9% positive** |
+| MFE before confirm | +1.52% | +2.06% |
+| Given back | +1.03% | +2.99% |
+| Confirmation day's own close | +0.07% | -0.81% |
+| Next day after confirm | +0.46% | -0.92% |
+| Worst close, 3 days after confirm | -0.66% | **-2.24%** |
+| % where holding past confirm was worse than exiting | 53.8% (coin flip) | 54.5% (coin flip) |
+
+**Survivors (C, n=6,394), matching daily checkpoints from entry**: D0 close +0.00%/44.7% positive,
+D1 close +1.52%/74.4%, D2 close +2.26%/79.5% -- keeps improving over time.
+
+**Provisional payoff ratio** (avg confirmed-failure exit loss -1.53% vs avg survivor(C) D1-close
+winner gain +3.36%, stated explicitly as provisional pending a real risk convention): **2.20**.
+
+**The key surfaced finding: B1 and B2 "failures" are not the same phenomenon.** B1 (fast, same-day
+confirmation) is still positive 72.4% of the time even after "failing" by the structural rule --
+barely a loss on average, and holding through it is a literal coin flip with modest further
+downside (-0.66% worst case over 3 days). B2 (slower, next-day confirmation) is a real loss 74% of
+the time, with meaningfully compounding downside if ignored (-2.24% worst case). **The round-trip
+signal appears to be doing real work for B2 but may be flagging noise, not genuine failure, for
+B1** -- exiting on a B1-style confirmation could be cutting trades that are mostly fine. Sent to
+critic given this raises a real question about whether the exit rule should apply identically to
+both, or whether B1/B2 need different treatment.
