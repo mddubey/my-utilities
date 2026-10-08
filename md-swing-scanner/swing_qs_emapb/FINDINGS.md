@@ -1885,3 +1885,46 @@ signal appears to be doing real work for B2 but may be flagging noise, not genui
 B1** -- exiting on a B1-style confirmation could be cutting trades that are mostly fine. Sent to
 critic given this raises a real question about whether the exit rule should apply identically to
 both, or whether B1/B2 need different treatment.
+
+## RQ-EMAPB-15C -- B2-only exit vs no-exit vs simple benchmark, a real bug caught and fixed (2026-10-07)
+
+Critic's revised interpretation after RQ-15B: B1 is noise, don't exit on it; B2 is the real
+candidate failure signal. Specified RQ-15C -- three predeclared paths on the same population: (A)
+B2-only structural exit (ignore B1, exit B2 at confirmation), (B) no structural exit at all (hold
+through), (C) a simple non-structural benchmark (exit everyone at D1 close).
+
+**First attempt had a real timing bug, caught before sending to critic**: compared "B2 exit at
+confirmation" against "hold to a fixed D2 close," but B2 confirmations actually land on D1 (56.5%),
+D2 (26.6%), or **D3 (16.9%)** within the classification window -- so for 43.5% of B2 trades, the
+fixed D2-close snapshot was at-or-before their actual confirmation, not a genuine "held through the
+failure" comparison. Rebuilt with the terminal hold horizon extended to D5 close, safely past the
+latest possible confirmation, before trusting any number.
+
+**Clean, isolated B2 sub-comparison (exit-at-confirmation vs hold-to-D5, n=7,714)**:
+
+| | median | % positive |
+|---|---|---|
+| Exit at confirmation | **-0.63%** | 25.9% |
+| Hold to D5 close instead | -1.23% | 39.5% |
+
+Exiting at confirmation gives a smaller typical loss even though holding recovers more often
+(39.5% vs 25.9%) -- the trades that don't recover when held get considerably worse. Only 45.3% of
+B2 cases do better by holding. **For a confirmed B2 failure, exiting at confirmation beats holding
+through** -- this part of the hypothesis holds up.
+
+**The three-policy aggregate comparison (terminal = D5 close, n=18,052), the more important
+result**:
+
+| policy | median | % positive | worst 1%ile | worst 5%ile |
+|---|---|---|---|---|
+| A. B2-only structural exit | -0.26% | 44.0% | -11.13% | -6.54% |
+| B. No structural exit (hold to D5) | -0.01% | 49.8% | -13.53% | -8.92% |
+| **C. Simple benchmark (exit everyone at D1 close)** | **+0.15%** | **52.7%** | **-6.80%** | **-3.90%** |
+
+**The dead-simple policy -- exit everyone at D1 close, no structural tracking at all -- beats both
+the structural-exit policy and simply holding, on every metric**: best median, best win rate, and
+by far the shallowest tail risk. The structural failure signal remains real and validated as a
+classifier (RQ-14a, RQ-15B), but once the extra time-in-market required to wait for a B2
+confirmation (up to D3) is accounted for, the simple time-based exit wins outright. Sent to critic
+-- may mean the candidate exit should flip: D1-close as the primary mechanism, structural failure
+as a secondary overlay rather than the main exit.
