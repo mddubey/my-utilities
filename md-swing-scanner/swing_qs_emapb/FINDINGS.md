@@ -1750,3 +1750,54 @@ meaning, do not introduce a new freshness cutoff yet.
 **Research queue, intentionally short**: predictive morning IOC closed; EMA8 closed; no more
 breakout predictors. -> Define 3pm entry + structural invalidation -> test realized R -> attack
 failure scenarios. This is the point to stop discovery and start trying to break the actual trade.
+
+## RQ-EMAPB-14a -- post-entry round-trip-to-box_high invalidation, VALIDATED (2026-10-06/07)
+
+User's own structural invalidation hypothesis for RQ-14 point 2, path-dependent by design (not a
+static level check, which would contradict the entry logic itself -- "below box_high at 3pm" is
+already the BEST entry state, so "price is below box_high" can't also be the failure signal; user
+caught this inconsistency directly). The actual rule: after a realistic 3pm entry, if price first
+moves up >=1% from entry (a meaningful "up moment," user-specified threshold), and THEN comes back
+down and re-touches `box_high`, that round-trip back to the breakout level is the failure signal.
+
+**Three-way split, full 3pm-entry population (n=18,055, all extension buckets -- this is a
+post-entry rule, independent of where entry sat relative to box_high)**:
+
+| group | n | % of pop | D1-close (median / %pos) |
+|---|---|---|---|
+| A. Never reached +1% up-move at all | 3,888 | 21.5% | -1.19% / 13.5% |
+| B. Reached +1%, THEN round-tripped back to box_high | 6,057 | 33.5% | -0.34% / 42.9% |
+| C. Reached +1%, did NOT round-trip back | 8,110 | 44.9% | **+1.44% / 78.8%** |
+
+B vs C formally confirmed: -35.87pp observed vs 1.65pp null p95, **p=0.0000** -- one of the largest
+effects found in this entire research program.
+
+**Circularity check, run precisely because the effect size was large enough to warrant the RQ-10B-
+style scrutiny**: is the round-trip event overlapping in time with the D1-close outcome it's being
+compared against? Timing audit (n=3,000 real retest events): median 5 bars of lead time remain
+before the window ends (out of ~7-8 total D1 bars), only 4.1% of retests happen at the very last
+bar. Not the RQ-10B exact-overlap pattern. Split further by which calendar day the retest actually
+happens on:
+
+| group | n | D1-close (median / %pos) |
+|---|---|---|
+| C. Reached +1%, no retest | 8,110 | +1.44% / 78.8% |
+| B1. Retest on D0 (entry day -- fully separate from D1, zero timing overlap) | 1,698 | +0.46% / **59.0%** |
+| B2. Retest on D1 itself (same day as the close measured) | 4,359 | -0.59% / 36.6% |
+
+**B1 vs C, the cleanest possible test (zero overlap between signal and outcome)**: -19.76pp
+observed vs 2.31pp null p95, **p=0.0000** -- the effect survives at real magnitude even with a full
+calendar day of separation between the round-trip event and the measured outcome. B2's larger gap
+is explained as ordinary same-day intraday momentum/persistence layered on top, not an artifact.
+
+**VALIDATED as RQ-14's structural invalidation definition**: enter at the realistic 3pm price;
+if price subsequently moves >=1% above entry and then comes back down to touch `box_high` again,
+treat the thesis as confirmed-failed. This is a genuinely path-dependent, structurally-grounded
+signal (mirrors the existing clean-win/round-trip-win framework's logic, applied post-entry at the
+3pm timeframe with `box_high` as the reference instead of A-day's own Low), not a static level
+check, and it passes the strictest available circularity test.
+
+**Status, RQ-14 checklist**: #1 (entry condition) settled via RQ-EMAPB-3PM-01. #2 (structural
+failure) now settled via this result. #3 (stop/risk sizing -- how much capital this actually risks,
+or a simpler fallback) and #4 (realized-R, blocked on #3 per Rule #20) remain open. Not yet sent to
+critic -- next action.
