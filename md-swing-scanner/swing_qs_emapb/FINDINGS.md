@@ -2034,6 +2034,44 @@ should be dropped/replaced before continuing the chart audit.
 
 **Adopted as a standing filter for all EMAPB population work going forward** -- apply the
 liquidity floor before building any future population or chart sample on this line of research.
-The "today's volume must be an N-day high" and "exclude a continuation-style A-day if a fully-
-qualifying prior A-day exists within N days" ideas remain open, untested hypotheses -- explicitly
-not adopted yet, pending their own bounded tests.
+Price floor subsequently raised to Rs50 per user's call (anything below is too easy to
+manipulate) -- re-verified, exclusion rises to 25.1%, core finding unaffected (+13.03pp,
+p=0.0000). The "today's volume must be an N-day high" and "exclude a continuation-style A-day if a
+fully-qualifying prior A-day exists within N days" ideas remain open, untested hypotheses at this
+point -- explicitly not adopted yet, pending their own bounded tests.
+
+## RQ-17/18 -- the two chart-motivated hypotheses, both CLOSED NEGATIVE (2026-10-07)
+
+Tested both on the liquidity-cleaned population (price>=Rs50, turnover>=Rs1cr/day, n=13,528),
+pre-declared (10-day lookback for both, matching the existing price-high lookback), not fit to
+results.
+
+**RQ-17 -- is the A-day's volume ALSO the highest in the trailing 10 days** (not just >=1.5x the
+rolling average, which ATLANTAA showed can be gamed by a quiet earlier baseline)?
+
+| | n | D1-close (median / %pos) |
+|---|---|---|
+| Is a 10-day volume high | 9,188 (67.9%) | +0.09% / 52.0% |
+| Not a volume high (ratio-gate only) | 4,340 (32.1%) | +0.18% / 53.7% |
+
+Observed -1.70pp vs 1.73pp null p95, **p=0.058** -- does not clear significance, and the direction
+is opposite the hypothesis (the "more convincing" volume-high group is marginally weaker, not
+stronger). **CLOSED NEGATIVE.**
+
+**RQ-18 -- exclude an A-day if a FULLY QUALIFYING prior A-day already existed for the same ticker
+within the trailing 10 days** (continuation-of-an-already-extended-move, per the LLOYDSENGG
+example -- a sharper, more specific version of the already-closed near-miss-gap-length test, which
+only asked about days that almost-but-didn't qualify).
+
+| | n | D1-close (median / %pos) |
+|---|---|---|
+| Fresh (no prior qualifying A-day) | 8,358 (61.8%) | +0.15% / 53.0% |
+| Continuation (a prior A-day already qualified) | 5,170 (38.2%) | +0.09% / 51.8% |
+
+Observed -1.17pp vs 1.79pp null p95, **p=0.1975** -- no effect. **CLOSED NEGATIVE.**
+
+**Both chart-motivated hypotheses fail to generalize.** ATLANTAA and LLOYDSENGG were real,
+individually legitimate observations -- the chart audit correctly surfaced them -- but neither
+pattern holds up across the full population. Standard discipline applies: a single compelling
+example motivates a test, not an adoption; both close here, don't reopen without materially new
+evidence.
