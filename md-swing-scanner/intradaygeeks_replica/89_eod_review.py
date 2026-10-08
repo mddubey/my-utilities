@@ -79,10 +79,7 @@ def summary():
     if "ema8_falling" in L:
         t = L[(L.category == "near: trend_1h") & L.ema8_falling.notna()]
         _split("trend misses (EMA8 above EMA34) by EMA8 direction:", t, t.ema8_falling.astype(bool), {True: "EMA8 falling", False: "EMA8 rising/flat"})
-    # 2026-10-08 (user): THIN warning (median Rs per 5-min bar < 25 lakh), scan setups only (not near misses)
-    if "warn" in L:
-        w = L[L.liq_L.notna() & ~L.category.str.startswith("near")]
-        _split("by liquidity (scan setups):", w, w.warn.eq("THIN"), {True: "THIN (< Rs25L / 5-min bar)", False: "liquid"})
+    # THIN split removed 2026-10-08 (user: nothing actionable); liq_L / warn still in the log
     pk = L[L.plan_pick == True]
     if len(pk):
         r = pk.ret_plan.fillna(pk.ret)

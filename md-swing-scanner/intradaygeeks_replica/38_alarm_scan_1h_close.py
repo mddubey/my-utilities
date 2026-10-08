@@ -226,7 +226,7 @@ if __name__ == "__main__":
         # "INFO (green candle)" and never picked; 89_eod_review.py logs their outcomes. Backtest: green net 30m -8 / 1H -43
         # vs red +45 / +21; as a later pick after red 30m +190 vs +181 but 1H +23 vs +32 -> decide on ~20 live cases.
         is_green = not checks["red"]
-        # 2026-10-08 (user, WARNING only, not a filter): median Rs per 5-min bar over the hour before the alarm, in lakh.
+        # 2026-10-08: no longer shown (user: nothing actionable); still saved to the csv. Was: WARNING only -- median Rs per 5-min bar over the hour before the alarm, in lakh.
         # Jumpy / slipping names (PNGJL 12.6, AMAGI 4.9, IPCALAB 12.7) vs smooth (TECHM 182, HINDCOPPER 229); THIN < 25.
         _lh = g[(g.index >= cend - pd.Timedelta("60min")) & (g.index < cend)]
         liq_L = round(float((_lh.Volume * _lh.Close).median()) / 1e5, 1) if len(_lh) else np.nan
@@ -267,7 +267,7 @@ if __name__ == "__main__":
         N = pd.DataFrame(near); N["_ok"] = N.stop_pct <= 0.5; N["_d"] = N.below_ema_pct.abs()
         N = N.sort_values(["_ok", "_d"], ascending=[False, True]).drop(columns=["_ok", "_d"])
         N.to_csv(out.with_name("near_" + out.name), index=False)   # read by 89_eod_review.py
-        N = N.drop(columns=["cend", "high", "ema8_falling"])
+        N = N.drop(columns=["cend", "high", "ema8_falling", "liq_L", "warn"])
         print(f"\nNEAR MISSES (info only, never a pick): failed exactly one check; stop <= 0.5% first, then closest to the EMA34."
               f" ema8_vs_ema34 > 0 = 1H uptrend\n" + N.head(25).to_string(index=False))
     if R.empty: print("no setups at this alarm"); print_near(); sys.exit()
@@ -284,7 +284,7 @@ if __name__ == "__main__":
     R.insert(0, "pick", ["FIRST COME" if i == (live_ix[0] if live_ix else -1) else "" for i in range(len(R))])
     print(f"\n{len(R)} SHORT setup(s), all equal quality after the filters. status = where it stands NOW; enter only 'ENTER' ones,"
           f" target = your fill - 1%. FIRST COME = first ENTER, the one-trade-a-day choice:\n")
-    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "below_ema_pct", "ema8_below_pct", "liq_L", "warn", "in_path"]
+    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "below_ema_pct", "ema8_below_pct", "in_path"]
     pd.set_option("display.width", 200)
     print(R[show].rename(columns={"risk_now_pct": "stop%_now", "target_now": "target", "entry": "candle_close", "below_ema_pct": "below_ema%", "ema8_below_pct": "ema8_below%"}).to_string(index=False))
     R.to_csv(out, index=False); print(f"saved {out.name}")
