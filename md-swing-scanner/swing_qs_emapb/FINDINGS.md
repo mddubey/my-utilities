@@ -1964,3 +1964,76 @@ and the outcome (MFE/MAE/D1 return). Explicitly hypothesis-generation and semant
 statistical validation -- do not optimize from the 20-30 charts; if a recurring structural pattern
 emerges among the losers, formulate ONE stop hypothesis from it, don't immediately test five
 variants.
+
+## Chart audit surfaces a real population-hygiene problem; liquidity floor adopted as a standing filter (2026-10-07)
+
+Hand-checking two of the RQ-16 sample winners surfaced two distinct, real problems the stratified
+sample alone couldn't catch, because it was sampling from a population that still contained them:
+
+**ATLANTAA (2024-03-22) -- the A-day itself is weak, and separately the stock is illiquid.**
+Volume ratio only 1.57x (barely clears the 1.5x gate), and LOWER than the volume on each of the
+two preceding days (94,078 and 160,790 vs the "breakout" day's 115,793) -- the 10-day rolling
+average was simply pulled down by quieter earlier days, so the day doesn't actually stand out from
+its own immediate past. Range only 3.46% of open -- a tight, unremarkable candle sitting at the
+tail of an already-running week-long grind higher (20.90->21.80->22.65->23.75->24.90, a new high
+every session). Separately confirmed illiquid: average turnover Rs0.12 crore/day, nowhere near a
+sane tradeable floor.
+
+**LLOYDSENGG (2024-04-29) -- the tagged A-day is a continuation, not the real breakout.** The
+actual explosive move was April 22 (39.9M volume vs ~4-9M in prior days, 18.21% range, +16.85%
+body) -- April 29 is a second leg within the same already-extended move (stock had already run
++18% by then). `cluster_length=1` for both ATLANTAA and LLOYDSENGG confirms the existing cluster
+de-duplication mechanism (collapses literally back-to-back qualifying days) is too narrow to catch
+either failure mode -- it doesn't catch a single qualifying day sitting atop a week of gradual
+climbing (ATLANTAA), nor a second, independent qualifying day appearing days after an earlier,
+much more convincing one (LLOYDSENGG). This is a different, more specific question than the
+already-closed near-miss-gap-length test (which asked about days that almost-but-didn't qualify,
+not a FULLY qualifying prior A-day) -- not yet tested, flagged as open.
+
+Also directly confirmed on this same LLOYDSENGG example: a real base-building wick (Low=56.50,
+"way low" below the eventual box_low=58.20 reference) closed the same day at 61.00, comfortably
+above the defended level -- the base held cleanly on a CLOSE basis across all 3 confirmation days,
+consistent with the project's standing close-over-wick discipline (the TCS catch). Separately,
+confirmed `box_low` is NOT `box_slice.Low.min()` as assumed -- it's the closing-price level that
+had to hold for 3 days to confirm the base (tracked via `running_low_close`, set from BEFORE the
+box_slice window even starts), not the literal lowest print within the box days. Not a bug -- a
+deliberate, close-based design choice, verified against the actual code
+(`13_rq_emapb07_lifecycle.py` lines 112-176) -- but asymmetric with `box_high` (which IS
+`box_slice.High.max()`, a wick-based ceiling). Worth being aware of when interpreting `box_low`
+elsewhere.
+
+**Literature check before building anything** (per standing discipline): researched three specific
+questions before adding filters.
+1. Volume confirmation: the user's "today's volume must be an N-day volume HIGH" idea is NOT a
+   recognized literature standard -- the real standard is ratio-to-trailing-average (O'Neil:
+   breakout volume 40-50% above the 50-day average; Minervini: >=1.4x; Bulkowski backtested
+   ratio-qualifying breakouts at 65% success vs 39% for below-average-volume ones). The N-day-high
+   framing is the user's own inference, not literature -- needs testing in our own data before
+   being treated as correct, not assumed. Bulkowski also found high-volume breakouts throw back
+   70-74% of the time within 30 days (more confirmed AND more prone to giveback) -- a real, notable
+   nuance, possibly connected to the CLV/round-trip findings, not yet investigated.
+2. Liquidity floor: real, settled, both practitioner and academic. Jegadeesh & Titman's momentum
+   papers explicitly exclude sub-$5 stocks and the smallest liquidity decile -- stated reason:
+   transaction costs can eat 70-100% of paper profits from momentum strategies in illiquid names.
+   Directly validates adding a liquidity floor.
+3. Fresh vs. late-stage/continuation breakouts: a real, named concept (O'Neil's base-count rule --
+   1st/2nd base best odds, 3rd/4th+ base failure rate climbs; Minervini's "late-stage base").
+   Direction is consensus across sources but not rigorously quantified in any primary source found
+   -- treat as a real hypothesis worth testing in our own data, not an importable statistic.
+
+**Liquidity floor adopted and tested (RQ-EMAPB-LIQ, `31_rq_emapb_liquidity_filter.py`)**: price
+>= Rs20, average daily turnover (Close*Volume) >= Rs1 crore over the 20 trading days before the
+A-day -- pre-declared from the literature above, not fit to this data. Applied to the full
+3pm-entry population (n=18,055): **21.8% (3,937 episodes) fail this floor** -- a real, widespread
+contamination problem, not just the couple of anecdotes spotted by eye. Re-ran the core
+RQ-EMAPB-3PM-01 extension-bucket finding on the cleaned population (n=14,118): **the effect
+survives and is slightly stronger** (below-box_high vs rest: +12.85pp observed vs 1.97pp null p95,
+p=0.0000, vs +11.32pp on the uncontrolled population). **The core finding is not an artifact of
+illiquid names.** Of the 28-trade RQ-16 sample, 9 (32%, including ATLANTAA) fail this filter and
+should be dropped/replaced before continuing the chart audit.
+
+**Adopted as a standing filter for all EMAPB population work going forward** -- apply the
+liquidity floor before building any future population or chart sample on this line of research.
+The "today's volume must be an N-day high" and "exclude a continuation-style A-day if a fully-
+qualifying prior A-day exists within N days" ideas remain open, untested hypotheses -- explicitly
+not adopted yet, pending their own bounded tests.
