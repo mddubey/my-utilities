@@ -1801,3 +1801,51 @@ check, and it passes the strictest available circularity test.
 failure) now settled via this result. #3 (stop/risk sizing -- how much capital this actually risks,
 or a simpler fallback) and #4 (realized-R, blocked on #3 per Rule #20) remain open. Not yet sent to
 critic -- next action.
+
+## RQ-EMAPB-15A -- Structural Risk Envelope, characterization only (2026-10-07)
+
+Critic's explicit framing: the round-trip rule (RQ-14a) is a failure CLASSIFIER, not automatically
+an executable STOP -- using it literally as the stop would let an already-winning trade (it
+requires a prior +1% move) reverse all the way back to `box_high` before declaring failure, which
+may be poor risk control even though it's a valid outcome label. The question before picking any
+stop: is there an earlier, executable price boundary that approximates the same failure mechanism
+without waiting for the full round-trip? Answering that requires first checking whether failing
+and surviving trades are even separable by adverse-excursion depth.
+
+Four groups, same 3pm-entry population, same frozen 1% threshold as RQ-14a (n=18,057): A (never
+reached +1%, n=3,890), B1 (reached +1%, retested box_high on D0, n=1,698), B2 (reached +1%,
+retested on D1, n=4,359), C (reached +1%, never retested, n=8,110).
+
+**B1 vs B2 -- failure timing and depth are linked**: B1 (fails fast, same day) median MAE-before-
+confirm is -0.63%; B2 (fails slower, next day) median is -1.52%, more than double. Timing and
+depth move together -- a faster failure is also a shallower one. A (never showed +1% strength at
+all) has the deepest typical drawdown of any group (-2.08% median), consistent with having no
+conviction from the start.
+
+**The critical comparison, per critic's explicit requirement -- MAE-before-failure (B1+B2 combined)
+vs MAE-over-the-same-window for survivors (C)**:
+
+| percentile | Failures (B1+B2) | Survivors (C) |
+|---|---|---|
+| 10th | -3.67% | -3.35% |
+| 25th | -2.26% | -2.03% |
+| 50th | -1.22% | -1.07% |
+| 75th | -0.60% | -0.53% |
+| 90th | -0.28% | -0.22% |
+
+**The two distributions are nearly identical at every percentile.** Confirmed directly via a stop-
+threshold sweep: at -1.0%, a stop catches 57.6% of failures but also stops out 52.6% of survivors;
+at -1.5%, 41.7% vs 35.7%; at -2.0%, 30.0% vs 25.5%; at -3.0%, 15.8% vs 12.7%. **No threshold tested
+meaningfully separates a dying trade from ordinary winner noise.**
+
+**Answer to critic's pre-registered question: NO, there is no reasonably narrow adverse-movement
+region that separates structurally failing trades from surviving trades.** Per critic's own
+pre-declared logic ("if no -> the structural signal may be a good exit/failure classification but
+a poor initial stop"), **a simple price-depth stop derived from typical failure MAE is NOT a valid
+risk-control candidate** -- it would cut roughly as many eventual winners as eventual losers at
+every level tested.
+
+**What remains as real candidates, not yet decided**: (1) accept the full round-trip itself as the
+exit trigger, accepting that a winner can fully reverse to `box_high` before confirmation; or (2) a
+TIME-based cutoff rather than a price-depth one, since B1/B2 shows a genuine behavioral split by
+speed-to-failure, not depth. Sent to critic for the call before building either.
