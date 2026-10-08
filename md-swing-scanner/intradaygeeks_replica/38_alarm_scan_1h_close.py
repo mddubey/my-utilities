@@ -23,6 +23,7 @@ HERE = Path(__file__).resolve().parent; A8 = 2 / 9
 M5 = INTRADAY_5M_DIR                   # 5-min cache (data/intraday_5m), refreshed daily by eod_checklist.sh (all ~2,300 NSE names)
 SCREEN_DIST = 3.0                       # 59: prior-close screen "1H trend down + within 3% of 1H EMA34" keeps 98% of setups
 BREADTH_N = 150                         # breadth from the 150 most liquid stocks (sampling error ~ +/-4%)
+MIN_PRICE = 100                         # 2026-10-08 (user): no stocks under Rs100
 MIN_ATR_PCT = 2.56                      # 2026-10-03: stocks whose normal daily range (ATR14 % of price, yday) is below this
                                         # rarely reach the 1% target: ~0 in BOTH the 30m (+0.010%) and 3-yr 1H (+0.002%) sets;
                                         # skipping them: 30m +0.089 -> +0.129%, 1H +0.069 -> +0.102% (cut = 30m tercile)
@@ -131,7 +132,7 @@ if __name__ == "__main__":
         if not REPLAY: P.to_csv(PREP)
     stale = int((~P.data_ok).sum())
     if "--prep" in sys.argv:
-        _wl = int(((P.adx <= 25) & (P.atrp >= MIN_ATR_PCT) & P.data_ok).sum())   # same mask as the live watchlist below
+        _wl = int(((P.adx <= 25) & (P.atrp >= MIN_ATR_PCT) & (P.pc >= MIN_PRICE) & P.data_ok).sum())   # same mask as the live watchlist below
         print(f"prep for {TODAY:%Y-%m-%d} (previous session {PREV_DAY:%Y-%m-%d}): {len(P)} liquid stocks, {_wl} on the watchlist "
               f"(daily ADX <= 25, daily range >= {MIN_ATR_PCT}%; 1H trend and EMA34 distance checked live at each alarm), "
               f"breadth sample {int(P.breadth.sum())} | old screen, info only: {int(P.candidate.sum())} already in a 1H downtrend "
@@ -142,7 +143,10 @@ if __name__ == "__main__":
     # -- those are defined on yesterday's values. The 1H trend and the distance to the 1H EMA34 are NOT pre-screened from
     # yesterday's close any more (that missed ~2% of setups, more on gap / wild mornings); the live checklist checks both
     # on today's bars at every alarm. Costs ~140 more stocks per fetch. `candidate` (old screen) stays in the prep file.
-    daily_ok = (P.adx <= 25) & (P.atrp >= MIN_ATR_PCT) & P.data_ok
+    # 2026-10-08 (user, logic-first universe rule): no stocks under Rs100 (yesterday's close) -- too easy to move / manipulate,
+    # one tick is 0.2-0.5% of price vs a 0.3-0.5% stop. Backtest can't see that (exact stop fills); plan unchanged or better:
+    # 30m +144 -> +151, 1H +32 -> +35 per trade.
+    daily_ok = (P.adx <= 25) & (P.atrp >= MIN_ATR_PCT) & (P.pc >= MIN_PRICE) & P.data_ok
     C = P[daily_ok]; B = P[P.breadth]; need = sorted(set(C.index) | set(B.index))
     print(f"as of {ASOF:%Y-%m-%d %H:%M} | candidates {len(C)} + breadth sample {len(B)} -> {len(need)} stocks "
           f"{'(from cache)' if REPLAY else '| fetching live 5m...'}", flush=True)

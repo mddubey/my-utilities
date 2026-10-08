@@ -10,7 +10,7 @@ All returns are % per trade, gross of costs, unless stated.
 
 **Side:** shorts only. Longs were negative in every variant and in every market regime.
 
-**Universe:** NSE EQ stocks with prior-day 20-day average traded value of at least ₹10 crore (INR).
+**Universe:** NSE EQ stocks with prior-day 20-day average traded value of at least ₹10 crore (INR). **Price floor (2026-10-08, user, logic-first):** yesterday's close at least ₹100 -- cheaper stocks are too easy to move and one tick is 0.2-0.5% of price against a 0.3-0.5% stop. Backtest effect on the one-a-day plan: 30m +144 -> +151, 1H +32 -> +35 net per trade (sub-₹100 setups look better per trade in the backtest, +70..+82, but it fills stops exactly, so tick/slippage risk is invisible).
 Your broker must allow intraday (MIS) shorting of the name.
 
 **Levels (the strong ones):**
