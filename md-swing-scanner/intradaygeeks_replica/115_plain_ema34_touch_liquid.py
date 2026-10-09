@@ -26,6 +26,7 @@ def gen(t):
     if not p.exists(): return []
     try:
         d, d8y, adx, tv = daily_inputs(t); atrp = (d.atr14 / d.Close * 100).shift(1)
+        d34y = d.Close.ewm(span=34, adjust=False).mean().shift(1)   # v3: daily trend (stacked-lines test, 117)
     except Exception: return []
     h = read(p)
     if len(h) < 300: return []
@@ -40,6 +41,9 @@ def gen(t):
     # volume) / 12 x 0.72, in Rs lakh per 5-min bar.
     tvh = (h.Volume * h.Close).where(h.Volume > 0)
     dmed = tvh.groupby(day).median(); prev_med = dmed.shift(1)
+    # 2026-10-09 v3 (refinement fields for 116): previous day's open / high / close from the hourly bars of that day
+    dO = h.Open.groupby(day).first(); dH = h.High.groupby(day).max(); dC = h.Close.groupby(day).last()
+    pO, pH, pC = dO.shift(1), dH.shift(1), dC.shift(1)
     rows = []
     for i in range(200, len(C) - 1):
         if T[i] < pd.Timestamp("2024-01-01") or last[i]: continue
@@ -58,10 +62,12 @@ def gen(t):
         stop = (qh - qc) / qc * 100
         rows.append(dict(ticker=t, date=dd.strftime("%Y-%m-%d"), hour=T[i].strftime("%H:%M"), entry=qc, high=qh, ema34=E,
                          ret=(qc - px) / qc * 100, out=why, dist=(E - qc) / E * 100, stop=stop,
-                         liq=V[i] * qc / 12 / 1e5 * LIQ_RATIO, liq_prev=prev_med.get(dd, np.nan) / 12 / 1e5 * LIQ_RATIO,
+                         liq=V[i] * qc / 12 / 1e5 * LIQ_RATIO, liq_prev=prev_med.get(dd, np.nan) / 12 / 1e5 * LIQ_RATIO, d8y=D8, d34y=d34y.get(dd, np.nan),
                          red=qc < O[i], trend=E8[i] < E, below_d8=qc < D8, pierce_d8=hi_day[i] >= A8 * qc + (1 - A8) * D8,
                          adx_ok=(AD <= 25) if not np.isnan(AD) else False, below_vwap=qc < vw[i],
-                         atr_ok=(AT >= 2.56) if not np.isnan(AT) else False, rr_ok=stop <= 0.5, price_ok=qc >= 100))
+                         atr_ok=(AT >= 2.56) if not np.isnan(AT) else False, rr_ok=stop <= 0.5, price_ok=qc >= 100,
+                         open=O[i], low=L[i], ema8=E8[i], adx=AD, e34_6h=E34[i - 6],
+                         prev_open=pO.get(dd, np.nan), prev_high=pH.get(dd, np.nan), prev_close=pC.get(dd, np.nan)))
     return rows
 
 
