@@ -363,6 +363,9 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    with each outcome's average result (stalls can be + or -); plus the luck test (script 129) for any promoted version.
    CURRENT LAYERS (2026-10-09, user after 131): red | Nifty close > 200-day SMA (yday) -- the ONLY market filter, 8>34 dropped |
    stock daily 8>34 | gap -0.25..+0.5%. 'We will circle back on things.'
+   CIRCLE-BACK LIST (user): (a) red on the 09:15 candle -- red kept for now, but 132 shows it hurts there (+49 -> +75 without);
+   (b) Nifty filter definition (close > 200d chosen over 50>200, 8>34 dropped; 131); (c) the exit (fixed 1% vs proportional vs
+   in-between; 0.25/0.35/0.5 x ATR within noise); (d) ATR floor (2% chosen by logic; >= 3% looked strongest, 128).
    Revisit the exit ONCE at the end on the final setup (fixed 1% vs proportional vs in-between; 0.25/0.35/0.5 were within noise).
 8i. **NEXT (user, 2026-10-09, after the liquid-names ground-zero work, scripts 114-117):** (1) overnight vs intraday split on NSE
    liquid stocks 2024-26, market-wide and by daily trend, to check on our data that a stock's own trend is paid overnight
