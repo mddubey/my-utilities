@@ -356,7 +356,8 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    setup = hourly high >= 1H EMA34, close below. EXIT (frozen): stop = candle high; target = 0.5 x daily ATR% (yday);
    ATR >= 2% (so the target is never below the user's 1% minimum); take only if stop <= half the target (>= 1:2).
    Exit after 5 hourly candles / day's last candle, stop first if both in one candle. Report Rs per trade at fixed Rs1 lakh
-   AND at fixed Rs1k risk, net of ~Rs85 per Rs1 lakh, by year; plus the luck test (script 129) for any promoted version.
+   AND at fixed Rs1k risk, net of ~Rs85 per Rs1 lakh, by year; ALWAYS the target / stall / stop split (user, 2026-10-09)
+   with each outcome's average result (stalls can be + or -); plus the luck test (script 129) for any promoted version.
    Revisit the exit ONCE at the end on the final setup (fixed 1% vs proportional vs in-between; 0.25/0.35/0.5 were within noise).
 8i. **NEXT (user, 2026-10-09, after the liquid-names ground-zero work, scripts 114-117):** (1) overnight vs intraday split on NSE
    liquid stocks 2024-26, market-wide and by daily trend, to check on our data that a stock's own trend is paid overnight
