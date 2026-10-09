@@ -10,6 +10,9 @@ src = open(Path(__file__).resolve().parent / "124_realistic_rr.py").read().split
 src = src.replace("(S.atrp >= 2.56) & ", "")
 exec(src)
 exec(open(Path(__file__).resolve().parent / "125_stop_cap_target_grid.py").read().split("res = []")[0].split('X = X.copy()')[1].split("\n", 1)[1])
+import sys
+if "--hour" in sys.argv: X = X[X.hour == sys.argv[sys.argv.index("--hour") + 1]]   # 2026-10-09 (user): one candle only
+print(f"candles: {sorted(X.hour.unique())}, setups {len(X)}")
 res = []
 for t, g in X.groupby("ticker"):
     h = pd.read_csv(HERE / "h1_cache" / f"{t}.csv", index_col=0); h.index = pd.to_datetime(h.index, utc=True).tz_convert("Asia/Kolkata").tz_localize(None)
