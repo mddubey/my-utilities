@@ -39,6 +39,17 @@ candle close (on all setups this zone lost in both sets: 1H net Rs-20 / -99 per 
 plan the effect is within noise). The scan marks it `SKIP (EMA8 0.4-0.6% below)` and FIRST COME passes to the next
 ENTER; skipped setups are logged with their would-be outcome. Review after ~20 cases.
 
+**User's liquidity rule (2026-10-09, logic-first, telemetry -- not backtest-proven):** FIRST COME never picks a setup whose
+median 5-min bar in the hour before the alarm traded under Rs15 lakh (scan column `Rs_L/5m`). Logic: a Rs1 lakh order
+should be a small slice (~7%) of a typical bar so a stop-market order fills without walking the price. Origin of the
+problem: the Rs10 cr ADTV floor was a DATA-QUALITY cut (SHEMAROO sparse prints), never a tradeability check; NSE turnover
+is concentrated (top 100 = 50% of the liquid list), so most setups are thin (median setup ~Rs10 lakh/bar). Live: both
+slipped stops were under it (PNGJL 12.6, IPCALAB 12.7), clean fills above (J&KBANK 35.9, TECHM 182); 10-09 every setup was
+1.3-13 (JSWDULUX 1.3 = ~40 shares/bar). Cost on the 30m set: setups kept 39%, days with a setup 63/71 (Rs20: 33%, 59/71;
+F&O-only: 17%, 39/71). The frictionless backtest favours thin names (10-07 floor test) because it fills stops exactly --
+so the rule is judged live. Thin setups show as `INFO (thin, RsXL/5m; ...)`, 89 logs them as `skip: thin`. Revisit after a
+few days; backtest comparison at 15 and 20 (declared 2026-10-09) with stop slippage on thin names still to run.
+
 **Info rows in the scan (never auto-picked; the user may take them after a chart look):** green-candle rejections (`INFO (green candle; ...)`, script 96) and, from 2026-10-09, OPENING REJECTION + LOWER HIGH (`INFO (opening rejection; ...)`, script 112): the 09:15 hour's high reached the live daily 8-EMA and closed below it, then a red candle (from the 10:45 check on) rejects the 1H EMA8 (close below it by <= 0.5%) with a high below the opening hour's high; EMA8 < EMA34, below yesterday's daily 8-EMA, below VWAP, same 2:1 and daily filters. A stock that also qualifies as a regular EMA34 setup shows as the regular row. Backtest: setups 1H +31 net every year, 30m +13; best at 10:45 / 11:15. EOD review logs it as 'info: opening rejection'.
 
 **Checks at the moment of entry:**

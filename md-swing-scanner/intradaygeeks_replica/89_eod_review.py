@@ -43,6 +43,7 @@ def walk(m, day, t_from, px, stop):
 def category(r):
     s = str(r.status)
     if s.startswith("INFO (opening rejection"): return "info: opening rejection" if r.stop_pct <= 0.5 else "info: opening rejection, stop > 0.5%"
+    if s.startswith("INFO (thin"): return "skip: thin (< Rs15 lakh / 5-min bar)"   # 2026-10-09 user's liquidity rule
     if s.startswith("INFO (green"): return "info: green candle" if r.stop_pct <= 0.5 else "info: green candle, stop > 0.5%"
     if r.stop_pct > 0.5: return "skip: stop > 0.5% (2:1 rule)"
     if s.startswith("SKIP (strong green"): return "skip: strong green hour"

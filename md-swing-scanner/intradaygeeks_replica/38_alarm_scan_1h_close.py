@@ -24,6 +24,7 @@ M5 = INTRADAY_5M_DIR                   # 5-min cache (data/intraday_5m), refresh
 SCREEN_DIST = 3.0                       # 59: prior-close screen "1H trend down + within 3% of 1H EMA34" keeps 98% of setups
 BREADTH_N = 150                         # breadth from the 150 most liquid stocks (sampling error ~ +/-4%)
 MIN_PRICE = 100                         # 2026-10-08 (user): no stocks under Rs100
+MIN_LIQ_L = 15                          # 2026-10-09 (user): FIRST COME skips setups under Rs15 lakh per 5-min bar (median, hour before the alarm)
 MIN_ATR_PCT = 2.56                      # 2026-10-03: stocks whose normal daily range (ATR14 % of price, yday) is below this
                                         # rarely reach the 1% target: ~0 in BOTH the 30m (+0.010%) and 3-yr 1H (+0.002%) sets;
                                         # skipping them: 30m +0.089 -> +0.129%, 1H +0.069 -> +0.102% (cut = 30m tercile)
@@ -303,12 +304,18 @@ if __name__ == "__main__":
     # setup is still saved here so its outcome can be checked later.
     zone = (R.ema8_below_pct > 0.4) & (R.ema8_below_pct <= 0.6) & (R.status == "ENTER")
     R.loc[zone, "status"] = "SKIP (EMA8 0.4-0.6% below)"
+    # 2026-10-09 (user's hard rule, logic-first, TELEMETRY -- not backtest-proven): never pick a stock whose median 5-min bar
+    # in the hour before the alarm traded under Rs15 lakh -- a Rs1 lakh order should be a small slice (~7%) of a typical
+    # bar so a stop-market order fills without walking the price. Both live slipped stops were under it (PNGJL 12.6,
+    # IPCALAB 12.7); the clean fills were above (J&KBANK 35.9, TECHM 182). Shown as INFO, logged by 89; revisit after a few days.
+    thin = (R.liq_L < MIN_LIQ_L) & (R.status == "ENTER")
+    R.loc[thin, "status"] = "INFO (thin, Rs" + R.loc[thin, "liq_L"].astype(str) + "L/5m; ENTER)"
     live_ix = [i for i, v in enumerate(R.status) if v == "ENTER"]
     R.insert(0, "pick", ["FIRST COME" if i == (live_ix[0] if live_ix else -1) else "" for i in range(len(R))])
     print(f"\n{len(R)} SHORT setup(s), all equal quality after the filters. status = where it stands NOW; enter only 'ENTER' ones,"
           f" target = your fill - 1%. FIRST COME = first ENTER, the one-trade-a-day choice:\n")
-    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "in_path"]
+    show = ["pick", "status", "ticker", "candle", "now", "now_at", "stop", "risk_now_pct", "target_now", "entry", "liq_L", "in_path"]
     pd.set_option("display.width", 200)
-    print(R[show].rename(columns={"risk_now_pct": "stop%_now", "target_now": "target", "entry": "candle_close", "below_ema_pct": "below_ema%", "ema8_below_pct": "ema8_below%"}).to_string(index=False))
+    print(R[show].rename(columns={"risk_now_pct": "stop%_now", "target_now": "target", "entry": "candle_close", "below_ema_pct": "below_ema%", "ema8_below_pct": "ema8_below%", "liq_L": "Rs_L/5m"}).to_string(index=False))
     R.to_csv(out, index=False); print(f"saved {out.name}")
     print_near()
