@@ -378,6 +378,15 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    Deleting them won't remove them from git history; a real cleanup means a deliberate history rewrite or an archive move
    (scripts read each other's outputs from this folder, so paths need fixing). Held local, not committed (public repo):
    TELEGRAM_CALLS.md, SOURCE_TRANSCRIPT.md, CHARTINK_QUERIES.md, OPEN_QUESTIONS.md, the chartink JSON.
+8k. **CANDIDATE SETUP v1 (2026-10-10, after scripts 114-153; in-sample, NOT live yet; the live scan still runs the old rules + Rs15L/5m):**
+   shorts only; liquid (prev-day >= Rs15 lakh / 5-min bar); market: Nifty closed above its 200-day SMA yesterday (else no trades);
+   stock: daily 8-EMA > daily 34-EMA, ATR >= 2%; open: gap -0.25..+0.5% vs yesterday's close; trigger: the 10:15-11:15 hourly candle
+   touches the 1H EMA34 from below/at it and closes RED below it; short at 11:15. BRANCH A: day opened 0-0.5% BELOW the 1H EMA34
+   (E1 +124 / E2 +134 @1L, 180 / 239 trades); BRANCH B: day opened ABOVE the 1H EMA34 AND ATR >= 3% (E1 +109 / E2 +95, 221 / 450).
+   Avoid: calm (ATR 2-3%) stock that opened above; calm stock with a big rejection candle (>= 0.2 x ATR). Exit E1 = 1% target, stop =
+   candle high <= 0.5%; E2 = max(1%, 0.35 x ATR) target, stop <= half the target. Book at the target (holding on tested only for E1).
+   Several setups: pick the highest ATR. Cautions: in-sample (no clean unseen data), slippage 0.05% erases E1's edge, decision at
+   11:15 (office), currently OFF (Nifty < 200d).
 8j. **FROZEN RESEARCH FRAME for the liquid-names short work (user, 2026-10-09 night; Rule #20 -- do not change mid-hunt):**
    population = liquid (prev-day median hourly turnover /12 x 0.72 >= Rs15 lakh / 5-min bar), 3-yr 1H set, BOTH the 09:15 and
    10:15 candles kept (user: keep the population broad, remove noisy parts later, don't cut real candidates up front);
