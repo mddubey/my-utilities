@@ -350,6 +350,14 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    Deleting them won't remove them from git history; a real cleanup means a deliberate history rewrite or an archive move
    (scripts read each other's outputs from this folder, so paths need fixing). Held local, not committed (public repo):
    TELEGRAM_CALLS.md, SOURCE_TRANSCRIPT.md, CHARTINK_QUERIES.md, OPEN_QUESTIONS.md, the chartink JSON.
+8j. **FROZEN RESEARCH FRAME for the liquid-names short work (user, 2026-10-09 night; Rule #20 -- do not change mid-hunt):**
+   population = liquid (prev-day median hourly turnover /12 x 0.72 >= Rs15 lakh / 5-min bar), 3-yr 1H set, BOTH the 09:15 and
+   10:15 candles kept (user: keep the population broad, remove noisy parts later, don't cut real candidates up front);
+   setup = hourly high >= 1H EMA34, close below. EXIT (frozen): stop = candle high; target = 0.5 x daily ATR% (yday);
+   ATR >= 2% (so the target is never below the user's 1% minimum); take only if stop <= half the target (>= 1:2).
+   Exit after 5 hourly candles / day's last candle, stop first if both in one candle. Report Rs per trade at fixed Rs1 lakh
+   AND at fixed Rs1k risk, net of ~Rs85 per Rs1 lakh, by year; plus the luck test (script 129) for any promoted version.
+   Revisit the exit ONCE at the end on the final setup (fixed 1% vs proportional vs in-between; 0.25/0.35/0.5 were within noise).
 8i. **NEXT (user, 2026-10-09, after the liquid-names ground-zero work, scripts 114-117):** (1) overnight vs intraday split on NSE
    liquid stocks 2024-26, market-wide and by daily trend, to check on our data that a stock's own trend is paid overnight
    (Lou, Polk & Skouras 2019); (2) SHALLOW / FIRST PULLBACK in a fresh trend (practitioner claim: first pullbacks are
