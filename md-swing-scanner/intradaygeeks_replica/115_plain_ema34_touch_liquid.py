@@ -35,6 +35,11 @@ def gen(t):
     tp = (h.High + h.Low + h.Close) / 3
     vw = ((tp * h.Volume).groupby(day).cumsum() / h.Volume.groupby(day).cumsum().replace(0, np.nan)).values
     hi_day = h.High.groupby(day).cummax().values
+    # 2026-10-09 v2 (ground zero): liquidity known BEFORE the candle, same for every hour incl. 09:15 (Yahoo's 09:15 hourly
+    # volume is 0, so the signal hour's own turnover can't be used there): previous day's median hourly turnover (bars with
+    # volume) / 12 x 0.72, in Rs lakh per 5-min bar.
+    tvh = (h.Volume * h.Close).where(h.Volume > 0)
+    dmed = tvh.groupby(day).median(); prev_med = dmed.shift(1)
     rows = []
     for i in range(200, len(C) - 1):
         if T[i] < pd.Timestamp("2024-01-01") or last[i]: continue
@@ -53,7 +58,7 @@ def gen(t):
         stop = (qh - qc) / qc * 100
         rows.append(dict(ticker=t, date=dd.strftime("%Y-%m-%d"), hour=T[i].strftime("%H:%M"), entry=qc, high=qh, ema34=E,
                          ret=(qc - px) / qc * 100, out=why, dist=(E - qc) / E * 100, stop=stop,
-                         liq=V[i] * qc / 12 / 1e5 * LIQ_RATIO,
+                         liq=V[i] * qc / 12 / 1e5 * LIQ_RATIO, liq_prev=prev_med.get(dd, np.nan) / 12 / 1e5 * LIQ_RATIO,
                          red=qc < O[i], trend=E8[i] < E, below_d8=qc < D8, pierce_d8=hi_day[i] >= A8 * qc + (1 - A8) * D8,
                          adx_ok=(AD <= 25) if not np.isnan(AD) else False, below_vwap=qc < vw[i],
                          atr_ok=(AT >= 2.56) if not np.isnan(AT) else False, rr_ok=stop <= 0.5, price_ok=qc >= 100))

@@ -4,6 +4,8 @@ from pathlib import Path
 import pandas as pd
 HERE = Path(__file__).resolve().parent
 P = pd.read_csv(HERE / "plain_touch_1h.csv"); P["yr"] = P.date.str[:4]
+import sys
+if "--prev" in sys.argv: P["liq"] = P.liq_prev   # v2: previous-day liquidity, valid for 09:15 too
 FL = ["red", "trend", "below_d8", "pierce_d8", "adx_ok", "below_vwap", "atr_ok", "rr_ok", "price_ok"]
 
 
@@ -17,7 +19,7 @@ def row(lab, g):
 H = "| n | target / stall / stop % | Rs net | median R | 2024 / 2025 / 2026 |\n|---|---|---|---|---|---|"
 L = P[P.liq >= 15]; T = P[P.liq < 15]
 print(f"all touches {len(P)} | liquid (>= Rs15 lakh/5m) {len(L)} | thin {len(T)} | 09:15 candles in liquid: {(L.hour == '09:15').sum()}"
-      " (Yahoo's 09:15 hourly bar often has volume 0 -> mostly counted thin)")
+      "" + (" [liquidity = previous day, valid for 09:15]" if "--prev" in sys.argv else " (signal-hour liquidity: Yahoo 09:15 volume is 0 -> mostly counted thin)"))
 print("\n## baseline\n| group " + H)
 print(row("LIQUID, plain touch (nothing applied)", L)); print(row("thin, for contrast", T))
 cur = L[L.red & L.trend & L.below_d8 & L.pierce_d8 & L.adx_ok & L.below_vwap & L.atr_ok & L.rr_ok & L.price_ok & (L.dist <= 0.5)
