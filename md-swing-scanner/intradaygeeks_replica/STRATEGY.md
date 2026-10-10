@@ -394,6 +394,8 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    stock: daily 8-EMA > daily 34-EMA, ATR >= 2%; open: gap -0.25..+0.5% vs yesterday's close; trigger: the 10:15-11:15 hourly candle
    touches the 1H EMA34 from below/at it and closes RED below it; short at 11:15. BRANCH A: day opened 0-0.5% BELOW the 1H EMA34
    (E1 +124 / E2 +134 @1L, 180 / 239 trades); BRANCH B: day opened ABOVE the 1H EMA34 AND ATR >= 3% (E1 +109 / E2 +95, 221 / 450).
+   Avoid (user's call 2026-10-10, 'rule out what is riskier'): LINES CONVERGED -- the live daily 8-EMA within 0.25% of the 1H EMA34
+   (script 162: removed E1 122 trades +82 / E2 180 +52; kept E1 +166 (207, every year +), E2 +143 (385); keeps 78% / 85% of profit).
    Avoid: a DOJI CUT BY THE LINE (10:15 candle body < 25% of its range, opened at/above the 1H EMA34, closed below; added
    2026-10-10, script 154: branch B -140 / -166, 76-78% stopped); calm (ATR 2-3%) stock that opened above; calm stock with a big rejection candle (>= 0.2 x ATR). Exit E1 = 1% target, stop =
    candle high <= 0.5%; E2 = max(1%, 0.35 x ATR) target, stop <= half the target. Book at the target (holding on tested only for E1).
