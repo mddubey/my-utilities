@@ -21,7 +21,7 @@ for en in EX:
     for bn, bm in (("A", lambda d: (d.ov >= -0.5) & (d.ov < 0)), ("B", lambda d: (d.ov >= 0) & (d.atrp >= 3))):
         X = X0[X0.ex == en]; X = X[bm(X)]
         print(f"\n## {en} -- branch {bn} ({len(X)} trades)\n" + H)
-        for lab, lo, hi in (("none (our candle made the day's high)", -1, 1e-9), ("0-0.1 x ATR", 1e-9, 0.1), ("0.1-0.25 x ATR", 0.1, 0.25), ("> 0.25 x ATR (big morning spike)", 0.25, 99)):
+        for lab, lo, hi in (("none (our 10:15 candle made the high SO FAR, 09:15-11:15 only)", -1, 1e-9), ("0-0.1 x ATR", 1e-9, 0.1), ("0.1-0.25 x ATR", 0.1, 0.25), ("> 0.25 x ATR (big morning spike)", 0.25, 99)):
             g = X[(X.spk > lo) & (X.spk <= hi)]
             if len(g) < 15: print(f"| {lab} | {len(g)} | {len(g)/len(X)*100:.0f}% | | | | | | |"); continue
             parts = [f"{(g.o == o).mean()*100:.0f}% ({g[g.o == o].rs1L.mean():+,.0f})" for o in ("target", "stall", "stop")]
