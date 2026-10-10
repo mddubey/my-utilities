@@ -379,7 +379,8 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    (scripts read each other's outputs from this folder, so paths need fixing). Held local, not committed (public repo):
    TELEGRAM_CALLS.md, SOURCE_TRANSCRIPT.md, CHARTINK_QUERIES.md, OPEN_QUESTIONS.md, the chartink JSON.
 8k. **CANDIDATE SETUP v1 (2026-10-10, after scripts 114-153; in-sample, NOT live yet; the live scan still runs the old rules + Rs15L/5m):**
-   shorts only; liquid (prev-day >= Rs15 lakh / 5-min bar); market: Nifty closed above its 200-day SMA yesterday (else no trades);
+   shorts only; liquid (prev-day >= Rs15 lakh / 5-min bar); PRICE >= Rs100 (added 2026-10-10, live-scan rule missed in the weekend
+   research; caught on a YESBANK chart; with it: A E1 +109 (165) / E2 +124 (216), B E1 +108 (197) / E2 +84 (395)); market: Nifty closed above its 200-day SMA yesterday (else no trades);
    stock: daily 8-EMA > daily 34-EMA, ATR >= 2%; open: gap -0.25..+0.5% vs yesterday's close; trigger: the 10:15-11:15 hourly candle
    touches the 1H EMA34 from below/at it and closes RED below it; short at 11:15. BRANCH A: day opened 0-0.5% BELOW the 1H EMA34
    (E1 +124 / E2 +134 @1L, 180 / 239 trades); BRANCH B: day opened ABOVE the 1H EMA34 AND ATR >= 3% (E1 +109 / E2 +95, 221 / 450).
