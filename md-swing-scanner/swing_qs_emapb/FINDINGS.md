@@ -2075,3 +2075,61 @@ individually legitimate observations -- the chart audit correctly surfaced them 
 pattern holds up across the full population. Standard discipline applies: a single compelling
 example motivates a test, not an adoption; both close here, don't reopen without materially new
 evidence.
+
+## RQ-19 -- Breakout Effort/Result Proportionality, CLOSED NEGATIVE, with an important wrinkle (2026-10-11)
+
+Chart audit on FORCEMOT (2025-08-21, a "Winner" in the 8-trade sample) surfaced a second instance
+of the ATLANTAA pattern: the tagged A-day's volume (154,598, vol_ratio 1.54x) is tiny next to two
+earlier candles for the same stock -- 2025-07-09 (605,703 volume) and especially 2025-07-24
+(1,238,416 volume, vol_ratio 9.30x, range 18.74%, body +9.58%), which almost certainly independently
+qualified as its own A-day. The trade still closed D1 at +5.15% -- a winner despite the weak volume
+-- which the user explicitly did NOT take as vindication (a single winning trade proves nothing
+about the theory; could be a news catalyst, not the mechanism).
+
+User proposed a new hypothesis: valid breakout volume expansion should be PROPORTIONAL to price-
+range expansion (not just clear a flat ratio-to-average) -- reasoning: a big price move on only
+modestly elevated volume suggests a thin order book a few participants could move and then exit.
+Researched before building (not guessed): not a documented/named rule anywhere found, but
+logically connects to Wyckoff/VSA's "effort vs. result" and is well-formalized in academic
+microstructure by the Amihud illiquidity ratio and Kyle's lambda (both measure price-move-per-
+unit-of-volume) -- no source ties a single day's high reading on either specifically to
+manipulation, only to thin liquidity generally.
+
+**Critic's refinement, addressing the user's own follow-up concern (is this just a byproduct of
+the stock's absolute price/volatility scale?)**: use TURNOVER (traded value, price-scale-free) and
+normalize RANGE against the stock's own ATR, not raw share volume against raw % range -- both
+measured relative to each stock's own 20-day history, making the comparison scale-independent
+across a Rs17,000 stock and a Rs170 stock alike.
+
+**RQ-19 formula (frozen, pre-registered, 1.5x volume gate unchanged during this test)**:
+`turnover_multiple = A-day traded value / median(prior-20-day traded value)`,
+`range_multiple = A-day true-range% (incl. gap) / median(prior-20-day true-range%)`,
+`Q = turnover_multiple / range_multiple` (Q~1 proportional, Q<1 range outran turnover). Guardrail:
+zero/missing baseline -> excluded, never extreme-scored. Tested on the liquidity-cleaned
+population (n=13,528).
+
+| Q quintile | n | D1-close win rate |
+|---|---|---|
+| Q1 (lowest -- least proportionate) | 2,706 | 53.3% |
+| Q2 | 2,705 | 54.8% |
+| Q3 | 2,706 | 52.4% |
+| Q4 | 2,705 | 51.9% |
+| Q5 (highest -- most proportionate) | 2,706 | **50.4%** |
+
+No clean pattern; direction is if anything opposite the hypothesis (least-proportionate group
+performs marginally better). **Pre-registered fixed split, Q<1 (5.9% of pop) vs Q>=1**: 54.9% vs
+52.4% positive, observed -2.49pp vs 3.65pp null p95, **p=0.173 -- not significant.** Year-by-year
+check shows no consistent pattern either. **CLOSED NEGATIVE per critic's own pre-declared decision
+rule.**
+
+**Important wrinkle, flagged rather than buried**: FORCEMOT's own motivating A-day (2025-08-21)
+scores **Q=1.19 -- "proportionate" by this formula, not flagged.** Reason: Q compares against the
+trailing 20 days, and July 24's huge spike sits near the edge of that window for the August entry
+-- the local recent baseline was already elevated by the earlier move itself, so August looks
+proportionate to an already-inflated neighborhood rather than to the true outlier a few weeks
+back. **The formalized measure does not catch the specific example that motivated it** -- this
+does not necessarily mean the user's underlying instinct is wrong, it may mean a 20-day lookback
+is too short to distinguish "proportionate to a quiet period" from "proportionate to an
+already-active one." Not re-tested with a different window per standing discipline (no threshold
+sweep after seeing results) -- flagged for critic's call on whether this warrants a second, still
+pre-registered attempt with a longer baseline, or whether to accept the close as-is.
