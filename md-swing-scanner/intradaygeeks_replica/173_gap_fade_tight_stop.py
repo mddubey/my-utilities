@@ -46,14 +46,14 @@ def gen(t):
             for sp in (0.4, 0.5):
                 stp = e * (1 + sp / 100)
                 for tn, tp in (("1%", 1.0), ("2x stop", 2 * sp)):
-                    tgt = e * (1 - tp / 100); px, o = None, "stall"
+                    tgt = e * (1 - tp / 100); px, o, ts = None, "stall", k
                     for ts, b in rest.iterrows():
                         if b.hm >= "15:15": px = b.Open; break
                         if b.High >= stp: px, o = stp, "stop"; break
                         if b.Low <= tgt: px, o = tgt, "target"; break
                     if px is None: px = rest.Close.iloc[-1] if len(rest) else e
                     ret = (e - px) / e * 100; pos = 1000 / (sp / 100)
-                    out.append(dict(date=dd.strftime("%Y-%m-%d"), mon=dd.strftime("%Y-%m"), orn=orn, sp=sp, tn=tn, vr=vr, o=o,
+                    out.append(dict(date=dd.strftime("%Y-%m-%d"), mon=dd.strftime("%Y-%m"), orn=orn, sp=sp, tn=tn, vr=vr, o=o, mins=(ts - k).total_seconds() / 60 + 5,
                                     rs1L=ret * 1000 - 85, rs1k=ret / 100 * pos - 85 * pos / 1e5))
     return out
 
@@ -68,8 +68,18 @@ if __name__ == "__main__":
     for orn in ("OR15", "OR30"):
         for sp in (0.4, 0.5):
             for tn in ("1%", "2x stop"):
-                for gl, gm in (("all", lambda d: d.vr == d.vr), ("weak", lambda d: d.vr < 2)):
+                for gl, gm in (("all", lambda d: d.vr.notna() | d.vr.isna()), ("weak", lambda d: d.vr < 2), ("vol ratio missing", lambda d: d.vr.isna())):
                     g = R[(R.orn == orn) & (R.sp == sp) & (R.tn == tn)]; g = g[gm(g)]; o = g.o
                     byd = g.groupby("date").rs1L.sum().sort_values(ascending=False); wo = g[~g.date.isin(byd.head(10).index)].rs1L.mean()
                     mon = " / ".join(f"{g[g.mon == k].rs1L.mean():+.0f}" for k in sorted(g.mon.unique()))
+                    if "--speed" in sys.argv: continue
                     print(f"| {orn} | {sp}% | {tn} | {gl} | {len(g):,} | {g.date.nunique()/ND*100:.0f}% | {(o=='target').mean()*100:.0f} / {(o=='stall').mean()*100:.0f} / {(o=='stop').mean()*100:.0f} | {g.rs1L.mean():+.0f} | {g.rs1k.mean():+.0f} | {wo:+.0f} | {mon} |")
+    if "--speed" in sys.argv:   # 2026-10-11: how fast is the stop hit? minutes from the entry bar's close to the exit bar's close
+        B = [5, 10, 15, 30, 60, 120, 400]
+        print("\n| range | stop | target | outcome | n | <=5m | <=10m | <=15m | <=30m | <=60m | <=2h | later | median min |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+        for orn in ("OR15", "OR30"):
+            for sp, tn in ((0.4, "1%"), (0.5, "1%")):
+                g = R[(R.orn == orn) & (R.sp == sp) & (R.tn == tn)]
+                for oc in ("stop", "target"):
+                    x = g[g.o == oc].mins; cum = [(x <= b).mean() * 100 for b in B[:-1]]
+                    print(f"| {orn} | {sp}% | {tn} | {oc} | {len(x)} | " + " | ".join(f"{c:.0f}%" for c in cum) + f" | {100 - cum[-1]:.0f}% | {x.median():.0f} |")
