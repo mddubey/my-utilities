@@ -2133,3 +2133,68 @@ is too short to distinguish "proportionate to a quiet period" from "proportionat
 already-active one." Not re-tested with a different window per standing discipline (no threshold
 sweep after seeing results) -- flagged for critic's call on whether this warrants a second, still
 pre-registered attempt with a longer baseline, or whether to accept the close as-is.
+
+## EMAPB v2 (theory-first, Stage 0-gated) -- implemented, full universe run, chart audit begun (2026-10-11)
+
+Major methodological reset this session, fully documented in `EMAPB_SPEC_v1.md` and
+`EMAPB_STAGE0_SPEC_FINAL.md`: stopped treating ad hoc advance/pullback/base definitions as
+established, wrote a theory-first specification grounded in classical continuation-base theory
+(O'Neil pivot breakout + VCP's contraction-as-quality-signal), and added a new precursor concept --
+**Stage 0 (established uptrend)** -- after chart-auditing the original v1 state machine found two
+independent, hand-verified decline-bounce cases (GATEWAY, GENUSPOWER) where a sharp relief rally
+off an isolated crash low mechanically qualified as an "advance" despite having no established
+trend behind it. Stage 0 requires a genuine 4-point ascending swing sequence (L1<L2 higher low,
+H1<H2 higher high) before any Stage A advance is even eligible, with a full invalidation state
+machine (lower-high warning -> close-below-defended-low invalidation) and a fresh-cycle reset that
+prevents old-cycle pivots from contaminating a new trend search.
+
+The Stage 0 specification went through 4 critic revisions before sign-off, each catching a real
+defect (not bureaucratic nitpicking): (1) conflating confirmation-order with pivot-date-order
+needed a proof, not an assumption; (2) Stage 0 was being declared established using a pivot (H2)
+that was still replaceable in the pivot list -- fixed by delaying establishment until H2 itself
+locks; (3) a same-bar dual swing-high/swing-low pivot can't be chronologically ordered against
+itself -- fixed by excluding dual-pivot bars from structural sequence construction entirely; (4) a
+lower-high warning was being dated to the wrong event (lock date instead of confirmation date) --
+traced to a root cause (conflating "locked enough to use for establishment" with "confirmed enough
+to track"), fixed by splitting into two explicit structures: `pivot_list` (establishment/fresh-cycle
+bookkeeping only) and an append-only confirmed-swing event stream (all ongoing reference tracking).
+Final spec adversarially validated against 10+ explicit counterexample sequences before
+implementation, per critic's own corrected process after both user and critic called out that the
+review cycle itself had become the obstacle, not the research.
+
+**Implemented** (`35_emapb_v2_full_pipeline.py`): Stage 0 gates Stage A's advance directly via its
+own `defended_low`/`reference_high` tracking; Stage B/C/D (pullback/base/breakout) otherwise
+unchanged from `EMAPB_SPEC_v1.md`. Caught and fixed a real bug during sanity testing before the full
+run: candidates were restarting on every single bar using the same unchanged, already-invalidated
+`(defended_low, reference_high)` pair (601 of 656 episodes were `advance_invalidated` on a 5-ticker
+test) -- fixed with a last-tried-pair guard, bringing the same test down to a sane 138 episodes.
+
+**Sanity-verified the core fix worked**: neither GATEWAY's nor GENUSPOWER's original decline-bounce
+episodes (the ones that motivated the entire Stage 0 redesign) appear anywhere in the new output for
+either ticker.
+
+**Full universe (2,338 tickers)**: 7,846 breakouts (down from 18,064 in the pre-Stage-0 v1 pipeline
+-- roughly half the population now requires a genuine established uptrend first). Track B
+(breakout-day EOD -> D+1 EOD, descriptive only) still flat as expected (median 0%, 50.2% positive)
+-- no quality overlay applied yet, consistent with the agreed Track A/Track B separation.
+
+**New population-hygiene finding from the chart audit (`36_emapb_circuit_exclusion.py`)**: INDOTHAI
+(a sampled "winner") turned out to be a near-continuous NSE upper-circuit run -- more than 15
+separate days closing within ~0.3pp of a 5%/10%/20% circuit tier across its 6-week advance window.
+A "biggest single day" trigger is meaningless when many days tie at the same circuit ceiling, and
+real two-sided liquidity is doubtful during a circuit lock regardless of reported volume. User's
+framing: this reflects a news/mania-driven event, not the organic demand-and-continuation mechanism
+EMAPB is meant to capture. Quantified across the full population: 8.8% of episodes have >=20% of
+their advance-window days at a circuit tier, 4.2% have >=30%, 1.9% have a majority. **Adopted
+EXCLUDE_FRAC_THRESHOLD = 0.3** (roughly a third or more of the advance's days circuit-pinned) as a
+new standing filter, hand-verified against 5 additional flagged examples plus INDOTHAI itself
+(which has 3 circuit-heavy episodes, now correctly excluded, and 1 clean episode, correctly
+retained -- confirming the filter works at the per-episode level, not a blanket ticker ban).
+Removes 326 of 7,846 episodes (4.2%). Track B on the cleaned population: median 0%, 49.6% positive
+-- still descriptive only, not yet evaluated for quality.
+
+**Status**: one chart audit still in progress (8-trade liquidity-cleaned sample from the v2
+population, `rq_emapb_v2_audit_sample.csv`) -- the circuit-run finding came from this audit, not
+from a separate statistical sweep, exactly matching the agreed discipline (semantic fidelity first,
+performance later). Liquidity floor (price>=Rs50, turnover>=Rs1cr/day) and now the circuit-run
+exclusion both apply as standing filters to this population going forward. Not yet sent to critic.
