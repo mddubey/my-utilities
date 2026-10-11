@@ -1,4 +1,4 @@
-# EMAPB Stage 0 — Final Specification (Revision 3, adversarially validated)
+# EMAPB Stage 0 — Final Specification (Revision 4, two structures made explicit)
 
 **Status: proposed for final sign-off. Not yet implemented.**
 
@@ -7,155 +7,124 @@
 Revision 2 conflated two genuinely different concepts under one word, "locked": (a) *a pivot is
 committed enough to be used as one of the fixed points that establishes Stage 0*, and (b) *a
 pivot's value is known and can be compared against the running references for invalidation
-tracking*. These do not need the same timing. (b) is knowable the instant a pivot **confirms** —
-nothing about comparing a freshly confirmed High's price to `reference_high` requires waiting to
-see whether an even-later High might eventually replace it in the list. (a) genuinely does need
-the wait, because establishing Stage 0 is a one-time, permanent decision that must not be able to
-later disagree with the pivot list.
+tracking*. These do not need the same timing. (b) is knowable the instant a pivot confirms; (a)
+needs to wait, because establishing Stage 0 is a one-time, permanent decision.
 
-**Resolution: split the concept.** "Locking" (append of an opposite-type pivot makes the previous
-tail permanent) is now used **only** for (1) the Stage 0 establishment rule, and (2) the fresh-cycle
-eligibility boundary. **Every ongoing reference update and warning, once Stage 0 is established,
-triggers on a pivot's own CONFIRMATION date — never on a later lock date.** This removes the whole
-class of confirm-vs-lock timing ambiguity from the part of the machine where it was causing
-contradictions.
+## Answering the Revision 3 question directly: yes, intentional — made explicit as two structures
 
-## 1. Pivot construction and chronological integrity (unchanged, still holds)
+Critic's question was precise: does a High that gets replaced in the pivot list still legitimately
+affect invalidation tracking? **Yes — and the reason it's not a contradiction is that "the pivot
+list" and "the tracking mechanism" were never the same data structure. Revision 3 left that
+implicit; this revision names them separately so nothing looks silently inconsistent.**
 
-Same-type pivot -> replace tail. Different-type pivot -> append, which locks the previous tail.
+**Structure 1 — `pivot_list`** (replace-tail / append / lock semantics, exactly as before). Used
+**only** for two purposes: (1) detecting Stage 0 establishment (Section 2), and (2) the fresh-cycle
+eligibility boundary after an invalidation (Section 5). It is dormant — not consulted at all — while
+Stage 0 is already ESTABLISHED.
+
+**Structure 2 — the confirmed-swing event stream**: a plain, **append-only** log of every
+swing-low and swing-high confirmation, in confirmation order, with nothing ever replaced or
+removed. Once Stage 0 is established, **all of Section 3's tracking rules read from this stream,
+never from `pivot_list`.**
+
+Why this resolves the concern rather than hiding it: a High confirming at 125 is a real,
+already-happened market event the moment it confirms — the fact that `pivot_list` may later replace
+its *bookkeeping slot* with a 135 High (because no Low confirmed in between) has no bearing on
+whether 125 actually printed below `reference_high` at the time. The warning it created reflects
+true, decision-time-knowable information. The 135 High that follows is a *separate*, later, equally
+real event, and it legitimately clears the warning on its own merits — not because it overwrote the
+125 entry in `pivot_list` (it does do that, in Structure 1, but Structure 2 never cared about that
+replacement in the first place).
+
+**Audit trail guarantee**: the event stream (Structure 2) is immutable and append-only by
+definition — the 125 confirmation and the warning it created are permanently recorded, exactly as
+they happened, regardless of anything `pivot_list` does afterward. Nothing is ever silently treated
+as "committed structure" by the tracking mechanism, because the tracking mechanism never makes
+structural-commitment claims — only `pivot_list` does, and only for establishment/fresh-cycle
+purposes, which are explicitly walled off from Section 3.
+
+## 1. Pivot construction and chronological integrity (Structure 1 — unchanged)
+
+Same-type pivot -> replace tail. Different-type pivot -> append, locking the previous tail.
 `confirmation_index = pivot_index + 2` for both swing types under symmetric K=2, so confirmation
 order and pivot-date order are always identical for two different bars.
 
 **Dual-pivot bars**: a bar satisfying both swing conditions simultaneously contributes **neither**
-event to the pivot list, and cannot update any reference or warning under any rule in this
-specification. Logged as `dual_pivot_excluded`.
+event to `pivot_list` **nor to the event stream** — excluded from both structures entirely, logged
+as `dual_pivot_excluded`.
 
-## 2. Stage 0 establishment (unchanged from Revision 2 — "locking" applies here)
+## 2. Stage 0 establishment (Structure 1 only)
 
-`L1 -> H1 -> L2 -> H2`, strict `L2 > L1` and `H2 > H1`. Establishment requires H2 to be **locked**
-by a 5th pivot (the next opposite-type confirmation) before Stage 0 is declared active — this is
-the one place in the spec where lock, not confirmation, is the correct trigger, because
-establishment is a permanent, one-time decision about which pivots to trust forever. Effective
-date = the locking pivot's confirmation date.
+`L1 -> H1 -> L2 -> H2`, strict `L2 > L1` and `H2 > H1`. Establishment requires H2 to be locked by a
+5th pivot in `pivot_list` before Stage 0 activates. Effective date = the locking pivot's
+confirmation date. Unchanged from Revision 3.
 
-## 3. Post-establishment reference tracking and invalidation — CONFIRMATION-triggered (revised)
+## 3. Post-establishment reference tracking and invalidation (Structure 2 only)
 
 **State**: `defended_low`, `reference_high` (initialized from the established L2/H2),
-`pending_warning` (None, or a snapshot).
+`pending_warning` (None, or a snapshot). From this point forward these are driven **exclusively**
+by the append-only event stream — `pivot_list`'s replace/lock mechanics are not consulted again
+unless/until an invalidation occurs and a fresh Stage 0 search restarts (Section 5).
 
-**Per-bar processing order, unchanged and now the single source of all timing correctness**:
+**Per-bar processing order** (unchanged, this is still what makes every timing question resolve
+cleanly):
 1. **First**: if `pending_warning` is active and today's Close < the snapshotted level ->
-   invalidation fires, effective today. (Uses only warnings that existed *before* today's own new
-   confirmations are processed — see the worked cases below for why this matters.)
-2. **Then**: process every pivot that **confirms today** (whether it replaces the current tail or
-   appends, locking something else — irrelevant for this step) and apply:
+   invalidation fires, effective today, using only state that existed before today's own stream
+   entries are processed.
+2. **Then**: process every swing event that **confirms today** (append to the stream — nothing is
+   ever replaced here) and apply:
    - New Low confirms, no warning pending, price > `defended_low` -> `defended_low` updates.
-   - New Low confirms, warning pending -> no change (frozen, per the existing freeze rule).
+   - New Low confirms, warning pending -> no change (frozen).
    - New Low confirms, price <= `defended_low` -> no change.
    - New High confirms, price > `reference_high` -> `reference_high` updates; clears
      `pending_warning` if one exists.
-   - New High confirms, price < `reference_high` -> **this is the lower-high event.** If no warning
-     is currently pending, set `pending_warning` = (today, current `defended_low`). **If a warning
-     is already pending, this repeated lower-high has no additional effect** — the original
-     warning's date and snapshot stand (documented choice: the first lower-high after
-     establishment/clearance is what matters; a second, even-lower high while already pending adds
-     no new information worth tracking).
+   - New High confirms, price < `reference_high` -> lower-high event. If no warning pending, set
+     `pending_warning` = (today, current `defended_low`). If already pending, no-op (original
+     snapshot/date stand).
    - New High confirms, price == `reference_high` -> no change.
 
-Because step 1 always runs before step 2 on the same bar, **a brand-new warning or a brand-new
-clearance created today can never affect today's own close-check** — both only take effect starting
-from the next day's step 1.
+## Adversarial validation — all 10 cases, plus the new one
 
-## Adversarial validation — all 10 cases
+**1-3, 7-10**: unchanged from Revision 3's validation; none of them depend on the Structure 1/2
+distinction in a way that changes their outcome — restating PASS for each (pivot replacement before
+establishment; dual-pivot bars; establishment timing; rolling defended-low; fresh-cycle reset;
+same-date collisions; full lifecycle including repeated warnings).
 
-**1. Pivot replacement before establishment.** A same-type pivot replacing the tail never touches
-anything earlier in the list (those entries are already locked, in the establishment sense, from
-when the current tail was appended). **PASS.**
+**4-6 (timing)**: unchanged conclusions, now additionally justified by the Structure 2 append-only
+model — a warning/clearance event is simply an entry in the stream, processed once, in order,
+exactly where it falls; nothing about `pivot_list` replacing its own bookkeeping slot afterward
+touches the stream.
 
-**2. Dual-pivot bar.** Excluded from the list, from establishment, from reference updates, and from
-warnings — all four mechanisms check pivot-list membership, and an excluded event never enters the
-list. **PASS.**
+**11 (new — the Revision 3 question itself). A High that is later replaced in `pivot_list` still
+created a valid warning/clearance.** Worked below. **Resolved, not a defect**: Structure 2 never
+treats the replaced pivot as "committed structure" — it never claimed structural commitment at all,
+only `pivot_list` does, for an unrelated purpose. **PASS.**
 
-**3. Stage 0 activation, L1->H1->L2->H2->L3.** H2 locks exactly when L3 confirms; establishment
-fires at that moment using the now-permanent L1/H1/L2/H2; Stage A eligible from L3's confirmation
-date onward, never earlier. **PASS** (per Revision 2's fix, unchanged here).
+## Worked example — the exact Revision-3 sequence, now shown against both structures
 
-**4. Lower-high warning timing — confirmation vs. lock.** **Resolved by the root-cause fix above:
-warnings trigger on the High's own confirmation date, full stop.** Locking is irrelevant to this
-mechanism. This directly fixes the Revision 2 defect: in the worked example below, the warning is
-now correctly dated to H3's confirmation (the day it actually happened), not deferred to whenever a
-subsequent Low happens to confirm afterward.
+| event | type | price | `pivot_list` (Structure 1) | event stream / tracking (Structure 2) |
+|---|---|---|---|---|
+| ... | (Stage 0 already established per Section 2, as in the prior worked example) | | | defended_low=110, reference_high=130 |
+| t6 | H confirms | 125 | replaces current tail in `pivot_list` (irrelevant to tracking) | 125 < 130 -> **pending_warning = (t6, 110)** |
+| t7 | H confirms | 135 | replaces the 125 entry in `pivot_list` | 135 > 130 -> **reference_high -> 135, warning cleared** |
 
-**5. Same-day invalidation vs. a same-day new warning.** A warning created today cannot invalidate
-off today's own close — step 1 (close-check) runs before step 2 (today's new confirmations,
-including the one that would create this warning). The earliest a brand-new warning can trigger
-invalidation is tomorrow's close-check. **No defect — this is the correct, intended behavior**,
-directly answering critic's question 3.
-
-**6. Warning clearance vs. a same-day breach.** If a warning has been pending since a prior day,
-and TODAY both (a) the close breaches the old snapshot, and (b) a new higher High confirms that
-would clear the warning: step 1 runs first, using the warning as it stood *before* today's
-confirmations are processed -> **invalidation fires on today's close-check**, before step 2 would
-otherwise have cleared it. The later clearing event is simply never reached, because the state
-machine has already exited to NO_TREND. **A later event never reverses an already-fired
-invalidation — PASS, consistent with the standing requirement.**
-
-**7. Rolling defended low — higher low / lower low / lower high in varied order.** A lower low
-confirming does nothing by itself (no rule reacts to it alone); a higher low updates `defended_low`
-immediately (if no warning pending); a lower high sets a warning as in case 4. No path produces a
-stale or silently-drifting value — every update is a direct, immediate consequence of a specific
-confirmation event. **PASS.**
-
-**8. Invalidation and reset — pivots confirming after invalidation but dated before it.**
-Unaffected by this revision; Section 5's boundary rule (pivot DATE, not confirmation date, must be
-strictly after the invalidation date) already excludes these regardless of confirmation timing.
-**PASS.**
-
-**9. Same-date multiple events, historical integrity.** The fixed per-bar order plus dual-pivot
-exclusion (case 2) plus immutable completed-breakout records (Section 4, unchanged) together cover
-every same-date collision this specification can produce. **PASS.**
-
-**10. Lifecycle completeness, including repeated warnings.** A second lower-high while a warning is
-already pending is explicitly a no-op (documented above, not left undefined). Equality (new High ==
-reference_high, new Low == defended_low) is a no-op in both directions, already specified.
-"Missing qualifying pivots" is simply the ongoing NO_TREND/searching state, not an error. Every
-state in the table below has a defined next action for every input. **PASS.**
-
-## Worked example — corrected timing (dual-pivot exclusion + confirmation-based warning)
-
-| event | type | price | effect |
-|---|---|---|---|
-| t1 | L1 confirms | 100 | list=[L1] |
-| t2 | H1 confirms | 120 | append, locks L1; list=[L1,H1] |
-| t2a | (same bar also satisfies swing-low) | — | **dual-pivot excluded, logged, no effect** |
-| t3 | L2 confirms | 110 | append, locks H1; list=[L1,H1,L2] |
-| t4 | H2 confirms | 130 (>120) | append, locks L2; list=[...,H2]. H2 still provisional — **not yet established** |
-| t5 | L3 confirms | 115 | append, **locks H2**. Check L1,H1,L2,H2 = 100,120,110,130: ascending holds -> **STAGE 0 ESTABLISHED at t5**. defended_low=110, reference_high=130 |
-| t6 | H3 **confirms** | 125 | 125 < reference_high(130) -> **lower-high warning set AT t6** (its own confirmation date, not deferred) |
-| t7 | L4 **confirms** | 112 | 112 vs defended_low(110): warning is pending, so **frozen — no update**, consistent with the freeze rule |
-| t8 | Close = 108 | — | 108 < snapshot (110, the defended_low value at the moment the t6 warning was set) -> **INVALIDATION fires at t8** |
-| t9 | a new High later confirms at 140 | — | irrelevant; cycle already ended at t8 |
-
-**Clearance variant**: identical through t5. At t6, instead of 125, a High confirms at 135 (>130)
--> `reference_high` updates to 135 immediately, no warning ever created. Trend continues.
-
-**Same-day collision variant (case 6)**: warning pending since t6 (snapshot=110). At t8, today's
-Close = 105 (< 110) AND a new High also confirms today at 140 (which would otherwise clear the
-warning). Step 1 (close-check, using yesterday's state) fires invalidation first; step 2's
-would-be clearance never executes because the cycle has already exited. The 140 high is logged as
-occurring on an already-invalidated bar, with no effect on this cycle.
+Both t6 and t7 are permanent entries in the event stream (Structure 2), regardless of what happened
+in `pivot_list`. Nothing is silently overwritten; the audit log shows exactly: a warning created at
+t6, cleared at t7, both real, both timestamped, neither retroactively altered.
 
 ## 4. Setup lifecycle when Stage 0 invalidates (unchanged)
 
 Historical records preserved in every case; unbroken in-flight setups terminate/disqualify going
 forward only; completed breakouts and Track B outcomes are immutable.
 
-## 5. Fresh-cycle eligibility (unchanged)
+## 5. Fresh-cycle eligibility (unchanged, Structure 1 only)
 
-Full pivot-list reset on invalidation; a pivot is eligible for the new cycle only if its pivot date
-is strictly after the invalidation date, regardless of confirmation timing.
+Full `pivot_list` reset on invalidation; a pivot is eligible for the new cycle only if its pivot
+date is strictly after the invalidation date, regardless of confirmation timing. The event stream
+(Structure 2) is not reset — it is a historical record and remains intact — but tracking (Section 3)
+does not resume until a new Stage 0 establishes, per Section 2, from the reset `pivot_list`.
 
-## 6. State-transition table (final)
+## 6. State-transition table (final, unchanged from Revision 3)
 
 | From | Trigger | To | Effective date | Setup impact |
 |---|---|---|---|---|
@@ -164,13 +133,14 @@ is strictly after the invalidation date, regardless of confirmation timing.
 | ESTABLISHED | a High confirms, price > reference_high | ESTABLISHED | that pivot's confirmation date | reference_high updates |
 | ESTABLISHED | a High confirms, price < reference_high | PENDING_WARNING | that pivot's confirmation date | snapshot taken |
 | PENDING_WARNING | a High confirms, price > reference_high | ESTABLISHED | that pivot's confirmation date | warning cleared, reference_high updates |
-| PENDING_WARNING | a second lower High confirms | PENDING_WARNING | — | no-op, original snapshot/date stand |
-| PENDING_WARNING | Close < snapshot (checked before today's new confirmations) | NO_TREND (via INVALIDATED) | close date | setups per Section 4; pivot list reset per Section 5 |
-| (any state) | a bar satisfies both swing conditions | unchanged | — | logged `dual_pivot_excluded`, zero effect |
+| PENDING_WARNING | a second lower High confirms | PENDING_WARNING | — | no-op |
+| PENDING_WARNING | Close < snapshot | NO_TREND (via INVALIDATED) | close date | setups per Section 4; `pivot_list` reset per Section 5 |
+| (any state) | a bar satisfies both swing conditions | unchanged | — | excluded from both structures, logged |
 
 ## Explicit remaining questions: none.
 
-Every adversarial case above resolves to a defined, consistent outcome. The root-cause fix
-(confirmation-triggers-tracking, lock-triggers-establishment-only) removes the specific ambiguity
-Revision 2 had, and the audit found no further contradictions. Requesting sign-off to implement
-once, followed by the single agreed chart audit for semantic fidelity.
+The two structures (establishment bookkeeping vs. ongoing tracking) were always functionally
+separate in the rules as written; this revision names them explicitly so that separation is
+auditable rather than implicit. No behavior changes from Revision 3 — only the explanation and
+the audit-trail guarantee are made concrete. Requesting sign-off to implement once, followed by the
+single agreed chart audit for semantic fidelity.
