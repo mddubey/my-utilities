@@ -409,6 +409,8 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
    2026-02-26 (last Nifty close above its 200d; now -8.5%). v1 without the filter loses in the bear phase (164: E1 -49, E2 -71);
    faster market filters only add flat/negative bear-phase trades (165); the LONG mirror fails everywhere (166: -122 / -68).
    USER: 'not workable to sit out for months' -> OPEN PROBLEM for the next session: what to trade in a bear phase.
+   PARKED for other sessions (user, 2026-10-11: this thread stays INTRADAY only): bear-phase multi-day shorts via futures
+   (trends pay overnight); options for bear phases (puts / put spreads on breakdowns; old threads short_discovery/, options_momentum/).
 
 8j. **FROZEN RESEARCH FRAME for the liquid-names short work (user, 2026-10-09 night; Rule #20 -- do not change mid-hunt):**
    population = liquid (prev-day median hourly turnover /12 x 0.72 >= Rs15 lakh / 5-min bar), 3-yr 1H set, BOTH the 09:15 and
