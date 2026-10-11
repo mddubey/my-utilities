@@ -10,6 +10,8 @@ time after 09:30 to see status. Rules as backtested (183/184 = the user's versio
              (= 09:15 low), protective BUY SL-M at the stop. Stop = trigger x (1 + k x ATR%), k = 0.10 (tight) or 0.20 (wide) --
              not chosen yet, both shown. Qty for Rs1,000 risk.
   exit       stop, or square off at ~14:15-15:15 (184: 14:15 ~ 15:15; nothing before ~12:15). NO target.
+Telemetry column `room` (2026-10-12): distance from the trigger to yesterday's close below a short (gap fill; NEAR < 1% = the group that
+lost in 191/192) / to yesterday's high above a long. Info only, not a skip.
 Log every fill: trigger vs actual fill, stop vs actual stop fill (182: the edge survives ~0.05% slip per side, not 0.15%).
 Usage: python3 185_orb_inplay_scan.py --prep [--date YYYY-MM-DD]   (evening before / before 09:15; local caches only)
        python3 185_orb_inplay_scan.py                              (live)
@@ -54,7 +56,7 @@ def prep_row(args):
             if x > 0: v0[dd] = x
     v0 = pd.Series(v0).sort_index().tail(14)
     last = m[m.day == m.day.max()]; liq = (last.Volume * last.Close)[last.Volume > 0].median() / 1e5
-    return dict(t=t, pc=d.Close.iloc[-1], atrp=atrp, tv=d.traded_value_sma20.iloc[-1], liq_L=liq,
+    return dict(t=t, pc=d.Close.iloc[-1], ph=d.High.iloc[-1], atrp=atrp, tv=d.traded_value_sma20.iloc[-1], liq_L=liq,
                 v0avg=v0.mean() if len(v0) >= 10 else np.nan, n_v0=len(v0),
                 data_ok=bool(d.index[-1] >= prev_day and m.day.max() >= prev_day))
 
@@ -131,7 +133,14 @@ if __name__ == "__main__":
         k = 1 if side == "SHORT" else -1; atr = U.at[t, "atrp"]
         st1, st2 = trig * (1 + k * K_TIGHT * atr / 100), trig * (1 + k * K_WIDE * atr / 100)
         last = g.Close.iloc[-1]
-        rows.append(dict(ticker=t, side=side, relvol=v0 / U.at[t, "v0avg"], status=status, trigger=round(trig, 2), now=round(last, 2),
+        # TELEMETRY (2026-10-12, user; scripts 191-193): room to yesterday's close below a short (the gap-fill level -- within 1%
+        # it turned price 83% of the time vs 41-62% placebo, -524/trade) and to yesterday's high above a long (weak effect). Info only.
+        if side == "SHORT":
+            yc = U.at[t, "pc"]; room = (trig - yc) / trig * 100 if yc < trig else None; lvl_name = "y_close"
+        else:
+            yh = U.at[t, "ph"] if "ph" in U.columns else np.nan; room = (yh - trig) / trig * 100 if yh > trig else None; lvl_name = "y_high"
+        room_s = f"{lvl_name} {room:.2f}% away" + (" (NEAR <1%)" if room < 1 else "") if room is not None else f"{lvl_name}: not in the way"
+        rows.append(dict(ticker=t, side=side, relvol=v0 / U.at[t, "v0avg"], status=status, room=room_s, trigger=round(trig, 2), now=round(last, 2),
                          stop_tight=round(st1, 2), qty_tight=int(RISK_RS / abs(st1 - trig)) if st1 != trig else 0,
                          stop_wide=round(st2, 2), qty_wide=int(RISK_RS / abs(st2 - trig)) if st2 != trig else 0,
                          atr=round(atr, 2), liq_L=round(U.at[t, "liq_L"], 1), c915=f"{f.Open:.2f}->{f.Close:.2f} (L {f.Low:.2f} H {f.High:.2f})"))
@@ -146,7 +155,7 @@ if __name__ == "__main__":
     if len(act):
         print("SUMMARY -- shorts to arm (sell-stop at trigger from 09:30; protective SL-M at the stop; exit ~14:15-15:15, no target):")
         for _, r in act.iterrows():
-            print(f"  #{r['rank']} {r.ticker}: trigger {r.trigger} | tight stop {r.stop_tight} (qty {r.qty_tight}) | wide stop {r.stop_wide} (qty {r.qty_wide}) | {r.status}")
+            print(f"  #{r['rank']} {r.ticker}: trigger {r.trigger} | tight stop {r.stop_tight} (qty {r.qty_tight}) | wide stop {r.stop_wide} (qty {r.qty_wide}) | {r.status} | {r.room}")
     else: print("SUMMARY -- no short to arm right now.")
     with pd.option_context("display.width", 250, "display.max_columns", 30):
         print("\n" + R.to_string(index=False, formatters={"relvol": "{:.1f}".format}))

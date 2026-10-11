@@ -177,6 +177,8 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 - 09:30: for ARMED shorts place a SELL-STOP at the trigger + protective SL-M; exit ~14:15-15:15 (no target).
 - Run again any time for status (TRIGGERED hh:mm). Log every fill: trigger vs fill, stop vs stop fill (182: the edge survives
   ~0.05% slip per side, not 0.15%). Replay check: `--replay 2026-10-07 09:31` reproduces 175's in-play list exactly.
+- Telemetry `room` (2026-10-12): distance from the trigger to yesterday's close below a short (gap fill; NEAR < 1% = the losing group in
+  191/192) and to yesterday's high above a long (weak, 193). Info only.
 - Open: live relvol depends on Yahoo's running DAY volume at 09:2x -- first live run must confirm it isn't lagging/zero.
 
 ## 3. What the tests showed
