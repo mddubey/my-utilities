@@ -26,7 +26,7 @@ from fetch_prices import _chunked_download
 from data.paths import DAILY_DIR, INTRADAY_5M_DIR
 
 TOP_N, MIN_RV, MIN_PRICE, MIN_TV, MIN_ATR, MIN_LIQ_L = 20, 1.0, 100, 1e8, 2.0, 15
-K_TIGHT, K_WIDE, RISK_RS = 0.10, 0.20, 1000
+K_TIGHT, K_WIDE, RISK_RS, MAX_TRADES = 0.10, 0.20, 1000, 2
 
 
 def read5(t):
@@ -149,14 +149,23 @@ if __name__ == "__main__":
     if R.empty: print("no data -- market not open yet, Yahoo lagging, or caches stale"); sys.exit()
     R = R[R.relvol >= MIN_RV].sort_values("relvol", ascending=False).head(TOP_N)
     R.insert(0, "rank", range(1, len(R) + 1))
-    S = R[R.side == "SHORT"]
-    act = S[S.status.str.startswith(("ARMED", "TRIGGERED"))]
-    print(f"\nIN PLAY (relvol >= {MIN_RV:g}, top {TOP_N}): {len(R)} | red 09:15 candle = SHORT setups: {len(S)} | still valid (not broken before 09:30): {len(act)}")
-    if len(act):
-        print("SUMMARY -- shorts to arm (sell-stop at trigger from 09:30; protective SL-M at the stop; exit ~14:15-15:15, no target):")
-        for _, r in act.iterrows():
-            print(f"  #{r['rank']} {r.ticker}: trigger {r.trigger} | tight stop {r.stop_tight} (qty {r.qty_tight}) | wide stop {r.stop_wide} (qty {r.qty_wide}) | {r.status} | {r.room}")
-    else: print("SUMMARY -- no short to arm right now.")
+    # 2026-10-12 LIVE RULES (user): tight stop (10% ATR), Rs1,000 risk, MAX 2 trades; SHORTS first, skip a short whose gap fill
+    # (yesterday's close) is < 1% below (191-192); LONGS only as a fallback when fewer than 2 shorts are valid. Pick = highest relvol
+    # (177: relvol rank <= 5 was the one filter that passed). Arm only the picks -- no need to cancel orders later.
+    valid = R.status.str.startswith(("ARMED", "TRIGGERED"))
+    S = R[R.side == "SHORT"]; near = S.room.str.contains("NEAR")
+    shorts_ok = S[valid[S.index] & ~near]; longs_ok = R[(R.side != "SHORT") & valid]
+    picks = pd.concat([shorts_ok, longs_ok]).head(MAX_TRADES)
+    print(f"\nIN PLAY (relvol >= {MIN_RV:g}, top {TOP_N}): {len(R)} | red 09:15 = SHORT setups {len(S)}, valid (not broken before 09:30) {int(valid[S.index].sum())}, "
+          f"of which gap fill NEAR (skipped) {int((valid[S.index] & near).sum())} | long fallbacks valid {len(longs_ok)}")
+    if len(picks):
+        print(f"SUMMARY -- ARM these {len(picks)} (max {MAX_TRADES}; Rs{RISK_RS:,} risk each, TIGHT stop = 10% ATR; from 09:30; exit ~14:15-15:15, no target):")
+        for _, r in picks.iterrows():
+            kind = "SELL-STOP (short)" if r.side == "SHORT" else "BUY-STOP (long, fallback)"
+            print(f"  #{r['rank']} {r.ticker}: {kind} trigger {r.trigger} | stop {r.stop_tight} (SL-M) | qty {r.qty_tight} (position ~Rs{r.qty_tight * r.trigger / 1e5:.1f} lakh) | {r.status} | {r.room}")
+    else: print("SUMMARY -- nothing to arm right now.")
+    if (valid[S.index] & near).any():
+        print("  skipped (gap fill NEAR): " + ", ".join(f"{r.ticker} ({r.room})" for _, r in S[valid[S.index] & near].iterrows()))
     with pd.option_context("display.width", 250, "display.max_columns", 30):
         print("\n" + R.to_string(index=False, formatters={"relvol": "{:.1f}".format}))
     out = HERE / "orb_scans"; out.mkdir(exist_ok=True)
