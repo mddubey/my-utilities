@@ -49,7 +49,7 @@ def gen(t):
             k = brk.index[0]; e = brk.Close.iloc[0]
             if e <= x.pc: continue
             stop = (orh - e) / e * 100; rest = g[g.index > k]
-            for tn, tgt in (("gap fill", x.pc), ("1%", e * 0.99)):
+            for tn, tgt in (("gap fill", x.pc), ("1%", e * 0.99), ("2R", e * (1 - 2 * stop / 100)), ("3R", e * (1 - 3 * stop / 100))):
                 px, o = None, "stall"
                 for ts, b in rest.iterrows():
                     if b.hm >= "15:15": px = b.Open; break
@@ -70,6 +70,7 @@ if __name__ == "__main__":
             res += r
             if k % 400 == 0 or k == len(tk): print(f"{k}/{len(tk)} stocks, {len(res):,} rows, {time.time()-t0:.0f}s", flush=True)
     R = pd.DataFrame(res); R.to_csv(HERE / "gap_fade_orb_5m.csv", index=False)
+    if "--rr" in sys.argv: RR_ONLY = True
     n = pd.read_csv(DAILY_DIR / "_NIFTY.csv", index_col=0, parse_dates=True).sort_index(); nc = n["Close"]
     bull = (nc > nc.rolling(200).mean()).shift(1); R["bull"] = pd.to_datetime(R.date).map(bull)
     tdays = [d for d in nc.loc["2026-06-10":].index]
@@ -84,6 +85,16 @@ if __name__ == "__main__":
                 f" | {g.stop.median():.2f}% / {g.tgt_pct.median():.2f}% | {g.rs1L.mean():+.0f} | {g.rs1k.mean():+.0f} | {wo:+.0f} | {mon} |")
 
     H = "| group | trades | days w/ setup | target % (avg Rs) | stall % (avg Rs) | stop % (avg Rs) | median stop / target dist | Rs/trade @1L | @1k risk | w/o top-10 days | by month (Jun..Oct) |\n|---|---|---|---|---|---|---|---|---|---|---|"
+    if "--rr" in sys.argv:
+        print("\n## USER'S RULE (>= 1:2 / 1:3)\n" + H)
+        for orn in ("OR15", "OR30"):
+            G = R[(R.orn == orn) & (R.tn == "gap fill")]
+            print(row(f"{orn}: gap-fill target, only if gap fill >= 2x stop away", G[G.tgt_pct >= 2 * G.stop]))
+            print(row(f"{orn}: gap-fill target, only if gap fill >= 3x stop away", G[G.tgt_pct >= 3 * G.stop]))
+            for tn in ("2R", "3R"):
+                X = R[(R.orn == orn) & (R.tn == tn)]
+                print(row(f"{orn}: target {tn}, ALL", X)); print(row(f"{orn}: target {tn}, WEAK gaps", X[X.vr < 2]))
+        sys.exit()
     for orn in ("OR15", "OR30"):
         for tn in ("gap fill", "1%"):
             X = R[(R.orn == orn) & (R.tn == tn)]
