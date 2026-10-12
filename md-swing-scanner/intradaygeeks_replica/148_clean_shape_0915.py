@@ -10,11 +10,15 @@ from pathlib import Path
 exec(open(Path(__file__).resolve().parent / "130_rebaseline_frozen_frame.py").read().split('B["tp"] = 0.5 * B.atrp')[0])
 B = B[(B.atrp >= 2.0) & (B.n200 == True) & (B.s8 > B.s34) & (B.gap > -0.25) & (B.gap <= 0.5)].copy()
 dop = {}
+# 2026-10-12: the day's open = the OFFICIAL open (Yahoo daily open = NSE bhavcopy open on 100% of days). Was the hourly 09:15 bar's
+# Open, which differs from it on 56% of days (> 0.5% on 16%) -> branch A/B ('opened below / above the 1H EMA34') was approximate.
+from data.paths import DAILY_DIR as _DD
 for t, g in B.groupby("ticker"):
-    h = pd.read_csv(HERE / "h1_cache" / f"{t}.csv", index_col=0); h.index = pd.to_datetime(h.index, utc=True).tz_convert("Asia/Kolkata").tz_localize(None)
+    try: od = pd.read_csv(_DD / f"{t}.csv", index_col=0, parse_dates=True).Open
+    except FileNotFoundError: continue
     for ix, r in g.iterrows():
-        k = pd.Timestamp(f"{r.date} 09:15")
-        if k in h.index: dop[ix] = h.at[k, "Open"]
+        k = pd.Timestamp(r.date)
+        if k in od.index: dop[ix] = od[k]
 B["dayopen"] = pd.Series(dop); B = B[B.dayopen.notna()]
 B["below_open"] = B.dayopen < B.ema34
 EX = {"E1 1% / stop <= 0.5%": (lambda r: 1.0, lambda r, tp: r.stop <= 0.5), "E2 max(1%, 0.35xATR) / >= 1:2": (lambda r: max(1.0, 0.35 * r.atrp), lambda r, tp: r.stop <= tp / 2)}
