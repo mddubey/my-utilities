@@ -16,12 +16,15 @@ from backtest import load
 from data.paths import DAILY_DIR, INTRADAY_5M_DIR
 
 
+OFFICIAL_OPEN = "--official-open" in sys.argv
+
+
 def gen(t):
     p = INTRADAY_5M_DIR / f"{t}.csv"
     if not p.exists(): return []
     try: d = load(t)
     except Exception: return []
-    c = d.Close; raw = pd.read_csv(DAILY_DIR / f"{t}.csv", index_col=0, parse_dates=True).Volume
+    c = d.Close; rawdf = pd.read_csv(DAILY_DIR / f"{t}.csv", index_col=0, parse_dates=True); raw = rawdf.Volume
     D = pd.DataFrame({"pc": c.shift(1), "tv": d.traded_value_sma20.shift(1), "atrp": (d.atr14 / c * 100).shift(1),
                       "ca": d.corp_action_day if "corp_action_day" in d else False})
     m = pd.read_csv(p, index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None)
@@ -40,7 +43,10 @@ def gen(t):
         if dd < pd.Timestamp("2026-06-10") or dd not in D.index or dd not in v0.index or not (avg.get(dd, 0) > 0): continue
         x = D.loc[dd]
         if not (x.pc >= 100) or not (x.tv >= 1e8) or bool(x.ca) or not (x.atrp >= 2) or medto.get(dd, 0) < 15e5: continue
-        g = g.sort_index(); f = g.iloc[0]
+        g = g.sort_index(); f = g.iloc[0].copy()
+        if OFFICIAL_OPEN:   # 2026-10-12: Yahoo's 5-min 09:15 'Open' is not the official NSE open (equal only 11% of days; daily
+            oo = rawdf.Open.get(dd, np.nan)   # Yahoo open == NSE bhavcopy open 100%) -> colour flipped on 8% of in-play days.
+            if oo == oo: f["Open"] = oo; f["High"] = max(f.High, oo); f["Low"] = min(f.Low, oo)   # candle as charts draw it
         if f.Close == f.Open: continue
         side = -1 if f.Close < f.Open else 1; lvl = f.Low if side < 0 else f.High
         rest = g.iloc[1:]; rest = rest[rest.hm < "15:15"]
@@ -84,7 +90,7 @@ if __name__ == "__main__":
     from multiprocessing import Pool
     tk = sorted(p.stem for p in INTRADAY_5M_DIR.glob("*.csv") if not p.stem.startswith("_")); t0 = time.time()
     with Pool(6) as pl: A = pd.DataFrame(sum(pl.map(gen, tk, chunksize=8), []))
-    A.to_csv(HERE / "orb_sip.csv", index=False)
+    A.to_csv(HERE / ("orb_sip_off.csv" if OFFICIAL_OPEN else "orb_sip.csv"), index=False)
     A["rank"] = A.groupby("date").rv.rank(ascending=False, method="first")
     ND = A.date.nunique()
     print(f"stock-days {len(A):,} on {ND} days ({A.date.min()} .. {A.date.max()}; relvol needs 10 days of history) in {time.time()-t0:.0f}s")

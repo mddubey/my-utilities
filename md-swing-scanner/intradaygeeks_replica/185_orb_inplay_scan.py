@@ -96,15 +96,16 @@ if __name__ == "__main__":
     print(f"as of {ASOF:%Y-%m-%d %H:%M} | {len(need)} liquid stocks | {'replay from cache' if REPLAY else 'fetching live 5-min + day volume...'}", flush=True)
     if REPLAY:
         bars = {t: read5(t) for t in need}
-        dayvol = {t: pd.read_csv(DAILY_DIR / f"{t}.csv", index_col=0, parse_dates=True).Volume.get(TODAY, np.nan) for t in need}
+        _dd = {t: pd.read_csv(DAILY_DIR / f"{t}.csv", index_col=0, parse_dates=True) for t in need}
+        dayvol = {t: x.Volume.get(TODAY, np.nan) for t, x in _dd.items()}; dayopen = {t: x.Open.get(TODAY, np.nan) for t, x in _dd.items()}
     else:
         bars = _chunked_download([f"{t}.NS" for t in need], chunk_size=50, pause=1, period="1d", interval="5m", group_by="ticker")
         dl = _chunked_download([f"{t}.NS" for t in need], chunk_size=50, pause=1, period="5d", interval="1d", group_by="ticker")
-        dayvol = {}
+        dayvol, dayopen = {}, {}
         for t, g in dl.items():
             if g is None or g.empty: continue
             g = g.dropna(subset=["Close"]); gi = g.index.tz_localize(None) if g.index.tz is not None else g.index
-            g.index = gi.normalize(); dayvol[t] = g.Volume.get(TODAY, np.nan)
+            g.index = gi.normalize(); dayvol[t] = g.Volume.get(TODAY, np.nan); dayopen[t] = g.Open.get(TODAY, np.nan)
     t1 = time.time(); rows = []; neg = 0
     for t in need:
         g = bars.get(t, pd.DataFrame())
@@ -114,7 +115,11 @@ if __name__ == "__main__":
         g = g[(g.index.normalize() == TODAY) & (g.index < ASOF)]          # includes the bar in progress (its volume is in day volume too)
         g = g.assign(hm=g.index.strftime("%H:%M"))
         if len(g) == 0 or g.hm.iloc[0] != "09:15": continue
-        f = g.iloc[0]
+        f = g.iloc[0].copy()
+        # 2026-10-12 (user caught ADANIENT 2026-09-01 green on Dhan, red here): use the OFFICIAL open (Yahoo 1d bar = NSE open) for
+        # the 09:15 candle, and extend its high/low to it -- the candle as Dhan / TradingView draw it.
+        oo = dayopen.get(t, np.nan)
+        if oo == oo: f["Open"] = oo; f["High"] = max(f.High, oo); f["Low"] = min(f.Low, oo)
         if TODAY + pd.Timedelta("9h20min") > ASOF: continue
         dv = dayvol.get(t, np.nan)
         if REPLAY:   # full-day volume minus every other bar of the day (the backtest's estimate)
