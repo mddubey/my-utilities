@@ -177,6 +177,11 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
   stocks -- this would be the in-play subset.) Stop used: the WIDE 20% ATR stop (123.50), later tightened to 122.55;
   entry came after the 09:30 bounce (high 123.39), so the tight 10% stop (122.50) would also have held (max 122.46 at 09:31 before the exit -- by 4 paise).
 
+- 2026-10-12 SHADOWFAX (user: 'never looked convincing'): 09:15 candle 302.00 -> 291.35 but low 279.70 -- a 7.4% flush (1.8x ATR) with a
+  LOWER WICK (11.65) longer than the red BODY (10.65): sellers pushed it down, buyers took most of it back inside 5 minutes. The level
+  279.70 never broke again; low after 09:20 was 286.00, close 295.00. Idea to check: red 09:15 candle whose lower wick >= its body
+  (flush-and-recover) vs a red candle closing near its low -- colour says short, structure says buyers.
+
 ### ORB in-play SHORT -- PAPER TRADING from 2026-10-12 (scripts 175-185; not a live rule yet)
 - Evening before / before 09:15: `./eod_checklist.sh` (root), then `python3 185_orb_inplay_scan.py --prep`.
 - 09:21-09:29: `python3 185_orb_inplay_scan.py` -> in-play list (relvol >= 1, top 20), red 09:15 candle = SHORT; trigger = 09:15 low;
