@@ -170,6 +170,12 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 
 ---
 
+### Live observations to check later (not rules, not tested)
+- 2026-10-12 INOXGREEN (user): the in-play ORB short was taken NOT on the first break (09:24) but after the bounce was rejected at VWAP
+  (~09:28-09:30, high ~123.4 vs VWAP ~123.0) and price came back down through the level (121.55). Idea to check on history: ORB stock ->
+  first break -> bounce rejected at VWAP -> re-break of the 09:15 level. One trade only. (Related: 174 VWAP retest was negative on all
+  stocks -- this would be the in-play subset.)
+
 ### ORB in-play SHORT -- PAPER TRADING from 2026-10-12 (scripts 175-185; not a live rule yet)
 - Evening before / before 09:15: `./eod_checklist.sh` (root), then `python3 185_orb_inplay_scan.py --prep`.
 - 09:21-09:29: `python3 185_orb_inplay_scan.py` -> in-play list (relvol >= 1, top 20), red 09:15 candle = SHORT; trigger = 09:15 low;
