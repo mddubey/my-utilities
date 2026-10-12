@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np, pandas as pd
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
 from backtest import load
+from orb_common import read5_official
 from data.paths import DAILY_DIR, INTRADAY_5M_DIR
 
 
@@ -33,7 +34,7 @@ def gen(t):
     c = d.Close; raw = pd.read_csv(DAILY_DIR / f"{t}.csv", index_col=0, parse_dates=True).Volume
     D = pd.DataFrame({"pc": c.shift(1), "tv": d.traded_value_sma20.shift(1), "atrp": (d.atr14 / c * 100).shift(1),
                       "ca": d.corp_action_day if "corp_action_day" in d else False})
-    m = pd.read_csv(p, index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None)
+    m = read5_official(t)  # 2026-10-12: official 09:15 open
     m = m[m.index >= "2026-05-01"]
     if len(m) < 500: return []
     m["day"] = m.index.normalize(); m["hm"] = m.index.strftime("%H:%M"); m["to"] = m.Volume * m.Close
