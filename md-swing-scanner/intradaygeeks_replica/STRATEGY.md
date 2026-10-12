@@ -182,6 +182,16 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
   279.70 never broke again; low after 09:20 was 286.00, close 295.00. Idea to check: red 09:15 candle whose lower wick >= its body
   (flush-and-recover) vs a red candle closing near its low -- colour says short, structure says buyers.
 
+- 2026-10-12 NAZARA (missed long, +9.4R held to 15:15, high +16R): 09:15 candle 379.00 -> 389.00 CLOSED AT ITS HIGH (no wick against it),
+  opened above yesterday's high (381.25); ALL lines BELOW price (VWAP ~385, 1H EMA34 / daily 8-EMA ~381, 1H EMA8 ~377-381) -- the mirror of
+  INOXGREEN where all lines were above. Broke 389 only at 11:45 after a 2.5-hour pause (383-388) that HELD ABOVE VWAP and never went near
+  the opposite side of the 09:15 candle (377.25) -> a late break that is a continuation, not the failed-opening reversal type (194).
+  Not picked: 'shorts first' filled both slots with SHADOWFAX / PREMIERENE (neither triggered).
+  COMMON THREADS across the three 2026-10-12 charts, to test on history: (a) which side of the price all the lines sit (5-min EMA8, VWAP,
+  1H EMA8 / EMA34, daily 8-EMA); (b) how the 09:15 candle closed (at its extreme vs flush-and-recover wick); (c) for late breaks, whether
+  the pause held VWAP and never touched the opposite side of the 09:15 candle; (d) picking rule: 'first valid break either side' vs
+  'shorts first'.
+
 ### ORB in-play SHORT -- PAPER TRADING from 2026-10-12 (scripts 175-185; not a live rule yet)
 - Evening before / before 09:15: `./eod_checklist.sh` (root), then `python3 185_orb_inplay_scan.py --prep`.
 - 09:21-09:29: `python3 185_orb_inplay_scan.py` -> in-play list (relvol >= 1, top 20), red 09:15 candle = SHORT; trigger = 09:15 low;
