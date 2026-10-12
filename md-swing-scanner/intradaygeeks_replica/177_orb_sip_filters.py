@@ -13,13 +13,14 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np, pandas as pd
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
 from backtest import load
+from orb_common import read5_official  # 2026-10-12: official 09:15 open
 from data.paths import INTRADAY_5M_DIR, INDEX_INTRADAY_DIR
 
 
 def feats(a):
     t, g = a; d = load(t); e8 = d.Close.ewm(span=8, adjust=False).mean().shift(1); e34 = d.Close.ewm(span=34, adjust=False).mean().shift(1)
     yl = d.Low.shift(1); pc = d.Close.shift(1)
-    m = pd.read_csv(INTRADAY_5M_DIR / f"{t}.csv", index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None)
+    m = read5_official(t)
     out = []
     for ix, r in g.iterrows():
         dd = pd.Timestamp(r.date); f = m.loc[dd + pd.Timedelta("9h15min")]; rng = f.High - f.Low

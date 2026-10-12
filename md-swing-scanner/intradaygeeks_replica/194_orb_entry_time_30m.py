@@ -9,11 +9,12 @@ warnings.filterwarnings("ignore")
 from pathlib import Path
 import numpy as np, pandas as pd
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
+from orb_common import read5_official  # 2026-10-12: official 09:15 open
 from data.paths import INTRADAY_5M_DIR
 A = pd.read_csv(HERE / "orb_sip.csv"); A["rank"] = A.groupby("date").rv.rank(ascending=False, method="first")
 S = A[(A.rv >= 1) & (A["rank"] <= 20) & A.traded].copy(); rows = []
 for t, g in S.groupby("ticker"):
-    m = pd.read_csv(INTRADAY_5M_DIR / f"{t}.csv", index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None); m["hm"] = m.index.strftime("%H:%M")
+    m = read5_official(t); m["hm"] = m.index.strftime("%H:%M")
     for ix, r in g.iterrows():
         d = m[m.index.normalize() == pd.Timestamp(r.date)]; f = d.iloc[0]; s = int(r.side)
         pre = d[(d.hm >= "09:20") & (d.hm < r.et)]; atr_px = r.atr / 100 * f.Open

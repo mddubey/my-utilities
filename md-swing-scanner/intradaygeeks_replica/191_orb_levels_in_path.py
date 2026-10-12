@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np, pandas as pd
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
 from backtest import load
+from orb_common import read5_official  # 2026-10-12: official 09:15 open
 from data.paths import INTRADAY_5M_DIR, DAILY_DIR
 
 A = pd.read_csv(HERE / "orb_sip.csv"); A["rank"] = A.groupby("date").rv.rank(ascending=False, method="first")
@@ -23,7 +24,7 @@ rows = []
 for t, g in S.groupby("ticker"):
     d = load(t); raw = pd.read_csv(DAILY_DIR / f"{t}.csv", index_col=0, parse_dates=True)
     e8 = d.Close.ewm(span=8, adjust=False).mean(); e34 = d.Close.ewm(span=34, adjust=False).mean()
-    m = pd.read_csv(INTRADAY_5M_DIR / f"{t}.csv", index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None)
+    m = read5_official(t)
     day = m.index.normalize(); hk = day + pd.Timedelta("9h15min") + ((m.index - day - pd.Timedelta("9h15min")) // pd.Timedelta("60min")) * pd.Timedelta("60min")
     hc = m.Close.groupby(hk).last(); h34 = hc.ewm(span=34, adjust=False).mean()
     for ix, r in g.iterrows():

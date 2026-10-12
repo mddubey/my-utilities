@@ -14,6 +14,7 @@ warnings.filterwarnings("ignore")
 from pathlib import Path
 import numpy as np, pandas as pd
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
+from orb_common import read5_official  # 2026-10-12: official 09:15 open
 from data.paths import INTRADAY_5M_DIR, DAILY_DIR
 
 A = pd.read_csv(HERE / "orb_sip.csv"); A["rank"] = A.groupby("date").rv.rank(ascending=False, method="first")
@@ -34,7 +35,7 @@ def walk(d, k_after, e, side, sp, exit_hm, entry_bar=None, lvl=None):
 
 rows, t0 = [], time.time()
 for n, (t, g) in enumerate(P.groupby("ticker"), 1):
-    m = pd.read_csv(INTRADAY_5M_DIR / f"{t}.csv", index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None)
+    m = read5_official(t)
     m["hm"] = m.index.strftime("%H:%M"); m["day"] = m.index.normalize()
     dv = pd.read_csv(DAILY_DIR / f"{t}.csv", index_col=0, parse_dates=True).Volume
     medv = m[m.Volume > 0].groupby("day").Volume.median().shift(1)

@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np, pandas as pd
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
 from backtest import load
+from orb_common import read5_official  # 2026-10-12: official 09:15 open
 from data.paths import INTRADAY_5M_DIR, INDEX_INTRADAY_DIR
 A0 = pd.read_csv(HERE / "orb_sip.csv"); A0["rank"] = A0.groupby("date").rv.rank(ascending=False, method="first")
 S = A0[(A0.rv >= 1) & (A0["rank"] <= 20) & A0.traded].copy(); S["mon"] = S.date.str[:7]
@@ -22,7 +23,7 @@ rows = []
 for t, g in S.groupby("ticker"):
     d0 = load(t); rng = d0.High - d0.Low
     nr7 = rng.rolling(7).apply(lambda x: float(x[-1] == x.min()), raw=True); inside = (d0.High <= d0.High.shift(1)) & (d0.Low >= d0.Low.shift(1))
-    m = pd.read_csv(INTRADAY_5M_DIR / f"{t}.csv", index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None)
+    m = read5_official(t)
     m["day"] = m.index.normalize(); m["hm"] = m.index.strftime("%H:%M")
     op = m.groupby("day").Open.first(); m["mv"] = (m.Close / m.day.map(op) - 1).abs()
     piv = m.pivot_table(index="day", columns="hm", values="mv"); noise = piv.rolling(14, min_periods=10).mean().shift(1)

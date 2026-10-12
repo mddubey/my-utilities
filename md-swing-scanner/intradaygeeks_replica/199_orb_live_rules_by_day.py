@@ -8,13 +8,14 @@ from pathlib import Path
 import numpy as np, pandas as pd
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
 from backtest import load
+from orb_common import read5_official  # 2026-10-12: official 09:15 open
 from data.paths import INTRADAY_5M_DIR
 A = pd.read_csv(HERE / "orb_sip.csv"); A["rank"] = A.groupby("date").rv.rank(ascending=False, method="first")
 P = A[(A.rv >= 1) & (A["rank"] <= 20)].copy()
 P = P[~(P.traded & (P.et < "09:30"))]                      # broken before 09:30 -> skipped
 lv = {}
 for t, g in P[P.side < 0].groupby("ticker"):              # 09:15 low + yesterday's close for the gap-fill check
-    m = pd.read_csv(INTRADAY_5M_DIR / f"{t}.csv", index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None)
+    m = read5_official(t)
     d0 = load(t)
     for _, r in g.iterrows():
         dd = pd.Timestamp(r.date); b = m[m.index == dd + pd.Timedelta("9h15min")]; prev = d0.Close[d0.index < dd]

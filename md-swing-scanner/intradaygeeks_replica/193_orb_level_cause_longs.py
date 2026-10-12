@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np, pandas as pd
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
 exec(open(HERE / "191_orb_levels_in_path.py").read().split("\ndef row(")[0])
+from orb_common import read5_official  # 2026-10-12: official 09:15 open
 from data.paths import INTRADAY_5M_DIR
 cache = {}
 
@@ -16,7 +17,7 @@ cache = {}
 def path(r, L):
     t = r.ticker
     if t not in cache:
-        m = pd.read_csv(INTRADAY_5M_DIR / f"{t}.csv", index_col=0, parse_dates=True); m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None)
+        m = read5_official(t)
         m["hm"] = m.index.strftime("%H:%M"); cache[t] = m
     m = cache[t]; d = m[m.index.normalize() == pd.Timestamp(r.date)]; e = r.e; stp = e * (1 - 0.1 * r.atr / 100)
     w = d[(d.hm >= r.et) & (d.hm < "15:15")]; reached, stop_at = None, None
