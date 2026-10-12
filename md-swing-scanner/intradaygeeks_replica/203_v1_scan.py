@@ -7,7 +7,7 @@ EMA34). Exits: E1 = 1% target, stop = candle high, only if stop <= 0.5%; E2 = ma
 highest ATR. NIFTY GATE: v1 only trades when Nifty closed above its 200-day SMA yesterday -- below it every setup is INFO.
 Below-200 LEAD flag (202, NOT proven): entry >= 3% (or 2.5%) below yesterday's high.
 Day open = official open (Yahoo 1d bar, = NSE open), not the first bar's open (2026-10-12 fix).
-Usage: python3 203_v1_scan.py [--replay YYYY-MM-DD]"""
+Usage: python3 203_v1_scan.py [--replay YYYY-MM-DD] [--early]   (--early = provisional read of the 10:15 candle before 11:15)"""
 import sys, time, warnings
 warnings.filterwarnings("ignore")
 from pathlib import Path
@@ -48,7 +48,8 @@ if __name__ == "__main__":
     REPLAY = "--replay" in sys.argv
     if REPLAY: TODAY = pd.Timestamp(sys.argv[sys.argv.index("--replay") + 1]); ASOF = TODAY + pd.Timedelta("11h16min")
     else: ASOF = pd.Timestamp.now(tz="Asia/Kolkata").tz_localize(None); TODAY = ASOF.normalize()
-    if not REPLAY and ASOF < TODAY + pd.Timedelta("11h15min"): print("Too early: the 10:15 hourly candle closes at 11:15."); sys.exit()
+    EARLY = "--early" in sys.argv   # 2026-10-12 (user): PROVISIONAL read of the 10:15 candle so far (e.g. at 10:45, like plan B's half-hour check)
+    if not REPLAY and not EARLY and ASOF < TODAY + pd.Timedelta("11h15min"): print("Too early: the 10:15 hourly candle closes at 11:15 (use --early for a provisional read)."); sys.exit()
     t0 = time.time()
     N = pd.read_csv(DAILY_DIR / "_NIFTY.csv", index_col=0, parse_dates=True).sort_index(); N = N[N.index < TODAY]
     n200 = N.Close.iloc[-1] > N.Close.rolling(200).mean().iloc[-1]
@@ -87,7 +88,7 @@ if __name__ == "__main__":
         if g is None or len(g) == 0: continue
         hm = g.index.strftime("%H:%M")
         h915 = g[(hm >= "09:15") & (hm < "10:15")]; c = g[(hm >= "10:15") & (hm < "11:15") & (g.index + pd.Timedelta("5min") <= ASOF)]
-        if len(h915) < 10 or len(c) < 12: continue
+        if len(h915) < 10 or len(c) < (6 if EARLY else 12): continue
         E = r.e34y + 2 / 35 * (h915.Close.iloc[-1] - r.e34y)          # 1H EMA34 as of the 09:15 hour's close
         o, hi, lo, cl = c.Open.iloc[0], c.High.max(), c.Low.min(), c.Close.iloc[-1]
         if not (hi >= E and cl < E and cl < o): continue
@@ -110,7 +111,7 @@ if __name__ == "__main__":
         rows.append(dict(ticker=t, branch=br, atr=round(r.atrp, 2), entry=round(cl, 2), stop=round(hi, 2), stop_pct=round(stop, 2),
                          E1_target=round(cl * 0.99, 2) if e1 else None, E2_target=round(cl * (1 - tp2 / 100), 2) if e2 else None,
                          ema34_1h=round(E, 2), open_vs_ema=round(ov, 2), gap=round(gap, 2), below_yday_high=round(dyh, 2), lead=lead,
-                         status=("ENTER" if n200 else "INFO (Nifty < 200d)")))
+                         status=("PROVISIONAL " if EARLY else "") + ("ENTER" if n200 else "INFO (Nifty < 200d)")))
     R = pd.DataFrame(rows)
     if R.empty: print("no v1 setups this hour"); sys.exit()
     R = R.sort_values("atr", ascending=False)
