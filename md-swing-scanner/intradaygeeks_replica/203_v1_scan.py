@@ -82,7 +82,7 @@ if __name__ == "__main__":
         for t, g in dl.items():
             if g is None or g.empty: continue
             gi = g.index.tz_localize(None) if g.index.tz is not None else g.index; g.index = gi.normalize(); dopen[t] = g.Open.get(TODAY, np.nan)
-    rows = []
+    rows = []; near = []
     for t, r in P.iterrows():
         g = bars.get(t, pd.DataFrame())
         if g is None or len(g) == 0: continue
@@ -91,8 +91,16 @@ if __name__ == "__main__":
         if len(h915) < 10 or len(c) < (6 if EARLY else 12): continue
         E = r.e34y + 2 / 35 * (h915.Close.iloc[-1] - r.e34y)          # 1H EMA34 as of the 09:15 hour's close
         o, hi, lo, cl = c.Open.iloc[0], c.High.max(), c.Low.min(), c.Close.iloc[-1]
-        if not (hi >= E and cl < E and cl < o): continue
         oo = dopen.get(t, np.nan)
+        if "--near" in sys.argv and oo == oo:   # 2026-10-12 (user): the closest candidates and what each still lacks
+            gp = (oo / r.pc - 1) * 100; ovv = (oo / E - 1) * 100
+            miss = [m_ for m_, ok in (("no touch (high < EMA34)", hi >= E), ("closed above EMA34", cl < E), ("green candle", cl < o),
+                                      ("gap outside -0.25..+0.5", -0.25 < gp <= 0.5),
+                                      ("open not 0-0.5% below EMA34 (A) / not above with ATR>=3 (B)", (-0.5 <= ovv < 0) or (ovv >= 0 and r.atrp >= 3))) if not ok]
+            near.append(dict(ticker=t, price=round(cl, 2), ema34_1h=round(E, 2), high_vs_ema=round((hi / E - 1) * 100, 2), close_vs_ema=round((cl / E - 1) * 100, 2),
+                             candle=("red" if cl < o else "green"), gap=round(gp, 2), open_vs_ema=round(ovv, 2), atr=round(r.atrp, 2),
+                             below_yday_high=round((cl / r.ph - 1) * 100, 2), missing="; ".join(miss) or "none"))
+        if not (hi >= E and cl < E and cl < o): continue
         if oo != oo: continue
         gap = (oo / r.pc - 1) * 100
         if not (-0.25 < gap <= 0.5): continue
@@ -112,6 +120,10 @@ if __name__ == "__main__":
                          E1_target=round(cl * 0.99, 2) if e1 else None, E2_target=round(cl * (1 - tp2 / 100), 2) if e2 else None,
                          ema34_1h=round(E, 2), open_vs_ema=round(ov, 2), gap=round(gap, 2), below_yday_high=round(dyh, 2), lead=lead,
                          status=("PROVISIONAL " if EARLY else "") + ("ENTER" if n200 else "INFO (Nifty < 200d)")))
+    if "--near" in sys.argv and near:
+        Nn = pd.DataFrame(near); Nn["dist"] = (Nn.close_vs_ema).abs(); Nn = Nn.sort_values("dist").head(int(sys.argv[sys.argv.index("--near") + 1]) if len(sys.argv) > sys.argv.index("--near") + 1 and sys.argv[sys.argv.index("--near") + 1].isdigit() else 5)
+        print("\nNEAREST to a v1 setup (price closest to its 1H EMA34) and what each still lacks:")
+        with pd.option_context("display.width", 250, "display.max_columns", 30, "display.max_colwidth", 80): print(Nn.drop(columns="dist").to_string(index=False))
     R = pd.DataFrame(rows)
     if R.empty: print("no v1 setups this hour"); sys.exit()
     R = R.sort_values("atr", ascending=False)
