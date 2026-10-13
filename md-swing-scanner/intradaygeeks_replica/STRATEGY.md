@@ -170,6 +170,17 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 
 ---
 
+### Every candle at the line, both sides (2026-10-13, user: 'make sure these come up so we don't miss them')
+- LIVE: `python3 203_v1_scan.py --wick [--hour HH:MM] [--early]` lists, for ANY hourly candle (10:15 default; --hour 11:15 / 12:15 / 13:15 / 14:15),
+  every liquid stock (both daily trends) with (a) an UPPER-WICK rejection at the 1H EMA34 and (b) a SUPPORT candle (low through the line, close
+  above in the top 40%, opened >= line - 0.2%), with stop_from_line, d8_touch / low_vs_d8 and liquidity. v1 setups still come from the 10:15 candle
+  only. Replay check: MOTILALOFS 2026-10-13 11:15 shows as SUPPORT (line 1038.11, low 1034.55). INFO only -- both mechanical versions tested
+  negative (217-219).
+- RESEARCH RULE: any study of a touch at a line (1H EMA34, VWAP, daily EMA ...) builds the EVENT first and classifies BOTH sides (rejection /
+  support / body cross, weak versions) before assigning a trade direction -- never a side-first population (v1 shorts silently held support
+  candles; the long mirror never saw uptrend supports). Entry convention must match how the user trades (at the line on a retrace, not at the
+  hourly close) and no inherited stop caps (218: v1's caps dropped 58% of the deep-wick candles).
+
 ### Live observations to check later (not rules, not tested)
 - 2026-10-12 INOXGREEN (user): the in-play ORB short was taken NOT on the first break (09:24) but after the bounce was rejected at VWAP
   (~09:28-09:30, high ~123.4 vs VWAP ~123.0) and price came back down through the level (121.55). Idea to check on history: ORB stock ->

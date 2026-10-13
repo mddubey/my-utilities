@@ -50,10 +50,12 @@ def prep_row(args):
 
 if __name__ == "__main__":
     REPLAY = "--replay" in sys.argv
-    if REPLAY: TODAY = pd.Timestamp(sys.argv[sys.argv.index("--replay") + 1]); ASOF = TODAY + pd.Timedelta("11h16min")
+    HOUR = sys.argv[sys.argv.index("--hour") + 1] if "--hour" in sys.argv else "10:15"   # 2026-10-13: --wick lists for ANY hourly candle (v1 itself stays 10:15)
+    HOFF = pd.Timedelta(hours=int(HOUR[:2]), minutes=int(HOUR[3:]))
+    if REPLAY: TODAY = pd.Timestamp(sys.argv[sys.argv.index("--replay") + 1]); ASOF = TODAY + HOFF + pd.Timedelta("61min")
     else: ASOF = pd.Timestamp.now(tz="Asia/Kolkata").tz_localize(None); TODAY = ASOF.normalize()
     EARLY = "--early" in sys.argv   # 2026-10-12 (user): PROVISIONAL read of the 10:15 candle so far (e.g. at 10:45, like plan B's half-hour check)
-    if not REPLAY and not EARLY and ASOF < TODAY + pd.Timedelta("11h15min"): print("Too early: the 10:15 hourly candle closes at 11:15 (use --early for a provisional read)."); sys.exit()
+    if not REPLAY and not EARLY and ASOF < TODAY + HOFF + pd.Timedelta("60min"): print(f"Too early: the {HOUR} hourly candle has not closed yet (use --early for a provisional read)."); sys.exit()
     t0 = time.time()
     N = pd.read_csv(DAILY_DIR / "_NIFTY.csv", index_col=0, parse_dates=True).sort_index(); N = N[N.index < TODAY]
     n200 = N.Close.iloc[-1] > N.Close.rolling(200).mean().iloc[-1]
@@ -88,14 +90,18 @@ if __name__ == "__main__":
         for t, g in dl.items():
             if g is None or g.empty: continue
             gi = g.index.tz_localize(None) if g.index.tz is not None else g.index; g.index = gi.normalize(); dopen[t] = g.Open.get(TODAY, np.nan)
-    rows = []; near = []; wk = []
+    rows = []; near = []; wk = []; sp = []
     for t, r in P.iterrows():
         g = bars.get(t, pd.DataFrame())
         if g is None or len(g) == 0: continue
         hm = g.index.strftime("%H:%M")
-        h915 = g[(hm >= "09:15") & (hm < "10:15")]; c = g[(hm >= "10:15") & (hm < "11:15") & (g.index + pd.Timedelta("5min") <= ASOF)]
-        if len(h915) < 10 or len(c) < (6 if EARLY else 12): continue
-        E = r.e34y + 2 / 35 * (h915.Close.iloc[-1] - r.e34y)          # 1H EMA34 as of the 09:15 hour's close
+        hs0 = TODAY + pd.Timedelta("9h15min"); E = r.e34y; ok_ = True; hs = hs0
+        while hs < TODAY + HOFF:                                          # 1H EMA34 updated through every completed hour before the candle
+            hb = g[(g.index >= hs) & (g.index < hs + pd.Timedelta("60min"))]
+            if len(hb) < 10: ok_ = False; break
+            E = E + 2 / 35 * (hb.Close.iloc[-1] - E); hs += pd.Timedelta("60min")
+        cs = TODAY + HOFF; c = g[(g.index >= cs) & (g.index < cs + pd.Timedelta("60min")) & (g.index + pd.Timedelta("5min") <= ASOF)]
+        if not ok_ or len(c) < (6 if EARLY else 12): continue
         o, hi, lo, cl = c.Open.iloc[0], c.High.max(), c.Low.min(), c.Close.iloc[-1]
         oo = dopen.get(t, np.nan)
         if WICK and hi >= E and cl < E and hi > lo:
@@ -107,6 +113,15 @@ if __name__ == "__main__":
                                opened=('below' if oo == oo and oo < E else 'above'), d8_vs_price=round((d8w / cl - 1) * 100, 2), atr=round(r.atrp, 2),
                                liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN' if r.get('liq5_L', 99) < 15 else ''),
                                d8_touch=round(r.s8, 2), d8_touch_pct=round((r.s8 / cl - 1) * 100, 2), d21_touch=round(r.get('s21', np.nan), 2)))
+        if WICK and lo <= E < cl and hi > lo:                             # 2026-10-13 (user): SUPPORT candles too -- 'don't miss these trades'
+            cpp = (cl - lo) / (hi - lo); ovs = (o / E - 1) * 100
+            if cpp >= 0.6 and ovs >= -0.2:
+                sp.append(dict(ticker=t, daily=('up' if r.up else 'down'), price=round(cl, 2), ema34_1h=round(E, 2), high=round(hi, 2), low=round(lo, 2),
+                               candle=('green' if cl >= o else 'red'), close_pos=f"{cpp*100:.0f}%", open_vs_line=round(ovs, 2),
+                               stop_from_close=round((cl / lo - 1) * 100, 2), stop_from_line=round((E / lo - 1) * 100, 2),
+                               d8_touch=round(r.s8, 2), low_vs_d8=round((lo / r.s8 - 1) * 100, 2), atr=round(r.atrp, 2),
+                               liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN' if r.get('liq5_L', 99) < 15 else '')))
+        if HOUR != "10:15": continue                                      # v1 itself is defined on the 10:15 candle only
         if "--near" in sys.argv and oo == oo and not LONG:   # 2026-10-12 (user): the closest candidates and what each still lacks
             gp = (oo / r.pc - 1) * 100; ovv = (oo / E - 1) * 100
             miss = [m_ for m_, ok in (("no touch (high < EMA34)", hi >= E), ("closed above EMA34", cl < E), ("green candle", cl < o),
@@ -144,9 +159,16 @@ if __name__ == "__main__":
         with pd.option_context("display.width", 250, "display.max_columns", 30, "display.max_colwidth", 80): print(Nn.drop(columns="dist").to_string(index=False))
     if WICK:
         W = pd.DataFrame(wk)
-        print(f"\n10:15 candles with an UPPER WICK (>= 1/3 of the range) into the 1H EMA34 and close below it -- {len(W)} (both daily trends; d8_vs_price < 0 = live daily 8-EMA BELOW price = support underneath):")
+        print(f"\n{HOUR} candles with an UPPER WICK (>= 1/3 of the range) into the 1H EMA34 and close below it -- {len(W)} (both daily trends; d8_vs_price < 0 = live daily 8-EMA BELOW price = support underneath):")
         if len(W):
             with pd.option_context("display.width", 250, "display.max_columns", 30): print(W.sort_values("stop_pct").to_string(index=False))
+        S_ = pd.DataFrame(sp)
+        print(f"\n{HOUR} SUPPORT candles (low through the 1H EMA34, closed above in the top 40%, opened >= line - 0.2%) -- {len(S_)} (both trends; "
+              "stop_from_line = risk if bought back at the line with the stop under the low; low_vs_d8 = how far the low is above yesterday's daily EMA8):")
+        if len(S_):
+            with pd.option_context("display.width", 250, "display.max_columns", 30): print(S_.sort_values("stop_from_line").to_string(index=False))
+        print("(INFO only: as mechanical rules both lists tested negative -- 217 / 218 / 219. Purpose: see every candle at the line, both sides.)")
+        if HOUR != "10:15": sys.exit()
     R = pd.DataFrame(rows)
     if R.empty: print(f"no v1 {'LONG-mirror ' if LONG else ''}setups this hour"); sys.exit()
     R = R.sort_values("atr", ascending=False)
