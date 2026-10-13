@@ -24,6 +24,8 @@ from data.paths import DAILY_DIR
 A = pd.read_csv(HERE / "orb_sip.csv"); A["rank"] = A.groupby("date").rv.rank(ascending=False, method="first")
 P = A[(A.rv >= 1) & (A["rank"] <= 20)].copy()
 STOPS = ["ATR10", "ATR20", "CLOSE", "FIB236", "VWAP"]; TGTS = [1.0, 1.5, 2.0]
+SWEEP = "--sweep" in sys.argv   # 2026-10-13 (user: the tight SL is sensitive to pullbacks): plain ATR stops 8 / 10 / 12 / 15 / 20 / 25%
+if SWEEP: STOPS = ["ATR8", "ATR10", "ATR12", "ATR15", "ATR20", "ATR25"]
 
 
 def run(d, kb, b0, ep, s, lvl, stp, tgt_pct, close_exit, gapfill):
@@ -57,6 +59,7 @@ for t, g in P.groupby("ticker"):
         stops = {"ATR10": ep * (1 - s * 0.1 * r.atr / 100), "ATR20": ep * (1 - s * 0.2 * r.atr / 100),
                  "FIB236": lvl - s * 0.236 * rng, "VWAP": vw.get(kb, np.nan)}
         stops["CLOSE"] = stops["ATR20"]
+        for k in (8, 12, 15, 25): stops[f"ATR{k}"] = ep * (1 - s * k / 100 * r.atr / 100)
         rec = dict(t=t, date=r.date, side=s)
         for sn in STOPS:
             stp = stops[sn]
@@ -67,10 +70,10 @@ for t, g in P.groupby("ticker"):
                 ret = s * (px - ep) / ep * 100
                 rec[f"{sn}_{tp}"] = ret / risk * 1000 - 85 * (1000 / (risk / 100)) / 1e5; rec[f"{sn}_{tp}_how"] = how
         rows.append(rec)
-X = pd.DataFrame(rows); X.to_csv(HERE / "orb_stop_placement.csv", index=False)
+X = pd.DataFrame(rows); X.to_csv(HERE / ("orb_stop_sweep.csv" if SWEEP else "orb_stop_placement.csv"), index=False)
 
-print("HAND CHECK (3 random shorts, ATR10 / CLOSE at 1.5%):")
-print(X[X.side == -1].sample(3, random_state=3)[["t", "date", "risk_ATR10", "ATR10_1.5", "ATR10_1.5_how", "risk_CLOSE", "CLOSE_1.5", "CLOSE_1.5_how", "risk_FIB236", "risk_VWAP"]].round(2).to_string(index=False))
+if not SWEEP: print("HAND CHECK (3 random shorts, ATR10 / CLOSE at 1.5%):")
+if not SWEEP: print(X[X.side == -1].sample(3, random_state=3)[["t", "date", "risk_ATR10", "ATR10_1.5", "ATR10_1.5_how", "risk_CLOSE", "CLOSE_1.5", "CLOSE_1.5_how", "risk_FIB236", "risk_VWAP"]].round(2).to_string(index=False))
 for sd, sn_ in ((-1, "SHORTS"), (1, "LONGS")):
     G = X[X.side == sd]
     print(f"\n## {sn_}: {len(G)} breaks")
