@@ -65,7 +65,8 @@ if __name__ == "__main__":
         uni = pd.read_csv(HERE.parent / "nse_equity_universe.csv").ticker.tolist()
         with Pool(6) as p: P = pd.DataFrame([r for r in p.map(prep_row, [(t, TODAY) for t in uni], chunksize=20) if r]).set_index("t")
         if not REPLAY: P.to_csv(PREP)
-    P = P[(P.liq_L >= 15) & (P.up != LONG)]
+    WICK = "--wick" in sys.argv   # 2026-10-13 (user): list every 10:15 candle with an UPPER WICK into the 1H EMA34 (both daily trends), v1 rules or not
+    P = P[(P.liq_L >= 15) & ((P.up != LONG) | WICK)]
     print(("LONG MIRROR (INFO only, 166 failed) -- " if LONG else "") + f"candidates (liquid, >= Rs100, ATR >= 2%, daily 8 {'<' if LONG else '>'} 34): {len(P)} | prep {time.time()-t0:.0f}s", flush=True)
     if REPLAY:
         bars, dopen = {}, {}
@@ -85,7 +86,7 @@ if __name__ == "__main__":
         for t, g in dl.items():
             if g is None or g.empty: continue
             gi = g.index.tz_localize(None) if g.index.tz is not None else g.index; g.index = gi.normalize(); dopen[t] = g.Open.get(TODAY, np.nan)
-    rows = []; near = []
+    rows = []; near = []; wk = []
     for t, r in P.iterrows():
         g = bars.get(t, pd.DataFrame())
         if g is None or len(g) == 0: continue
@@ -95,6 +96,13 @@ if __name__ == "__main__":
         E = r.e34y + 2 / 35 * (h915.Close.iloc[-1] - r.e34y)          # 1H EMA34 as of the 09:15 hour's close
         o, hi, lo, cl = c.Open.iloc[0], c.High.max(), c.Low.min(), c.Close.iloc[-1]
         oo = dopen.get(t, np.nan)
+        if WICK and hi >= E and cl < E and hi > lo:
+            uw = (hi - max(o, cl)) / (hi - lo); lw = (min(o, cl) - lo) / (hi - lo)
+            if uw >= 1 / 3:
+                d8w = 2 / 9 * cl + 7 / 9 * r.s8
+                wk.append(dict(ticker=t, daily=('up' if r.up else 'down'), price=round(cl, 2), ema34_1h=round(E, 2), high=round(hi, 2), low=round(lo, 2),
+                               candle=('red' if cl < o else 'green'), upper_wick=f"{uw*100:.0f}%", lower_wick=f"{lw*100:.0f}%", stop_pct=round((hi / cl - 1) * 100, 2),
+                               opened=('below' if oo == oo and oo < E else 'above'), d8_vs_price=round((d8w / cl - 1) * 100, 2), atr=round(r.atrp, 2)))
         if "--near" in sys.argv and oo == oo and not LONG:   # 2026-10-12 (user): the closest candidates and what each still lacks
             gp = (oo / r.pc - 1) * 100; ovv = (oo / E - 1) * 100
             miss = [m_ for m_, ok in (("no touch (high < EMA34)", hi >= E), ("closed above EMA34", cl < E), ("green candle", cl < o),
@@ -103,6 +111,7 @@ if __name__ == "__main__":
             near.append(dict(ticker=t, price=round(cl, 2), ema34_1h=round(E, 2), high_vs_ema=round((hi / E - 1) * 100, 2), close_vs_ema=round((cl / E - 1) * 100, 2),
                              candle=("red" if cl < o else "green"), gap=round(gp, 2), open_vs_ema=round(ovv, 2), atr=round(r.atrp, 2),
                              below_yday_high=round((cl / r.ph - 1) * 100, 2), missing="; ".join(miss) or "none"))
+        if WICK and r.up == LONG: continue                                  # --wick widened the list; v1 itself keeps its own daily trend
         if not ((lo <= E and cl > E and cl > o) if LONG else (hi >= E and cl < E and cl < o)): continue
         if oo != oo: continue
         gap = (oo / r.pc - 1) * 100
@@ -128,6 +137,11 @@ if __name__ == "__main__":
         Nn = pd.DataFrame(near); Nn["dist"] = (Nn.close_vs_ema).abs(); Nn = Nn.sort_values("dist").head(int(sys.argv[sys.argv.index("--near") + 1]) if len(sys.argv) > sys.argv.index("--near") + 1 and sys.argv[sys.argv.index("--near") + 1].isdigit() else 5)
         print("\nNEAREST to a v1 setup (price closest to its 1H EMA34) and what each still lacks:")
         with pd.option_context("display.width", 250, "display.max_columns", 30, "display.max_colwidth", 80): print(Nn.drop(columns="dist").to_string(index=False))
+    if WICK:
+        W = pd.DataFrame(wk)
+        print(f"\n10:15 candles with an UPPER WICK (>= 1/3 of the range) into the 1H EMA34 and close below it -- {len(W)} (both daily trends; d8_vs_price < 0 = live daily 8-EMA BELOW price = support underneath):")
+        if len(W):
+            with pd.option_context("display.width", 250, "display.max_columns", 30): print(W.sort_values("stop_pct").to_string(index=False))
     R = pd.DataFrame(rows)
     if R.empty: print(f"no v1 {'LONG-mirror ' if LONG else ''}setups this hour"); sys.exit()
     R = R.sort_values("atr", ascending=False)
