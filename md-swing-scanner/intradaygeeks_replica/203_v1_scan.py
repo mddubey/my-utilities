@@ -7,7 +7,10 @@ EMA34). Exits: E1 = 1% target, stop = candle high, only if stop <= 0.5%; E2 = ma
 highest ATR. NIFTY GATE: v1 only trades when Nifty closed above its 200-day SMA yesterday -- below it every setup is INFO.
 Below-200 LEAD flag (202, NOT proven): entry >= 3% (or 2.5%) below yesterday's high.
 Day open = official open (Yahoo 1d bar, = NSE open), not the first bar's open (2026-10-12 fix).
-Usage: python3 203_v1_scan.py [--replay YYYY-MM-DD] [--early]   (--early = provisional read of the 10:15 candle before 11:15)"""
+Usage: python3 203_v1_scan.py [--replay YYYY-MM-DD] [--early] [--long]   (--early = provisional read of the 10:15 candle before 11:15)
+--long (2026-10-13, user: "shorts and longs both"): the LONG MIRROR of every v1 rule exactly as script 166 tested it -- stock daily 8 < 34,
+gap -0.5..+0.25%, 10:15 candle GREEN with LOW <= 1H EMA34 and close above, A' = opened 0-0.5% above the EMA34, B' = opened below with
+ATR >= 3, no doji cut by the line, no converged lines, stop = candle low. 166 FAILED (every row negative, 63-71% stopped) -> INFO only."""
 import sys, time, warnings
 warnings.filterwarnings("ignore")
 from pathlib import Path
@@ -33,7 +36,6 @@ def prep_row(args):
     pc = d.Close.iloc[-1]; atrp = d.atr14.iloc[-1] / pc * 100
     if pc < 100 or atrp < 2 or d.traded_value_sma20.iloc[-1] < 1e8: return None
     s8 = d.Close.ewm(span=8, adjust=False).mean().iloc[-1]; s34 = d.Close.ewm(span=34, adjust=False).mean().iloc[-1]
-    if not s8 > s34: return None
     m = pd.read_csv(INTRADAY_5M_DIR / f"{t}.csv", index_col=0, parse_dates=True) if (INTRADAY_5M_DIR / f"{t}.csv").exists() else None
     if m is None: return None
     m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None); m = m[m.index < today]
@@ -41,7 +43,7 @@ def prep_row(args):
     hh = h1(t); hh = hh[hh.index < today]
     if len(hh) < 60: return None
     e34y = hh.Close.ewm(span=34, adjust=False).mean().iloc[-1]   # 1H EMA34 through yesterday's last hourly close
-    return dict(t=t, pc=pc, ph=d.High.iloc[-1], atrp=atrp, s8=s8, s34=s34, liq_L=liq, e34y=e34y)
+    return dict(t=t, pc=pc, ph=d.High.iloc[-1], atrp=atrp, s8=s8, s34=s34, up=bool(s8 > s34), liq_L=liq, e34y=e34y)
 
 
 if __name__ == "__main__":
@@ -55,15 +57,16 @@ if __name__ == "__main__":
     n200 = N.Close.iloc[-1] > N.Close.rolling(200).mean().iloc[-1]
     print(f"v1 scan {TODAY:%Y-%m-%d} | NIFTY GATE: yesterday {N.Close.iloc[-1]:.0f} vs 200d {N.Close.rolling(200).mean().iloc[-1]:.0f} -> "
           + ("ON (v1 trades)" if n200 else "OFF -- every setup is INFO only (v1 loses below the 200-day)"))
-    PREP = HERE / "prep" / f"v1_prep_{TODAY:%Y%m%d}.csv"
+    LONG = "--long" in sys.argv; S = 1 if LONG else -1
+    PREP = HERE / "prep" / f"v1_prep2_{TODAY:%Y%m%d}.csv"   # prep2 = both daily trends, `up` column (2026-10-13)
     if PREP.exists() and not REPLAY: P = pd.read_csv(PREP, index_col=0)
     else:
         from multiprocessing import Pool
         uni = pd.read_csv(HERE.parent / "nse_equity_universe.csv").ticker.tolist()
         with Pool(6) as p: P = pd.DataFrame([r for r in p.map(prep_row, [(t, TODAY) for t in uni], chunksize=20) if r]).set_index("t")
         if not REPLAY: P.to_csv(PREP)
-    P = P[P.liq_L >= 15]
-    print(f"candidates (liquid, >= Rs100, ATR >= 2%, daily 8 > 34): {len(P)} | prep {time.time()-t0:.0f}s", flush=True)
+    P = P[(P.liq_L >= 15) & (P.up != LONG)]
+    print(("LONG MIRROR (INFO only, 166 failed) -- " if LONG else "") + f"candidates (liquid, >= Rs100, ATR >= 2%, daily 8 {'<' if LONG else '>'} 34): {len(P)} | prep {time.time()-t0:.0f}s", flush=True)
     if REPLAY:
         bars, dopen = {}, {}
         for t in P.index:
@@ -92,7 +95,7 @@ if __name__ == "__main__":
         E = r.e34y + 2 / 35 * (h915.Close.iloc[-1] - r.e34y)          # 1H EMA34 as of the 09:15 hour's close
         o, hi, lo, cl = c.Open.iloc[0], c.High.max(), c.Low.min(), c.Close.iloc[-1]
         oo = dopen.get(t, np.nan)
-        if "--near" in sys.argv and oo == oo:   # 2026-10-12 (user): the closest candidates and what each still lacks
+        if "--near" in sys.argv and oo == oo and not LONG:   # 2026-10-12 (user): the closest candidates and what each still lacks
             gp = (oo / r.pc - 1) * 100; ovv = (oo / E - 1) * 100
             miss = [m_ for m_, ok in (("no touch (high < EMA34)", hi >= E), ("closed above EMA34", cl < E), ("green candle", cl < o),
                                       ("gap outside -0.25..+0.5", -0.25 < gp <= 0.5),
@@ -100,33 +103,34 @@ if __name__ == "__main__":
             near.append(dict(ticker=t, price=round(cl, 2), ema34_1h=round(E, 2), high_vs_ema=round((hi / E - 1) * 100, 2), close_vs_ema=round((cl / E - 1) * 100, 2),
                              candle=("red" if cl < o else "green"), gap=round(gp, 2), open_vs_ema=round(ovv, 2), atr=round(r.atrp, 2),
                              below_yday_high=round((cl / r.ph - 1) * 100, 2), missing="; ".join(miss) or "none"))
-        if not (hi >= E and cl < E and cl < o): continue
+        if not ((lo <= E and cl > E and cl > o) if LONG else (hi >= E and cl < E and cl < o)): continue
         if oo != oo: continue
         gap = (oo / r.pc - 1) * 100
-        if not (-0.25 < gap <= 0.5): continue
+        if not ((-0.5 <= gap < 0.25) if LONG else (-0.25 < gap <= 0.5)): continue
         ov = (oo / E - 1) * 100
-        br = "A" if -0.5 <= ov < 0 else ("B" if ov >= 0 and r.atrp >= 3 else None)
+        if LONG: br = "A'" if 0 < ov <= 0.5 else ("B'" if ov <= 0 and r.atrp >= 3 else None)
+        else: br = "A" if -0.5 <= ov < 0 else ("B" if ov >= 0 and r.atrp >= 3 else None)
         if br is None: continue
-        rng = hi - lo; bodyp = (o - cl) / rng if rng > 0 else 0
-        if bodyp < 0.25 and o >= E: continue                              # doji cut by the line
+        rng = hi - lo; bodyp = (S * (cl - o)) / rng if rng > 0 else 0
+        if bodyp < 0.25 and ((o <= E) if LONG else (o >= E)): continue                              # doji cut by the line
         d8 = 2 / 9 * cl + 7 / 9 * r.s8
         if abs(E - d8) / cl * 100 < 0.25: continue                         # converged lines
-        stop = (hi - cl) / cl * 100; tp2 = max(1.0, 0.35 * r.atrp)
+        stop = ((cl - lo) if LONG else (hi - cl)) / cl * 100; tp2 = max(1.0, 0.35 * r.atrp)
         e1 = stop <= 0.5; e2 = stop <= tp2 / 2
         if not (e1 or e2): continue
         dyh = (cl / r.ph - 1) * 100
-        lead = "LEAD >= 3%" if dyh <= -3 else ("lead >= 2.5%" if dyh <= -2.5 else "")
-        rows.append(dict(ticker=t, branch=br, atr=round(r.atrp, 2), entry=round(cl, 2), stop=round(hi, 2), stop_pct=round(stop, 2),
-                         E1_target=round(cl * 0.99, 2) if e1 else None, E2_target=round(cl * (1 - tp2 / 100), 2) if e2 else None,
+        lead = "" if LONG else ("LEAD >= 3%" if dyh <= -3 else ("lead >= 2.5%" if dyh <= -2.5 else ""))
+        rows.append(dict(ticker=t, side="LONG" if LONG else "SHORT", branch=br, atr=round(r.atrp, 2), entry=round(cl, 2), stop=round(lo if LONG else hi, 2), stop_pct=round(stop, 2),
+                         E1_target=round(cl * (1 + S * 0.01), 2) if e1 else None, E2_target=round(cl * (1 + S * tp2 / 100), 2) if e2 else None,
                          ema34_1h=round(E, 2), open_vs_ema=round(ov, 2), gap=round(gap, 2), below_yday_high=round(dyh, 2), lead=lead,
-                         status=("PROVISIONAL " if EARLY else "") + ("ENTER" if n200 else "INFO (Nifty < 200d)")))
+                         status=("PROVISIONAL " if EARLY else "") + ("INFO (long mirror FAILED in 166)" if LONG else ("ENTER" if n200 else "INFO (Nifty < 200d)"))))
     if "--near" in sys.argv and near:
         Nn = pd.DataFrame(near); Nn["dist"] = (Nn.close_vs_ema).abs(); Nn = Nn.sort_values("dist").head(int(sys.argv[sys.argv.index("--near") + 1]) if len(sys.argv) > sys.argv.index("--near") + 1 and sys.argv[sys.argv.index("--near") + 1].isdigit() else 5)
         print("\nNEAREST to a v1 setup (price closest to its 1H EMA34) and what each still lacks:")
         with pd.option_context("display.width", 250, "display.max_columns", 30, "display.max_colwidth", 80): print(Nn.drop(columns="dist").to_string(index=False))
     R = pd.DataFrame(rows)
-    if R.empty: print("no v1 setups this hour"); sys.exit()
+    if R.empty: print(f"no v1 {'LONG-mirror ' if LONG else ''}setups this hour"); sys.exit()
     R = R.sort_values("atr", ascending=False)
-    print(f"\n{len(R)} v1 setup(s) -- pick = highest ATR: {R.ticker.iloc[0]} | below-200 lead (>= 3% under yesterday's high): {', '.join(R[R.lead == 'LEAD >= 3%'].ticker) or 'none'}")
+    print(f"\n{len(R)} v1 {'LONG-mirror ' if LONG else ''}setup(s) -- pick = highest ATR: {R.ticker.iloc[0]}" + ("" if LONG else f" | below-200 lead (>= 3% under yesterday's high): {', '.join(R[R.lead == 'LEAD >= 3%'].ticker) or 'none'}"))
     with pd.option_context("display.width", 250, "display.max_columns", 30): print(R.to_string(index=False))
-    out = HERE / "v1_scans"; out.mkdir(exist_ok=True); R.to_csv(out / f"v1_scan_{ASOF:%Y%m%d_%H%M}{'_replay' if REPLAY else ''}.csv", index=False)
+    out = HERE / "v1_scans"; out.mkdir(exist_ok=True); R.to_csv(out / f"v1_scan_{ASOF:%Y%m%d_%H%M}{'_long' if LONG else ''}{'_replay' if REPLAY else ''}.csv", index=False)
