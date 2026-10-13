@@ -44,7 +44,8 @@ def prep_row(args):
     hh = h1(t); hh = hh[hh.index < today]
     if len(hh) < 60: return None
     e34y = hh.Close.ewm(span=34, adjust=False).mean().iloc[-1]   # 1H EMA34 through yesterday's last hourly close
-    return dict(t=t, pc=pc, ph=d.High.iloc[-1], atrp=atrp, s8=s8, s34=s34, up=bool(s8 > s34), liq_L=liq, liq5_L=liq5, e34y=e34y)
+    return dict(t=t, pc=pc, ph=d.High.iloc[-1], atrp=atrp, s8=s8, s34=s34, up=bool(s8 > s34), liq_L=liq, liq5_L=liq5, e34y=e34y,
+                s21=d.Close.ewm(span=21, adjust=False).mean().iloc[-1])   # s8 / s21 = yesterday's daily EMAs = TODAY'S TOUCH PRICES (2026-10-13)
 
 
 if __name__ == "__main__":
@@ -59,7 +60,7 @@ if __name__ == "__main__":
     print(f"v1 scan {TODAY:%Y-%m-%d} | NIFTY GATE: yesterday {N.Close.iloc[-1]:.0f} vs 200d {N.Close.rolling(200).mean().iloc[-1]:.0f} -> "
           + ("ON (v1 trades)" if n200 else "OFF -- every setup is INFO only (v1 loses below the 200-day)"))
     LONG = "--long" in sys.argv; S = 1 if LONG else -1
-    PREP = HERE / "prep" / f"v1_prep3_{TODAY:%Y%m%d}.csv"   # prep3 = + liq5_L (2026-10-13)   # prep2 = both daily trends, `up` column (2026-10-13)
+    PREP = HERE / "prep" / f"v1_prep4_{TODAY:%Y%m%d}.csv"   # prep3 = + liq5_L (2026-10-13)   # prep2 = both daily trends, `up` column (2026-10-13)
     if PREP.exists() and not REPLAY: P = pd.read_csv(PREP, index_col=0)
     else:
         from multiprocessing import Pool
@@ -104,7 +105,8 @@ if __name__ == "__main__":
                 wk.append(dict(ticker=t, daily=('up' if r.up else 'down'), price=round(cl, 2), ema34_1h=round(E, 2), high=round(hi, 2), low=round(lo, 2),
                                candle=('red' if cl < o else 'green'), upper_wick=f"{uw*100:.0f}%", lower_wick=f"{lw*100:.0f}%", stop_pct=round((hi / cl - 1) * 100, 2),
                                opened=('below' if oo == oo and oo < E else 'above'), d8_vs_price=round((d8w / cl - 1) * 100, 2), atr=round(r.atrp, 2),
-                               liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN' if r.get('liq5_L', 99) < 15 else '')))
+                               liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN' if r.get('liq5_L', 99) < 15 else ''),
+                               d8_touch=round(r.s8, 2), d8_touch_pct=round((r.s8 / cl - 1) * 100, 2), d21_touch=round(r.get('s21', np.nan), 2)))
         if "--near" in sys.argv and oo == oo and not LONG:   # 2026-10-12 (user): the closest candidates and what each still lacks
             gp = (oo / r.pc - 1) * 100; ovv = (oo / E - 1) * 100
             miss = [m_ for m_, ok in (("no touch (high < EMA34)", hi >= E), ("closed above EMA34", cl < E), ("green candle", cl < o),
@@ -112,7 +114,8 @@ if __name__ == "__main__":
                                       ("open not 0-0.5% below EMA34 (A) / not above with ATR>=3 (B)", (-0.5 <= ovv < 0) or (ovv >= 0 and r.atrp >= 3))) if not ok]
             near.append(dict(ticker=t, price=round(cl, 2), ema34_1h=round(E, 2), high_vs_ema=round((hi / E - 1) * 100, 2), close_vs_ema=round((cl / E - 1) * 100, 2),
                              candle=("red" if cl < o else "green"), gap=round(gp, 2), open_vs_ema=round(ovv, 2), atr=round(r.atrp, 2),
-                             below_yday_high=round((cl / r.ph - 1) * 100, 2), missing="; ".join(miss) or "none"))
+                             below_yday_high=round((cl / r.ph - 1) * 100, 2), d8_touch=round(r.s8, 2), d8_touch_pct=round((r.s8 / cl - 1) * 100, 2),
+                             missing="; ".join(miss) or "none"))
         if WICK and r.up == LONG: continue                                  # --wick widened the list; v1 itself keeps its own daily trend
         if not ((lo <= E and cl > E and cl > o) if LONG else (hi >= E and cl < E and cl < o)): continue
         if oo != oo: continue
@@ -133,7 +136,7 @@ if __name__ == "__main__":
         lead = "" if LONG else ("LEAD >= 3%" if dyh <= -3 else ("lead >= 2.5%" if dyh <= -2.5 else ""))
         rows.append(dict(ticker=t, side="LONG" if LONG else "SHORT", branch=br, atr=round(r.atrp, 2), entry=round(cl, 2), stop=round(lo if LONG else hi, 2), stop_pct=round(stop, 2),
                          E1_target=round(cl * (1 + S * 0.01), 2) if e1 else None, E2_target=round(cl * (1 + S * tp2 / 100), 2) if e2 else None,
-                         ema34_1h=round(E, 2), open_vs_ema=round(ov, 2), gap=round(gap, 2), below_yday_high=round(dyh, 2), lead=lead, liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN 5-day' if r.get('liq5_L', 99) < 15 else ''),
+                         ema34_1h=round(E, 2), open_vs_ema=round(ov, 2), gap=round(gap, 2), below_yday_high=round(dyh, 2), lead=lead, d8_touch=round(r.s8, 2), d8_touch_pct=round((r.s8 / cl - 1) * 100, 2), d21_touch=round(r.get('s21', np.nan), 2), liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN 5-day' if r.get('liq5_L', 99) < 15 else ''),
                          status=("PROVISIONAL " if EARLY else "") + ("INFO (long mirror FAILED in 166)" if LONG else ("ENTER" if n200 else "INFO (Nifty < 200d)"))))
     if "--near" in sys.argv and near:
         Nn = pd.DataFrame(near); Nn["dist"] = (Nn.close_vs_ema).abs(); Nn = Nn.sort_values("dist").head(int(sys.argv[sys.argv.index("--near") + 1]) if len(sys.argv) > sys.argv.index("--near") + 1 and sys.argv[sys.argv.index("--near") + 1].isdigit() else 5)
