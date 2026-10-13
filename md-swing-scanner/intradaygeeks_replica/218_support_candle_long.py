@@ -53,7 +53,9 @@ def gen(t):
             if not len(later): continue
             rec = dict(t=t, day=day, hm=b.hm, cls=cls, cp=cp, ov=ov, risk=risk, atrp=r.atrp, o=b.Open, h=b.High, l=b.Low, c=b.Close, line=L0,
                        e8_gap=(stp / r.e8 - 1) * 100)
-            for ex, tp in (("E1", 1.0), ("E2", max(1.0, 0.35 * r.atrp))):
+            # 2026-10-13 FIX (user caught it on MOTILALOFS): v1's stop caps dropped 58% of SUPPORT candles -- the deep-wick ones. NOCAP exits
+            # added: stop = candle low whatever its size; N1 = +1% target, N2 = 2R target, NH = no target (5 candles / day end). Scored per Rs1,000 risk.
+            for ex, tp in (("E1", 1.0), ("E2", max(1.0, 0.35 * r.atrp)), ("N1", 1.0), ("N2", 2 * risk), ("NH", 99.0)):
                 if (ex == "E1" and risk > 0.5) or (ex == "E2" and risk > tp / 2): rec[ex] = np.nan; continue
                 tgt = e * (1 + tp / 100); px = None; how = "stall"
                 for lb in later.itertuples():
@@ -61,6 +63,7 @@ def gen(t):
                     if lb.High >= tgt: px, how = tgt, "target"; break
                 if px is None: px = later.Close.iloc[-1]
                 rec[ex] = (px / e - 1) * 100 * 1000 - 85; rec[ex + "_how"] = how
+                if ex[0] == "N": rec[ex] = ((px / e - 1) * 100 / risk) * 1000 - 85 * (1000 / (risk / 100)) / 1e5; rec[ex + "_R"] = (px - e) / (e - stp)
             out.append(rec)
     return out
 
@@ -75,12 +78,13 @@ if __name__ == "__main__":
     X = pd.DataFrame(res); X.to_csv(HERE / "support_candle_long.csv", index=False)
     N = pd.read_csv(DAILY_DIR / "_NIFTY.csv", index_col=0, parse_dates=True).sort_index().Close
     n200 = (N > N.rolling(200).mean()).shift(1); X["n200"] = X.day.map(lambda d: bool(n200.get(d, False))); X["yr"] = pd.to_datetime(X.day).dt.year
+    print("MOTILALOFS / VINDHYATEL 2026-10-13:"); print(X[X.t.isin(["MOTILALOFS", "VINDHYATEL"]) & (X.day.astype(str).str[:10] == "2026-10-13")][["t", "hm", "cls", "risk", "N1_how", "N1_R", "N2_how", "N2_R", "NH_R"]].round(2).to_string(index=False))
     print("HAND CHECK (3 random SUPPORT trades, E2):")
     print(X[(X.cls == "SUPPORT") & X.E2.notna()].sample(3, random_state=21)[["t", "day", "hm", "o", "h", "l", "c", "line", "cp", "ov", "risk", "E2_how", "E2"]].round(2).to_string(index=False))
     ORDER = ["SUPPORT", "WEAK SUPPORT", "BREAKOUT", "BREAKOUT + WICK"]
-    for ex in ("E1", "E2"):
+    for ex in ("N1", "N2", "NH", "E1", "E2"):
         Y = X[X[ex].notna()]
-        print(f"\n## {ex}\n| class | Nifty ABOVE 200d: trades / stopped / Rs @1L | Nifty BELOW 200d: trades / stopped / Rs @1L | below 200d by year 2024 / 2025 / 2026 |\n|---|---|---|---|")
+        print(f"\n## {ex} ({'Rs per Rs1,000 RISK, no stop cap' if ex[0] == 'N' else 'Rs per Rs1 lakh, v1 stop caps'})\n| class | Nifty ABOVE 200d: trades / stopped / Rs | Nifty BELOW 200d: trades / stopped / Rs | below 200d by year 2024 / 2025 / 2026 |\n|---|---|---|---|")
         for c in ORDER + ["ALL"]:
             x = Y if c == "ALL" else Y[Y.cls == c]; cells = []
             for nv in (True, False):
