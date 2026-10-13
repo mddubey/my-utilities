@@ -40,10 +40,11 @@ def prep_row(args):
     if m is None: return None
     m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None); m = m[m.index < today]
     last = m[m.index.normalize() == m.index.normalize().max()]; liq = (last.Volume * last.Close)[last.Volume > 0].median() / 1e5
+    mv = m[m.Volume > 0]; liq5 = ((mv.Volume * mv.Close).groupby(mv.index.normalize()).median() / 1e5).tail(5).median()   # 2026-10-13 CHECK (VINDHYATEL)
     hh = h1(t); hh = hh[hh.index < today]
     if len(hh) < 60: return None
     e34y = hh.Close.ewm(span=34, adjust=False).mean().iloc[-1]   # 1H EMA34 through yesterday's last hourly close
-    return dict(t=t, pc=pc, ph=d.High.iloc[-1], atrp=atrp, s8=s8, s34=s34, up=bool(s8 > s34), liq_L=liq, e34y=e34y)
+    return dict(t=t, pc=pc, ph=d.High.iloc[-1], atrp=atrp, s8=s8, s34=s34, up=bool(s8 > s34), liq_L=liq, liq5_L=liq5, e34y=e34y)
 
 
 if __name__ == "__main__":
@@ -58,7 +59,7 @@ if __name__ == "__main__":
     print(f"v1 scan {TODAY:%Y-%m-%d} | NIFTY GATE: yesterday {N.Close.iloc[-1]:.0f} vs 200d {N.Close.rolling(200).mean().iloc[-1]:.0f} -> "
           + ("ON (v1 trades)" if n200 else "OFF -- every setup is INFO only (v1 loses below the 200-day)"))
     LONG = "--long" in sys.argv; S = 1 if LONG else -1
-    PREP = HERE / "prep" / f"v1_prep2_{TODAY:%Y%m%d}.csv"   # prep2 = both daily trends, `up` column (2026-10-13)
+    PREP = HERE / "prep" / f"v1_prep3_{TODAY:%Y%m%d}.csv"   # prep3 = + liq5_L (2026-10-13)   # prep2 = both daily trends, `up` column (2026-10-13)
     if PREP.exists() and not REPLAY: P = pd.read_csv(PREP, index_col=0)
     else:
         from multiprocessing import Pool
@@ -102,7 +103,8 @@ if __name__ == "__main__":
                 d8w = 2 / 9 * cl + 7 / 9 * r.s8
                 wk.append(dict(ticker=t, daily=('up' if r.up else 'down'), price=round(cl, 2), ema34_1h=round(E, 2), high=round(hi, 2), low=round(lo, 2),
                                candle=('red' if cl < o else 'green'), upper_wick=f"{uw*100:.0f}%", lower_wick=f"{lw*100:.0f}%", stop_pct=round((hi / cl - 1) * 100, 2),
-                               opened=('below' if oo == oo and oo < E else 'above'), d8_vs_price=round((d8w / cl - 1) * 100, 2), atr=round(r.atrp, 2)))
+                               opened=('below' if oo == oo and oo < E else 'above'), d8_vs_price=round((d8w / cl - 1) * 100, 2), atr=round(r.atrp, 2),
+                               liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN' if r.get('liq5_L', 99) < 15 else '')))
         if "--near" in sys.argv and oo == oo and not LONG:   # 2026-10-12 (user): the closest candidates and what each still lacks
             gp = (oo / r.pc - 1) * 100; ovv = (oo / E - 1) * 100
             miss = [m_ for m_, ok in (("no touch (high < EMA34)", hi >= E), ("closed above EMA34", cl < E), ("green candle", cl < o),
@@ -131,7 +133,7 @@ if __name__ == "__main__":
         lead = "" if LONG else ("LEAD >= 3%" if dyh <= -3 else ("lead >= 2.5%" if dyh <= -2.5 else ""))
         rows.append(dict(ticker=t, side="LONG" if LONG else "SHORT", branch=br, atr=round(r.atrp, 2), entry=round(cl, 2), stop=round(lo if LONG else hi, 2), stop_pct=round(stop, 2),
                          E1_target=round(cl * (1 + S * 0.01), 2) if e1 else None, E2_target=round(cl * (1 + S * tp2 / 100), 2) if e2 else None,
-                         ema34_1h=round(E, 2), open_vs_ema=round(ov, 2), gap=round(gap, 2), below_yday_high=round(dyh, 2), lead=lead,
+                         ema34_1h=round(E, 2), open_vs_ema=round(ov, 2), gap=round(gap, 2), below_yday_high=round(dyh, 2), lead=lead, liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN 5-day' if r.get('liq5_L', 99) < 15 else ''),
                          status=("PROVISIONAL " if EARLY else "") + ("INFO (long mirror FAILED in 166)" if LONG else ("ENTER" if n200 else "INFO (Nifty < 200d)"))))
     if "--near" in sys.argv and near:
         Nn = pd.DataFrame(near); Nn["dist"] = (Nn.close_vs_ema).abs(); Nn = Nn.sort_values("dist").head(int(sys.argv[sys.argv.index("--near") + 1]) if len(sys.argv) > sys.argv.index("--near") + 1 and sys.argv[sys.argv.index("--near") + 1].isdigit() else 5)

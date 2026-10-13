@@ -56,7 +56,8 @@ def prep_row(args):
             if x > 0: v0[dd] = x
     v0 = pd.Series(v0).sort_index().tail(14)
     last = m[m.day == m.day.max()]; liq = (last.Volume * last.Close)[last.Volume > 0].median() / 1e5
-    return dict(t=t, pc=d.Close.iloc[-1], ph=d.High.iloc[-1], atrp=atrp, tv=d.traded_value_sma20.iloc[-1], liq_L=liq,
+    mv = m[m.Volume > 0]; liq5 = ((mv.Volume * mv.Close).groupby(mv.day).median() / 1e5).tail(5).median()   # 2026-10-13 CHECK: one busy day can't vouch for a thin stock
+    return dict(t=t, pc=d.Close.iloc[-1], ph=d.High.iloc[-1], atrp=atrp, tv=d.traded_value_sma20.iloc[-1], liq_L=liq, liq5_L=liq5,
                 v0avg=v0.mean() if len(v0) >= 10 else np.nan, n_v0=len(v0),
                 data_ok=bool(d.index[-1] >= prev_day and m.day.max() >= prev_day))
 
@@ -148,7 +149,7 @@ if __name__ == "__main__":
         rows.append(dict(ticker=t, side=side, relvol=v0 / U.at[t, "v0avg"], status=status, room=room_s, trigger=round(trig, 2), now=round(last, 2),
                          stop_tight=round(st1, 2), qty_tight=int(RISK_RS / abs(st1 - trig)) if st1 != trig else 0,
                          stop_wide=round(st2, 2), qty_wide=int(RISK_RS / abs(st2 - trig)) if st2 != trig else 0,
-                         atr=round(atr, 2), liq_L=round(U.at[t, "liq_L"], 1), c915=f"{f.Open:.2f}->{f.Close:.2f} (L {f.Low:.2f} H {f.High:.2f})"))
+                         atr=round(atr, 2), liq_L=round(U.at[t, "liq_L"], 1), liq5_L=round(U.at[t, "liq5_L"], 1) if "liq5_L" in U else np.nan, c915=f"{f.Open:.2f}->{f.Close:.2f} (L {f.Low:.2f} H {f.High:.2f})"))
     R = pd.DataFrame(rows)
     print(f"[timing] fetch {t1 - t0:.0f}s, checks {time.time() - t1:.0f}s | first-bar volume could not be estimated for {neg} stocks (negative / missing day volume)")
     if R.empty: print("no data -- market not open yet, Yahoo lagging, or caches stale"); sys.exit()
@@ -173,5 +174,6 @@ if __name__ == "__main__":
         print("  skipped (gap fill NEAR): " + ", ".join(f"{r.ticker} ({r.room})" for _, r in S[valid[S.index] & near].iterrows()))
     with pd.option_context("display.width", 250, "display.max_columns", 30):
         print("\n" + R.to_string(index=False, formatters={"relvol": "{:.1f}".format}))
+        if "liq5_L" in R: th = R[R.liq5_L < MIN_LIQ_L]; print("THIN on a normal day (5-day median 5-min turnover < Rs%d lakh -- yesterday may have been unusually busy): " % MIN_LIQ_L + (", ".join(f"{a_} ({b_:.1f}L)" for a_, b_ in zip(th.ticker, th.liq5_L)) or "none"))
     out = HERE / "orb_scans"; out.mkdir(exist_ok=True)
     fn = out / f"orb_scan_{ASOF:%Y%m%d_%H%M}{'_replay' if REPLAY else ''}.csv"; R.to_csv(fn, index=False); print(f"saved {fn.name}")
