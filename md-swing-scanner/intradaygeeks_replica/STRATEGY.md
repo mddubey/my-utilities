@@ -194,6 +194,8 @@ python3 38_alarm_scan_1h_close.py --replay 2026-10-01 10:45   # replay a past al
 
 - 2026-10-12 INOXINDIA / TIMEX (user, discretionary shorts): the 10:15-10:45 candle crossed the 1H EMA34, wicked into resistance (INOXINDIA 2083.2 = yesterday's high / pivot zone; TIMEX two touches of 724.00) and closed GREEN ABOVE the line; both fell ~1% by 11:10 (2056.2 / 715.05) and both were back above the candle high by 12:25 / 12:45 -> a quick exit decided it. Tested as script 208: no edge on history (see section 3).
 
+- 2026-10-13 RBLBANK (user, discretionary short +5.10/share, 395.25 -> 390.15): in-play red 09:15 candle (400.00 -> 390.35, L 388.25); the 09:20 bar bounced hard to 396.70; the 09:25 bar sat on VWAP (low 394.55 vs ~394.2) and closed feeble (small body); the 09:30 bar fell hard from its high (396.65 -> 391.40) and the short was taken INSIDE it with SL = that bar's high (~1.4 risk, ~3.6R). Entry came BEFORE the ORB trigger (388.25, not hit). Shape: red ORB candle -> sharp bounce -> stall at / above VWAP -> first heavy down bar = lower high, entered intrabar. Related but different from 206 (pullback UP to VWAP from below, then rejection) -- here VWAP was support that gave way. One trade.
+
 ### ORB in-play SHORT -- PAPER TRADING from 2026-10-12 (scripts 175-185; not a live rule yet)
 - Evening before / before 09:15: `./eod_checklist.sh` (root), then `python3 185_orb_inplay_scan.py --prep`.
 - 09:21-09:29: `python3 185_orb_inplay_scan.py` -> in-play list (relvol >= 1, top 20), red 09:15 candle = SHORT; trigger = 09:15 low;
