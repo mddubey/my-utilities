@@ -41,7 +41,9 @@ def prep_row(args):
     m.index = m.index.tz_convert("Asia/Kolkata").tz_localize(None); m = m[m.index < today]
     last = m[m.index.normalize() == m.index.normalize().max()]; liq = (last.Volume * last.Close)[last.Volume > 0].median() / 1e5
     mv = m[m.Volume > 0]; liq5 = ((mv.Volume * mv.Close).groupby(mv.index.normalize()).median() / 1e5).tail(5).median()   # 2026-10-13 CHECK (VINDHYATEL)
-    hh = h1(t); hh = hh[hh.index < today]
+    hh = h1(t)
+    if hh.empty: return None   # 2026-10-15: no hourly cache yet (new listing, e.g. INTERARCH) -- crashed the prep
+    hh = hh[hh.index < today]
     if len(hh) < 60: return None
     e34y = hh.Close.ewm(span=34, adjust=False).mean().iloc[-1]   # 1H EMA34 through yesterday's last hourly close
     return dict(t=t, pc=pc, ph=d.High.iloc[-1], atrp=atrp, s8=s8, s34=s34, up=bool(s8 > s34), liq_L=liq, liq5_L=liq5, e34y=e34y,
