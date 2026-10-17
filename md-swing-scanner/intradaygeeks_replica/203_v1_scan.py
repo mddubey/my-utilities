@@ -67,11 +67,12 @@ if __name__ == "__main__":
     t0 = time.time()
     N = pd.read_csv(DAILY_DIR / "_NIFTY.csv", index_col=0, parse_dates=True).sort_index(); N = N[N.index < TODAY]
     n200 = N.Close.iloc[-1] > N.Close.rolling(200).mean().iloc[-1]
-    print(f"v1 scan {TODAY:%Y-%m-%d} | NIFTY GATE: yesterday {N.Close.iloc[-1]:.0f} vs 200d {N.Close.rolling(200).mean().iloc[-1]:.0f} -> "
-          + ("ON (v1 trades)" if n200 else "OFF -- every setup is INFO only (v1 loses below the 200-day)"))
+    print(f"hourly 34 rejection scan {TODAY:%Y-%m-%d} | Nifty: yesterday {N.Close.iloc[-1]:.0f} vs 200d {N.Close.rolling(200).mean().iloc[-1]:.0f} -> "
+          + (("above (rising market)" if n200 else "BELOW (falling market) -- bear-phase LIVE TRIAL, setups still tradeable") if ("--v1old" not in sys.argv and "--long" not in sys.argv)
+             else ("ON (v1 trades)" if n200 else "OFF -- every setup is INFO only (v1 loses below the 200-day)")))
     LONG = "--long" in sys.argv; S = 1 if LONG else -1
     SIMPLE = not LONG and "--v1old" not in sys.argv   # 2026-10-18: v1 simplified is the default for shorts
-    if SIMPLE: print("v1 SIMPLIFIED rules (ATR >= 3%, any trend, daily 8 not in the target path, no gap / branch / converged / Nifty gate) -- Nifty gate shown as INFO only")
+    if SIMPLE: print("HOURLY 34 REJECTION (formerly v1, simplified 2026-10-18) rules (ATR >= 3%, any trend, daily 8 not in the target path, no gap / branch / converged / Nifty gate) -- Nifty gate shown as INFO only")
     PREP = HERE / "prep" / f"v1_prep4_{TODAY:%Y%m%d}.csv"   # prep3 = + liq5_L (2026-10-13)   # prep2 = both daily trends, `up` column (2026-10-13)
     if PREP.exists() and not REPLAY: P = pd.read_csv(PREP, index_col=0)
     else:
@@ -198,8 +199,8 @@ if __name__ == "__main__":
         print("(INFO only: as mechanical rules both lists tested negative -- 217 / 218 / 219. Purpose: see every candle at the line, both sides.)")
         if HOUR != "10:15": sys.exit()
     R = pd.DataFrame(rows)
-    if R.empty: print(f"no v1 {'LONG-mirror ' if LONG else ''}setups this hour"); sys.exit()
+    if R.empty: print(f"no {'hourly 34 rejection' if SIMPLE else 'v1'} {'LONG-mirror ' if LONG else ''}setups this hour"); sys.exit()
     R = R.sort_values("atr", ascending=False)
-    print(f"\n{len(R)} v1 {'LONG-mirror ' if LONG else ''}setup(s) -- pick = highest ATR: {R.ticker.iloc[0]}" + ("" if (LONG or SIMPLE) else f" | below-200 lead (>= 3% under yesterday's high): {', '.join(R[R.lead == 'LEAD >= 3%'].ticker) or 'none'}"))
+    print(f"\n{len(R)} {'hourly 34 rejection' if SIMPLE else 'v1'} {'LONG-mirror ' if LONG else ''}setup(s) -- pick = highest ATR: {R.ticker.iloc[0]}" + ("" if (LONG or SIMPLE) else f" | below-200 lead (>= 3% under yesterday's high): {', '.join(R[R.lead == 'LEAD >= 3%'].ticker) or 'none'}"))
     with pd.option_context("display.width", 250, "display.max_columns", 30): print(R.to_string(index=False))
     out = HERE / "v1_scans"; out.mkdir(exist_ok=True); R.to_csv(out / f"v1_scan_{ASOF:%Y%m%d_%H%M}{'_long' if LONG else ''}{'_replay' if REPLAY else ''}.csv", index=False)
