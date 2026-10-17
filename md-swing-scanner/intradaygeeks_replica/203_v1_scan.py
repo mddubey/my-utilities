@@ -1,4 +1,10 @@
-"""LIVE scan for CANDIDATE v1 (STRATEGY 8k + later additions; user, 2026-10-12). Run after 11:15 IST (the 10:15-11:15 hourly candle).
+"""LIVE scan for v1. DEFAULT = v1 SIMPLIFIED (2026-10-18, user's filter cleanup, scripts 240-244; STRATEGY rows of 2026-10-17/18):
+  shorts: liquid (>= Rs15 lakh / 5-min bar), price >= Rs100, daily ATR >= 3%, ANY daily trend (shown, not filtered), NO gap zone, NO branch A / B, NO
+  converged-lines skip, NO Nifty 200-day gate (bear phase = live trial); 10:15 candle touches the 1H EMA34 and closes RED below it; doji cut by the line
+  skipped; SKIP when the daily 8 touch (yesterday's EMA8) sits between the entry and the 1% target. Stop = the candle high, or the earlier wick (the day's
+  high before 11:15) + 0.05% when that still keeps the stop <= 0.5%; trade only if the stop <= 0.5%. Target 1%, out by 15:15; user's trail rule applies.
+  --v1old = the previous rules below, unchanged.
+PREVIOUS: LIVE scan for CANDIDATE v1 (STRATEGY 8k + later additions; user, 2026-10-12). Run after 11:15 IST (the 10:15-11:15 hourly candle).
 v1 rules: liquid (prev-day median 5-min turnover >= Rs15 lakh), price >= Rs100, daily ATR >= 2%, stock daily EMA8 > EMA34 (yesterday),
 gap -0.25..+0.5% (OFFICIAL open vs yesterday's close); the 10:15 hourly candle touches the 1H EMA34 (high >= EMA34 as of the 09:15
 hour's close) and closes RED below it; branch A = day opened 0-0.5% BELOW that EMA34, branch B = opened above with ATR >= 3%; skip a
@@ -64,6 +70,8 @@ if __name__ == "__main__":
     print(f"v1 scan {TODAY:%Y-%m-%d} | NIFTY GATE: yesterday {N.Close.iloc[-1]:.0f} vs 200d {N.Close.rolling(200).mean().iloc[-1]:.0f} -> "
           + ("ON (v1 trades)" if n200 else "OFF -- every setup is INFO only (v1 loses below the 200-day)"))
     LONG = "--long" in sys.argv; S = 1 if LONG else -1
+    SIMPLE = not LONG and "--v1old" not in sys.argv   # 2026-10-18: v1 simplified is the default for shorts
+    if SIMPLE: print("v1 SIMPLIFIED rules (ATR >= 3%, any trend, daily 8 not in the target path, no gap / branch / converged / Nifty gate) -- Nifty gate shown as INFO only")
     PREP = HERE / "prep" / f"v1_prep4_{TODAY:%Y%m%d}.csv"   # prep3 = + liq5_L (2026-10-13)   # prep2 = both daily trends, `up` column (2026-10-13)
     if PREP.exists() and not REPLAY: P = pd.read_csv(PREP, index_col=0)
     else:
@@ -72,8 +80,8 @@ if __name__ == "__main__":
         with Pool(6) as p: P = pd.DataFrame([r for r in p.map(prep_row, [(t, TODAY) for t in uni], chunksize=20) if r]).set_index("t")
         if not REPLAY: P.to_csv(PREP)
     WICK = "--wick" in sys.argv   # 2026-10-13 (user): list every 10:15 candle with an UPPER WICK into the 1H EMA34 (both daily trends), v1 rules or not
-    P = P[(P.liq_L >= 15) & ((P.up != LONG) | WICK)]
-    print(("LONG MIRROR (INFO only, 166 failed) -- " if LONG else "") + f"candidates (liquid, >= Rs100, ATR >= 2%, daily 8 {'<' if LONG else '>'} 34): {len(P)} | prep {time.time()-t0:.0f}s", flush=True)
+    P = P[(P.liq_L >= 15) & ((P.up != LONG) | WICK | SIMPLE)]
+    print(("LONG MIRROR (INFO only, 166 failed) -- " if LONG else "") + (f"candidates (liquid, >= Rs100, any daily trend; ATR >= 3% applied per setup): {len(P)} | prep {time.time()-t0:.0f}s" if SIMPLE else f"candidates (liquid, >= Rs100, ATR >= 2%, daily 8 {'<' if LONG else '>'} 34): {len(P)} | prep {time.time()-t0:.0f}s"), flush=True)
     if REPLAY:
         bars, dopen = {}, {}
         for t in P.index:
@@ -137,8 +145,26 @@ if __name__ == "__main__":
         if not ((lo <= E and cl > E and cl > o) if LONG else (hi >= E and cl < E and cl < o)): continue
         if oo != oo: continue
         gap = (oo / r.pc - 1) * 100
-        if not ((-0.5 <= gap < 0.25) if LONG else (-0.25 < gap <= 0.5)): continue
         ov = (oo / E - 1) * 100
+        if SIMPLE:
+            if r.atrp < 3: continue
+            rng = hi - lo; bodyp = (o - cl) / rng if rng > 0 else 0
+            if bodyp < 0.25 and o >= E: continue                                                # doji cut by the line
+            if cl * 0.99 < r.s8 < cl: continue                                                  # daily 8 touch inside the 1% target path
+            pre = g[(g.index < cs) & (g.index >= TODAY + pd.Timedelta("9h15min"))]
+            dh = pre.High.max() if len(pre) else np.nan
+            stop_px, rule = hi, "candle high"
+            if dh == dh and dh > hi * 1.0005 and (dh * 1.0005 / cl - 1) * 100 <= 0.5: stop_px, rule = dh * 1.0005, "earlier wick"
+            stop = (stop_px / cl - 1) * 100
+            if stop > 0.5: continue
+            dyh = (cl / r.ph - 1) * 100
+            rows.append(dict(ticker=t, side="SHORT", trend=("up" if r.up else "DOWN"), atr=round(r.atrp, 2), entry=round(cl, 2), stop=round(stop_px, 2), stop_pct=round(stop, 2),
+                             stop_rule=rule, target_1pct=round(cl * 0.99, 2), ema34_1h=round(E, 2), d8_touch=round(r.s8, 2), d8_touch_pct=round((r.s8 / cl - 1) * 100, 2),
+                             d21_touch=round(r.get('s21', np.nan), 2), opened=("above" if ov >= 0 else "below") + f" the line ({ov:+.2f}%)", gap=round(gap, 2),
+                             below_yday_high=round(dyh, 2), liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN 5-day' if r.get('liq5_L', 99) < 15 else ''),
+                             status=("PROVISIONAL " if EARLY else "") + ("ENTER" if n200 else "ENTER (bear-phase live trial, Nifty < 200d)")))
+            continue
+        if not ((-0.5 <= gap < 0.25) if LONG else (-0.25 < gap <= 0.5)): continue
         if LONG: br = "A'" if 0 < ov <= 0.5 else ("B'" if ov <= 0 and r.atrp >= 3 else None)
         else: br = "A" if -0.5 <= ov < 0 else ("B" if ov >= 0 and r.atrp >= 3 else None)
         if br is None: continue
@@ -174,6 +200,6 @@ if __name__ == "__main__":
     R = pd.DataFrame(rows)
     if R.empty: print(f"no v1 {'LONG-mirror ' if LONG else ''}setups this hour"); sys.exit()
     R = R.sort_values("atr", ascending=False)
-    print(f"\n{len(R)} v1 {'LONG-mirror ' if LONG else ''}setup(s) -- pick = highest ATR: {R.ticker.iloc[0]}" + ("" if LONG else f" | below-200 lead (>= 3% under yesterday's high): {', '.join(R[R.lead == 'LEAD >= 3%'].ticker) or 'none'}"))
+    print(f"\n{len(R)} v1 {'LONG-mirror ' if LONG else ''}setup(s) -- pick = highest ATR: {R.ticker.iloc[0]}" + ("" if (LONG or SIMPLE) else f" | below-200 lead (>= 3% under yesterday's high): {', '.join(R[R.lead == 'LEAD >= 3%'].ticker) or 'none'}"))
     with pd.option_context("display.width", 250, "display.max_columns", 30): print(R.to_string(index=False))
     out = HERE / "v1_scans"; out.mkdir(exist_ok=True); R.to_csv(out / f"v1_scan_{ASOF:%Y%m%d_%H%M}{'_long' if LONG else ''}{'_replay' if REPLAY else ''}.csv", index=False)
