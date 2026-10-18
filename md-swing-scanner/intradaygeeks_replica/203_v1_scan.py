@@ -24,7 +24,7 @@ import numpy as np, pandas as pd
 HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
 from backtest import load
 from fetch_prices import _chunked_download
-from data.paths import DAILY_DIR, INTRADAY_5M_DIR
+from data.paths import DAILY_DIR, INTRADAY_5M_DIR, INDEX_INTRADAY_DIR
 
 
 def h1(t):
@@ -101,7 +101,19 @@ if __name__ == "__main__":
         for t, g in dl.items():
             if g is None or g.empty: continue
             gi = g.index.tz_localize(None) if g.index.tz is not None else g.index; g.index = gi.normalize(); dopen[t] = g.Open.get(TODAY, np.nan)
-    rows = []; near = []; wk = []; sp = []
+    rows = []; near = []; wk = []; sp = []; clean_rows = []
+    NCHG = np.nan                                                          # 2026-10-18 telemetry: Nifty % from its open to the end of the candle
+    if SIMPLE:
+        try:
+            if REPLAY:
+                nf = pd.read_csv(INDEX_INTRADAY_DIR / "_NIFTY_5m_60d.csv", index_col=0, parse_dates=True)
+                nf.index = nf.index.tz_convert("Asia/Kolkata").tz_localize(None) if nf.index.tz is not None else nf.index
+            else:
+                nf = _chunked_download(["^NSEI"], chunk_size=1, pause=0, period="1d", interval="5m", group_by="ticker").get("^NSEI")
+                if nf.index.tz is not None: nf.index = nf.index.tz_convert("Asia/Kolkata").tz_localize(None)
+            nf = nf[nf.index.normalize() == TODAY].dropna(subset=["Close"]); nf = nf[nf.index + pd.Timedelta("5min") <= min(ASOF, TODAY + HOFF + pd.Timedelta("60min"))]
+            NCHG = (nf.Close.iloc[-1] / nf.Open.iloc[0] - 1) * 100
+        except Exception as ex: print(f"(Nifty since-open telemetry unavailable: {ex})")
     for t, r in P.iterrows():
         g = bars.get(t, pd.DataFrame())
         if g is None or len(g) == 0: continue
@@ -149,6 +161,13 @@ if __name__ == "__main__":
         ov = (oo / E - 1) * 100
         if SIMPLE:
             if r.atrp < 3: continue
+            vsn = (cl / oo - 1) * 100 - NCHG if NCHG == NCHG else np.nan          # telemetry (2026-10-18): stock vs Nifty since the open
+            rng_ = hi - lo; uwp_ = (hi - max(o, cl)) / cl * 100; lwr_ = (min(o, cl) - lo) / rng_ if rng_ > 0 else 1
+            if uwp_ >= 0.3 and lwr_ < 0.10:                                        # CLEAN rejection, any stop (2026-10-18, INFO)
+                clean_rows.append(dict(ticker=t, trend=("up" if r.up else "DOWN"), atr=round(r.atrp, 2), entry=round(cl, 2), stop=round(hi * 1.0005, 2),
+                                       stop_pct=round((hi * 1.0005 / cl - 1) * 100, 2), pierce=f"{(hi / E - 1) * 100:+.2f}%", pierce_ok=("YES" if (hi / E - 1) * 100 > 0.5 else "shallow"), target_1p5=round(cl * 0.985, 2),
+                                       upper_wick=f"{uwp_:.2f}%", lower_wick=f"{lwr_ * 100:.0f}%", ema34_1h=round(E, 2), d8_touch=round(r.s8, 2),
+                                       d8_in_path=("YES" if cl * 0.985 < r.s8 < cl else ""), vs_nifty=(f"{vsn:+.2f}% " + ("weaker" if vsn < 0 else "stronger")) if vsn == vsn else ""))
             rng = hi - lo; bodyp = (o - cl) / rng if rng > 0 else 0
             if bodyp < 0.25 and o >= E: continue                                                # doji cut by the line
             if cl * 0.99 < r.s8 < cl: continue                                                  # daily 8 touch inside the 1% target path
@@ -163,6 +182,7 @@ if __name__ == "__main__":
                              stop_rule=rule, target_1pct=round(cl * 0.99, 2), ema34_1h=round(E, 2), d8_touch=round(r.s8, 2), d8_touch_pct=round((r.s8 / cl - 1) * 100, 2),
                              d21_touch=round(r.get('s21', np.nan), 2), opened=("above" if ov >= 0 else "below") + f" the line ({ov:+.2f}%)", gap=round(gap, 2),
                              below_yday_high=round(dyh, 2), liq5_L=round(r.get('liq5_L', np.nan), 1), thin=('THIN 5-day' if r.get('liq5_L', 99) < 15 else ''),
+                             vs_nifty=(f"{vsn:+.2f}% " + ("weaker" if vsn < 0 else "stronger")) if vsn == vsn else "", pierce=f"{(hi / E - 1) * 100:+.2f}%",
                              status=("PROVISIONAL " if EARLY else "") + ("ENTER" if n200 else "ENTER (bear-phase live trial, Nifty < 200d)")))
             continue
         if not ((-0.5 <= gap < 0.25) if LONG else (-0.25 < gap <= 0.5)): continue
@@ -199,8 +219,26 @@ if __name__ == "__main__":
         print("(INFO only: as mechanical rules both lists tested negative -- 217 / 218 / 219. Purpose: see every candle at the line, both sides.)")
         if HOUR != "10:15": sys.exit()
     R = pd.DataFrame(rows)
-    if R.empty: print(f"no {'hourly 34 rejection' if SIMPLE else 'v1'} {'LONG-mirror ' if LONG else ''}setups this hour"); sys.exit()
+    def print_clean_and_notes():
+        if SIMPLE:
+            CR = pd.DataFrame(clean_rows)
+            print(f"\nCLEAN REJECTIONS, any stop size (upper wick >= 0.3% of price, lower wick < 10% of the candle) -- {len(CR)} | INFO: not a tested rule; "
+                  f"research lead = pierce > 0.5% above the line, smallest stop first, 1.5% target" + (f" | Nifty since open {NCHG:+.2f}%" if NCHG == NCHG else ""))
+            if len(CR):
+                with pd.option_context("display.width", 250, "display.max_columns", 30): print(CR.sort_values("stop_pct")[["ticker", "trend", "entry", "stop", "stop_pct", "pierce", "pierce_ok", "target_1p5", "upper_wick", "lower_wick", "d8_in_path", "vs_nifty"]].to_string(index=False))
+            print("HOW TO READ (backtest hints, 2026-10-18 -- not rules):\n"
+                  "  clean list: pierce_ok YES (> 0.5% above the line) is the one that worked; SHALLOW pokes lost money; beyond ~0.5% bigger is NOT clearly better (and the stop gets wider).\n"
+                  "              if several, smallest stop first; target 1.5% (a 1% target was the weakest); size by rupee risk -- these stops are wide.\n"
+                  "  both lists: vs_nifty = the stock's move since the open minus Nifty's. WEAKER was better (+87 vs -20 per Rs1 lakh on the normal setups) -- telemetry, not used to pick.\n  normal list: pierce = how far the 10:15 high went above the line; bigger leaned better (+64 vs +30 per Rs1 lakh) but NOT reliable (could be luck, 2026 the other way) -- telemetry.\n"
+                  "  normal list: stop <= 0.5% (candle high / earlier wick); a 1% target or holding to the close (holding did better, not yet adopted); your trail rule.")
+    if R.empty:
+        print(f"no {'hourly 34 rejection' if SIMPLE else 'v1'} {'LONG-mirror ' if LONG else ''}setups (stop <= 0.5%) this hour"); print_clean_and_notes(); sys.exit()
     R = R.sort_values("atr", ascending=False)
     print(f"\n{len(R)} {'hourly 34 rejection' if SIMPLE else 'v1'} {'LONG-mirror ' if LONG else ''}setup(s) -- pick = highest ATR: {R.ticker.iloc[0]}" + ("" if (LONG or SIMPLE) else f" | below-200 lead (>= 3% under yesterday's high): {', '.join(R[R.lead == 'LEAD >= 3%'].ticker) or 'none'}"))
-    with pd.option_context("display.width", 250, "display.max_columns", 30): print(R.to_string(index=False))
+    with pd.option_context("display.width", 250, "display.max_columns", 30):
+        if SIMPLE:
+            V = R.assign(d8=[f"{a:.2f} ({b:+.2f}%)" for a, b in zip(R.d8_touch, R.d8_touch_pct)])
+            print(V[["ticker", "trend", "atr", "entry", "stop", "stop_pct", "stop_rule", "target_1pct", "ema34_1h", "d8", "pierce", "vs_nifty", "thin"]].to_string(index=False))
+        else: print(R.to_string(index=False))
+    if SIMPLE: print_clean_and_notes()
     out = HERE / "v1_scans"; out.mkdir(exist_ok=True); R.to_csv(out / f"v1_scan_{ASOF:%Y%m%d_%H%M}{'_long' if LONG else ''}{'_replay' if REPLAY else ''}.csv", index=False)
