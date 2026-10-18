@@ -153,7 +153,8 @@ if __name__ == "__main__":
                          stop_wide=round(st2, 2), qty_wide=int(RISK_RS / abs(st2 - trig)) if st2 != trig else 0,
                          atr=round(atr, 2), liq_L=round(U.at[t, "liq_L"], 1), liq5_L=round(U.at[t, "liq5_L"], 1) if "liq5_L" in U else np.nan,
                          d8_touch=round(U.at[t, "e8y"], 2) if "e8y" in U else np.nan, d8_touch_pct=round((U.at[t, "e8y"] / last - 1) * 100, 2) if "e8y" in U else np.nan,
-                         d21_touch=round(U.at[t, "e21y"], 2) if "e21y" in U else np.nan, c915=f"{f.Open:.2f}->{f.Close:.2f} (L {f.Low:.2f} H {f.High:.2f})"))
+                         d21_touch=round(U.at[t, "e21y"], 2) if "e21y" in U else np.nan, c915=f"{f.Open:.2f}->{f.Close:.2f} (L {f.Low:.2f} H {f.High:.2f})",
+                         o915=f.Open, h915=f.High, l915=f.Low, cl915=f.Close))
     R = pd.DataFrame(rows)
     print(f"[timing] fetch {t1 - t0:.0f}s, checks {time.time() - t1:.0f}s | first-bar volume could not be estimated for {neg} stocks (negative / missing day volume)")
     if R.empty: print("no data -- market not open yet, Yahoo lagging, or caches stale"); sys.exit()
@@ -179,5 +180,29 @@ if __name__ == "__main__":
     with pd.option_context("display.width", 250, "display.max_columns", 30):
         print("\n" + R.to_string(index=False, formatters={"relvol": "{:.1f}".format}))
         if "liq5_L" in R: th = R[R.liq5_L < MIN_LIQ_L]; print("THIN on a normal day (5-day median 5-min turnover < Rs%d lakh -- yesterday may have been unusually busy): " % MIN_LIQ_L + (", ".join(f"{a_} ({b_:.1f}L)" for a_, b_ in zip(th.ticker, th.liq5_L)) or "none"))
+    # 2026-10-18 (user): FADE LEVELS for the 09:20-09:40 read -- every level known now, above the current price, named; STACK = two within 0.3%;
+    # targets = the 09:15 close, then the 09:15 low (evidence on red 09:15 candles: close reached ~64% in ~10 min, low ~46% in ~30 min).
+    fl = []
+    for _, r in R.iterrows():
+        try:
+            dd = pd.read_csv(DAILY_DIR / f"{r.ticker}.csv", index_col=0, parse_dates=True).sort_index(); dd = dd[~dd.index.duplicated()].dropna(subset=["Close"])
+            y = dd[dd.index < TODAY].iloc[-1]
+        except Exception: continue
+        pp = (y.High + y.Low + y.Close) / 3
+        lv = {"09:15 high": r.h915, "R1": 2 * pp - y.Low, "R2": pp + y.High - y.Low, "daily 8": r.d8_touch, "yday high": y.High, "yday close": y.Close}
+        above = sorted([(v, k) for k, v in lv.items() if v == v and v > r.now])
+        stk = [f"{a[1]}+{b[1]} ~{a[0]:.2f}" for a, b in zip(above, above[1:]) if b[0] / a[0] - 1 <= 0.003]
+        red = r.cl915 < r.o915
+        fl.append(dict(ticker=r.ticker, now=r.now, c0915=f"{r.o915:.2f} / {r.h915:.2f} / {r.l915:.2f} / {r.cl915:.2f}" + (" red" if red else " green"),
+                       levels_above=" | ".join(f"{v:.2f} {k}" for v, k in above[:4]) or "none above", stacked=("; ".join(stk) or ""),
+                       target1_0915close=((f"{r.cl915:.2f} ({(r.cl915 / r.now - 1) * 100:+.2f}%)" if r.cl915 < r.now else "already below") if red else ""),
+                       target2_0915low=((f"{r.l915:.2f} ({(r.l915 / r.now - 1) * 100:+.2f}%)" if r.l915 < r.now else "already below") if red else "")))
+    if fl:
+        with pd.option_context("display.width", 250, "display.max_columns", 30, "display.max_colwidth", 80):
+            print("\nFADE LEVELS (for your 09:20-09:40 read; nearest 4 levels above the price; INFO):")
+            print(pd.DataFrame(fl).to_string(index=False))
+        print("  with a level: a turn AT it counts, even mid-bar | no level: a doji / stall, then a bar red from its open (no new high) | skip pushes made of full green bars\n"
+              "  and trades with no room to the targets | a level alone is ~50/50 (first touches break ~56-60%); the 09:15 high alone is the weakest, the daily 8 /\n"
+              "  yesterday's high / two stacked levels the strongest | gap-down stock: yesterday's close above is a magnet")
     out = HERE / "orb_scans"; out.mkdir(exist_ok=True)
     fn = out / f"orb_scan_{ASOF:%Y%m%d_%H%M}{'_replay' if REPLAY else ''}.csv"; R.to_csv(fn, index=False); print(f"saved {fn.name}")
