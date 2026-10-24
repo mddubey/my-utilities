@@ -89,19 +89,18 @@ for _, r in sc.iterrows():
                     et = e.index[0]; entry = e.Close.iloc[0]; stop = pk * 1.0005
                     B.append(dict(t=t, rank=r['rank'], peak=f'{pk:.2f} {pt:%H:%M}', bounce_pct=round((pk / L0 - 1) * 100, 2), entry=round(entry, 2),
                                   at=et.strftime('%H:%M'), stop=round(stop, 2), **outcome(day, idx[et.strftime('%H:%M')], entry, stop, c, l)))
-    # A (as shapes.py)
-    p0 = day.iloc[idx.get('09:20', 5)].Open; best = None
+    # A (as shapes.py) -- 2026-10-23 (user): the list is only seen at 09:21, so a poke counts only if it starts from 09:21 with price
+    # still under the level at 09:21 (a 09:15 / 09:20 poke cannot be traded); EVERY level is its own event (a later stack poke counts too)
+    w21 = day[(tm >= '09:21') & (tm <= '09:45')]
+    p0 = day.iloc[idx.get('09:21', 6)].Open
     for name, L in lv.items():
         if L <= p0: continue
-        cr = w[w.High > L]
+        cr = w21[w21.High > L]
         if not len(cr): continue
         ct = cr.index[0]; win = day[(day.index >= ct) & (day.index <= ct + pd.Timedelta('10min'))]
         back = win[win.Close < L]
         if not len(back): continue
-        et = back.index[0]
-        if best is None or et < best[2]: best = (name, L, et, ct)
-    if best:
-        name, L, et, ct = best; sp = day[(day.index >= ct) & (day.index <= et)].High.max(); entry = day.loc[et].Close; stop = sp * 1.0005
+        et = back.index[0]; sp = day[(day.index >= ct) & (day.index <= et)].High.max(); entry = day.loc[et].Close; stop = sp * 1.0005
         A.append(dict(t=t, rank=r['rank'], first915='red' if c < o else 'green', level=f'{name} {L:.2f}', crossed=ct.strftime('%H:%M'), spike=round(sp, 2),
                       entry=round(entry, 2), at=et.strftime('%H:%M'), stop=round(stop, 2), **outcome(day, idx[et.strftime('%H:%M')], entry, stop, c, l)))
     # ORB stop orders (rows not skipped), live from 09:30

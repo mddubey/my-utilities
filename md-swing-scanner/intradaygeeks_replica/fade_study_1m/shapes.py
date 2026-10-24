@@ -2,7 +2,8 @@ import pandas as pd, re, numpy as np
 S='/Users/mdubey/workspace/personal/my-utilities/md-swing-scanner/intradaygeeks_replica/orb_scans/'
 D='/Users/mdubey/workspace/personal/my-utilities/md-swing-scanner/data/daily/'
 F={'2026-10-12':'orb_scan_20261012_0921.csv','2026-10-13':'orb_scan_20261013_0922.csv','2026-10-14':'orb_scan_20261014_0921.csv',
-   '2026-10-15':'orb_scan_20261015_0921.csv','2026-10-16':'orb_scan_20261016_0921.csv','2026-10-19':'orb_scan_20261019_0921.csv'}
+   '2026-10-15':'orb_scan_20261015_0921.csv','2026-10-16':'orb_scan_20261016_0921.csv','2026-10-19':'orb_scan_20261019_0921.csv',
+   '2026-10-21':'orb_scan_20261021_0921.csv','2026-10-22':'orb_scan_20261022_0921.csv','2026-10-23':'orb_scan_20261023_0921.csv'}
 rx=re.compile(r'([\d.]+)->([\d.]+) \(L ([\d.]+) H ([\d.]+)\)')
 def outcome(day,ei,entry,stop,c915,l915):
     a=day.iloc[ei+1:]; a=a[a.index.strftime('%H:%M')<='15:14']
@@ -40,20 +41,17 @@ for date,f in F.items():
                     if len(e) and (not len(nh) or nh.index[0]>e.index[0]):
                         et=e.index[0]; entry=e.Close.iloc[0]; stop=pk*1.0005
                         B.append(dict(date=date,t=t,rank=r['rank'],peak=f'{pk:.2f} {pt:%H:%M}',bounce_pct=round((pk/L0-1)*100,2),entry=round(entry,2),at=et.strftime('%H:%M'),stop=round(stop,2),c915=c,l915=l,**outcome(day,idx[et.strftime('%H:%M')],entry,stop,c,l)))
-        # ---------- A
-        p0=day.iloc[idx.get('09:20',5)].Open
-        best=None
+        # ---------- A  (2026-10-23, user: list seen at 09:21 -> poke must start from 09:21 with price under the level; every level its own event)
+        w21=day[(tm>='09:21')&(tm<='09:45')]
+        p0=day.iloc[idx.get('09:21',6)].Open
         for name,L in lv.items():
             if L<=p0: continue
-            cr=w[w.High>L]
+            cr=w21[w21.High>L]
             if not len(cr): continue
             ct=cr.index[0]; win=day[(day.index>=ct)&(day.index<=ct+pd.Timedelta('10min'))]
             back=win[win.Close<L]
             if not len(back): continue
-            et=back.index[0]
-            if best is None or et<best[2]: best=(name,L,et,ct)
-        if best:
-            name,L,et,ct=best; sp=day[(day.index>=ct)&(day.index<=et)].High.max(); entry=day.loc[et].Close; stop=sp*1.0005
+            et=back.index[0]; sp=day[(day.index>=ct)&(day.index<=et)].High.max(); entry=day.loc[et].Close; stop=sp*1.0005
             A.append(dict(date=date,t=t,rank=r['rank'],first915='red' if c<o else 'green',level=f'{name} {L:.2f}',crossed=ct.strftime('%H:%M'),spike=round(sp,2),entry=round(entry,2),at=et.strftime('%H:%M'),stop=round(stop,2),c915=c,l915=l,**outcome(day,idx[et.strftime('%H:%M')],entry,stop,c,l)))
 pd.set_option('display.width',300); pd.set_option('display.max_rows',300)
 for nm,X in (('B',B),('A',A)):

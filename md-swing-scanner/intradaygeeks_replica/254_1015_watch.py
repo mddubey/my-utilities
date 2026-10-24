@@ -53,6 +53,7 @@ if __name__ == "__main__":
         uni = pd.read_csv(HERE.parent / "nse_equity_universe.csv").ticker.tolist()
         with Pool(6) as p: P = pd.DataFrame([r for r in p.map(prep, [(t, TODAY) for t in uni], chunksize=20) if r]).set_index("t")
         if not REPLAY: P.to_csv(PREP)
+    if "liq5_L" in P: P = P[P.liq5_L >= 15]   # 2026-10-22 (user): thin on a normal day = filtered, not just flagged
     P = P[(P.liq_L >= 15) & (P.atrp >= 3)]
     B = bars_for(list(P.index), TODAY, REPLAY)
     W = []

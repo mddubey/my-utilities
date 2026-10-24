@@ -86,7 +86,8 @@ if __name__ == "__main__":
         P = build_prep(TODAY, PREV_DAY)
         if not REPLAY: P.to_csv(PREP)
     stale = int((~P.data_ok).sum())
-    U = P[P.data_ok & (P.liq_L >= MIN_LIQ_L) & P.v0avg.notna()]
+    # 2026-10-22 (user, after PRIVISCL): thin stocks are FILTERED, not just flagged -- yesterday AND the 5-day median must pass
+    U = P[P.data_ok & (P.liq_L >= MIN_LIQ_L) & (P.liq5_L >= MIN_LIQ_L) & P.v0avg.notna()]
     if "--prep" in sys.argv:
         print(f"ORB prep for {TODAY:%Y-%m-%d} (previous session {PREV_DAY:%Y-%m-%d}): {len(P)} stocks pass price/value/ATR, "
               f"{len(U)} also liquid (>= Rs{MIN_LIQ_L} lakh/5m) with a first-bar volume history | {time.time()-t0:.0f}s")

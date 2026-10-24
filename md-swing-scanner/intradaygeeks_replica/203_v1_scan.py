@@ -81,6 +81,7 @@ if __name__ == "__main__":
         with Pool(6) as p: P = pd.DataFrame([r for r in p.map(prep_row, [(t, TODAY) for t in uni], chunksize=20) if r]).set_index("t")
         if not REPLAY: P.to_csv(PREP)
     WICK = "--wick" in sys.argv   # 2026-10-13 (user): list every 10:15 candle with an UPPER WICK into the 1H EMA34 (both daily trends), v1 rules or not
+    if "liq5_L" in P: P = P[P.liq5_L >= 15]   # 2026-10-22 (user): thin on a normal day = filtered, not just flagged
     P = P[(P.liq_L >= 15) & ((P.up != LONG) | WICK | SIMPLE)]
     print(("LONG MIRROR (INFO only, 166 failed) -- " if LONG else "") + (f"candidates (liquid, >= Rs100, any daily trend; ATR >= 3% applied per setup): {len(P)} | prep {time.time()-t0:.0f}s" if SIMPLE else f"candidates (liquid, >= Rs100, ATR >= 2%, daily 8 {'<' if LONG else '>'} 34): {len(P)} | prep {time.time()-t0:.0f}s"), flush=True)
     if REPLAY:
