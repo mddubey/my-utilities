@@ -24,6 +24,7 @@ HERE = Path(__file__).resolve().parent; sys.path.insert(0, str(HERE.parent))
 from backtest import load
 from fetch_prices import _chunked_download
 from data.paths import DAILY_DIR, INTRADAY_5M_DIR
+from data.fetch_nse_mtf import latest_before as mtf_latest_before
 
 TOP_N, MIN_RV, MIN_PRICE, MIN_TV, MIN_ATR, MIN_LIQ_L = 20, 1.0, 100, 1e8, 2.0, 15
 K_TIGHT, K_WIDE, RISK_RS, MAX_TRADES = 0.10, 0.20, 1000, 2
@@ -183,12 +184,23 @@ if __name__ == "__main__":
         if "liq5_L" in R: th = R[R.liq5_L < MIN_LIQ_L]; print("THIN on a normal day (5-day median 5-min turnover < Rs%d lakh -- yesterday may have been unusually busy): " % MIN_LIQ_L + (", ".join(f"{a_} ({b_:.1f}L)" for a_, b_ in zip(th.ticker, th.liq5_L)) or "none"))
     # 2026-10-18 (user): FADE LEVELS for the 09:20-09:40 read -- every level known now, above the current price, named; STACK = two within 0.3%;
     # targets = the 09:15 close, then the 09:15 low (evidence on red 09:15 candles: close reached ~64% in ~10 min, low ~46% in ~30 min).
-    fl = []
+    # 2026-10-25 (user): MTF telemetry, INFO only (no filter, no ranking). Latest NSE MTF file before today (usually T-2, published
+    # the evening after its date). mtf_under = yesterday's close vs the average funded price (amount / shares); mtf_days = funded
+    # shares / 20-day average volume; trapped = YES at <= -30% underwater after a >= 3% fall yesterday, "near" at <= -20%.
+    MTF_DATE, MTF = mtf_latest_before(PREV_DAY)                     # a file dated PREV_DAY is not out yet at 09:21 (also keeps --replay honest)
+    fl = []; mtf_cols = {}
     for _, r in R.iterrows():
         try:
             dd = pd.read_csv(DAILY_DIR / f"{r.ticker}.csv", index_col=0, parse_dates=True).sort_index(); dd = dd[~dd.index.duplicated()].dropna(subset=["Close"])
             y = dd[dd.index < TODAY].iloc[-1]
         except Exception: continue
+        h = dd[dd.index < TODAY]; fall = (y.Close / h.Close.iat[-2] - 1) * 100
+        under = days = None
+        if MTF is not None and r.ticker in MTF.index and MTF.at[r.ticker, "qty"] > 0:
+            m = MTF.loc[r.ticker]; under = (y.Close / (m.amt_lakh * 1e5 / m.qty) - 1) * 100; days = m.qty / h.Volume.tail(20).mean()
+        trapped = "" if under is None else "YES" if (under <= -30 and fall <= -3) else "near" if under <= -20 else ""
+        mtf_cols[r.ticker] = dict(mtf_under=None if under is None else round(under, 1), mtf_days=None if days is None else round(days, 1),
+                                  yday_fall=round(fall, 2), trapped=trapped)
         pp = (y.High + y.Low + y.Close) / 3
         lv = {"09:15 high": r.h915, "R1": 2 * pp - y.Low, "R2": pp + y.High - y.Low, "daily 8": r.d8_touch, "yday high": y.High, "yday close": y.Close}
         above = sorted([(v, k) for k, v in lv.items() if v == v and v > r.now])
@@ -197,13 +209,16 @@ if __name__ == "__main__":
         fl.append(dict(ticker=r.ticker, now=r.now, c0915=f"{r.o915:.2f} / {r.h915:.2f} / {r.l915:.2f} / {r.cl915:.2f}" + (" red" if red else " green"),
                        levels_above=" | ".join(f"{v:.2f} {k}" for v, k in above[:4]) or "none above", stacked=("; ".join(stk) or ""),
                        target1_0915close=((f"{r.cl915:.2f} ({(r.cl915 / r.now - 1) * 100:+.2f}%)" if r.cl915 < r.now else "already below") if red else ""),
-                       target2_0915low=((f"{r.l915:.2f} ({(r.l915 / r.now - 1) * 100:+.2f}%)" if r.l915 < r.now else "already below") if red else "")))
+                       target2_0915low=((f"{r.l915:.2f} ({(r.l915 / r.now - 1) * 100:+.2f}%)" if r.l915 < r.now else "already below") if red else ""),
+                       **mtf_cols[r.ticker]))
     if fl:
         with pd.option_context("display.width", 250, "display.max_columns", 30, "display.max_colwidth", 80):
             print("\nFADE LEVELS (for your 09:20-09:40 read; nearest 4 levels above the price; INFO):")
             print(pd.DataFrame(fl).to_string(index=False))
+        print(f"  MTF file used: {MTF_DATE:%Y-%m-%d}" if MTF_DATE is not None else "  MTF: no file on disk (run data/fetch_nse_mtf.py)")
         print("  with a level: a turn AT it counts, even mid-bar | no level: a doji / stall, then a bar red from its open (no new high) | skip pushes made of full green bars\n"
               "  and trades with no room to the targets | a level alone is ~50/50 (first touches break ~56-60%); the 09:15 high alone is the weakest, the daily 8 /\n"
               "  yesterday's high / two stacked levels the strongest | gap-down stock: yesterday's close above is a magnet")
     out = HERE / "orb_scans"; out.mkdir(exist_ok=True)
+    if mtf_cols: R = R.join(pd.DataFrame(R.ticker.map(mtf_cols).dropna().tolist(), index=R.ticker[R.ticker.isin(mtf_cols)].index))
     fn = out / f"orb_scan_{ASOF:%Y%m%d_%H%M}{'_replay' if REPLAY else ''}.csv"; R.to_csv(fn, index=False); print(f"saved {fn.name}")

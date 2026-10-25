@@ -19,11 +19,12 @@ step() {   # step "label" command...
 
 {
     echo "EOD data refresh started $(date '+%Y-%m-%d %H:%M:%S %Z')"
-    step "1/5 daily prices, full NSE equity universe" python3 fetch_prices.py --progress
-    step "2/5 Nifty daily + regime indicators" python3 market_regime.py
-    step "3/5 5-min bars, full universe" python3 intraday_cache.py
-    step "4/5 Nifty/BankNifty intraday" python3 data/fetch_index_intraday.py
-    step "5/5 60-min bars top-up" python3 data/fetch_intraday_60m.py 0 1 10d --topup
+    step "1/6 daily prices, full NSE equity universe" python3 fetch_prices.py --progress
+    step "2/6 Nifty daily + regime indicators" python3 market_regime.py
+    step "3/6 5-min bars, full universe" python3 intraday_cache.py
+    step "4/6 Nifty/BankNifty intraday" python3 data/fetch_index_intraday.py
+    step "5/6 60-min bars top-up" python3 data/fetch_intraday_60m.py 0 1 10d --topup
+    step "6/6 NSE MTF disclosure (intraday telemetry)" python3 data/fetch_nse_mtf.py
     [ ${#FAILED[@]} -gt 0 ] && echo && echo "steps that failed: ${FAILED[*]}"
     python3 data/check.py
     rc=$?

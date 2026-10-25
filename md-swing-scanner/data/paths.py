@@ -14,6 +14,7 @@ NSE_CASH_CLOSE_DIR = DATA_DIR / "nse_cash_close"  # NSE cash bhavcopy, close onl
 NSE_BHAV_DIR = DATA_DIR / "nse_bhav"              # NSE full cash bhavcopy (OHLC + PREVCLOSE), all sessions
 NSE_BANDS_DIR = DATA_DIR / "nse_bands"            # NSE point-in-time price bands
 NSE_CORP_ACTIONS_FILE = DATA_DIR / "nse_corp_actions.csv"
+NSE_MTF_DIR = DATA_DIR / "nse_mtf"                # NSE margin trading (MTF) disclosure, per reporting date
 
 
 def last_row_time(path):

@@ -28,7 +28,8 @@ fetcher.
 | 3 | `intraday_5m/` all | `intraday_cache.py` | top-up last 10 days, one retry pass |
 | 4 | `index_intraday/` | `data/fetch_index_intraday.py` | merges; Nifty 5m kept beyond Yahoo's 60 days |
 | 5 | `intraday_60m/` all | `data/fetch_intraday_60m.py 0 1 10d --topup` | merges last 10 days |
-| 6 | health check | `data/check.py` | PASS/WARN/FAIL per dataset vs the latest real NSE session |
+| 6 | `nse_mtf/` | `data/fetch_nse_mtf.py` | last 15 sessions; a file not yet published is retried next run |
+| 7 | health check | `data/check.py` | PASS/WARN/FAIL per dataset vs the latest real NSE session |
 
 - **Session skip:** every step first asks Nifty's 60-min bars for the latest real NSE session
   (`fetch_prices._latest_nifty_session`) and skips stocks that already hold it, so weekend/holiday runs take
@@ -54,6 +55,7 @@ fetcher.
 | `NSE_BHAV_DIR` | `nse_bhav/` | NSE full cash bhavcopy | 1,203 sessions, 2021-11-22 → 2026-10-01, every equity series | raw unadjusted OHLC + PREVCLOSE + volume |
 | `NSE_BANDS_DIR` | `nse_bands/` | NSE `sec_list_DDMMYYYY` | 1,200 sessions, 2021-11-22 → 2026-10-01 | price-band % per symbol |
 | `NSE_CORP_ACTIONS_FILE` | `nse_corp_actions.csv` | NSE corporate-actions API | 12,556 rows, ex-dates 2021-11 → 2026-10, equities + SME | n/a |
+| `NSE_MTF_DIR` | `nse_mtf/` | NSE MTF disclosure `mrg_trading_DDMMYY` | 2026-05-25 → now (one file per reporting date) | shares + Rs lakh funded per symbol |
 
 ## daily/ — Yahoo daily OHLCV (owner: production / EOD)
 
@@ -170,6 +172,15 @@ fetcher.
 - **"No Band":** about the F&O names. It agrees with `nse_fo_bhav` stock-option listings on
   99.89% of rows, so it works as a point-in-time F&O proxy before 2022-06.
 - **Gaps:** NSE returned empty files for 2021-12-09, 2022-05-10 and 2022-07-12 (not stored).
+
+## nse_mtf/ — NSE margin trading (MTF) disclosure (owner: intradaygeeks_replica)
+
+- **Fetcher:** `data/fetch_nse_mtf.py [start_yyyy-mm-dd]` (default 15 sessions back). Incremental; daily in `refresh.sh`.
+- **Columns:** ticker, qty (shares funded by all members), amt_lakh (Rs lakh funded). Average funded price = amt_lakh × 1e5 / qty.
+- **Publishing lag:** the file dated t appears the evening of t+1, so at 09:21 on day T the newest usable file is T−2.
+  `latest_before(prev_session)` gives exactly that, live or in a replay.
+- **Revised layout:** some dates (e.g. 2026-08-18) were re-issued with two blocks side by side; the right-hand (current) block is used.
+- **Used by:** `185_orb_inplay_scan.py` FADE LEVELS telemetry (mtf_under / mtf_days / yday_fall / trapped), info only.
 
 ## nse_corp_actions.csv — NSE corporate actions (owner: short_discovery)
 
