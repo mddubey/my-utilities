@@ -10,7 +10,8 @@ Reconstruct the current state of the **intraday shorts system** in
 else the user says this session. Do the reads below quietly (don't narrate each file), then give ONE consolidated
 orientation summary.
 
-Scope (updated 2026-10-18): the user trades TWO intraday short setups, one trade a day in total:
+Scope (updated 2026-10-18; trade count updated 2026-10-28): the user trades TWO intraday short setups, judged trade by trade
+(no one-trade-a-day rule; flag overtrading only from ~5 trades in a day):
 1. **Morning fade** on the 09:21 ORB in-play list, 09:20-09:40, discretionary (the user reads the chart and enters inside
    the bar). The ORB sell-stop breakout itself is NOT traded (too luck-dependent; its edge sits in the 09:20 bar).
 2. **Hourly 34 rejection** (the user's name; formerly "v1"): short when the 10:15 hourly candle touches the 1H EMA34 and
