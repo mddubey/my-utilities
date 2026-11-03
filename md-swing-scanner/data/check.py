@@ -50,13 +50,15 @@ def main():
     g, t = share(sorted(INDEX_INTRADAY_DIR.glob("*.csv")),
                  lambda p: (last_row_time(p) or pd.Timestamp(0, tz="UTC")).tz_convert(IST).normalize().tz_localize(None) >= session)
     add("index intraday (Nifty/BankNifty)", False, g, t, 100)
+    fo = max((p.stem for p in NSE_FO_BHAV_DIR.glob("*.csv")), default="00000000")   # F&O bhavcopy, refreshed since 2026-11-03
+    add("F&O bhavcopy (OI)", False, int(pd.Timestamp(fo) >= session), 1, 100)
 
     print(f"\nDATA HEALTH -- latest NSE session {session.date()} (from {source}), checked {datetime.now(IST):%Y-%m-%d %H:%M} IST")
     print(f"{'dataset':36} {'status':6} {'have':>6} / {'of':<6} {'%':>6}  need")
     for r in rows:
         print(f"{r['dataset'] + (' *' if r['critical'] else ''):36} {r['status']:6} {r['have']:>6} / {r['of']:<6} {r['pct']:>6}  {r['need']}%")
     print("* = critical: the trading part of the EOD checklist stops if it fails")
-    manual = {"nse_fo_bhav": NSE_FO_BHAV_DIR, "nse_cash_close": NSE_CASH_CLOSE_DIR, "nse_bhav": NSE_BHAV_DIR, "nse_bands": NSE_BANDS_DIR}
+    manual = {"nse_cash_close": NSE_CASH_CLOSE_DIR, "nse_bhav": NSE_BHAV_DIR, "nse_bands": NSE_BANDS_DIR}
     print("manual datasets (not refreshed here), latest file: " + ", ".join(
         f"{k} {max((p.stem for p in v.glob('*.csv')), default='none')}" for k, v in manual.items())
         + f", nse_corp_actions {'present' if NSE_CORP_ACTIONS_FILE.exists() else 'missing'}")

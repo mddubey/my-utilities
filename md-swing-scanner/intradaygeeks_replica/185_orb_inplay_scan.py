@@ -93,6 +93,8 @@ if __name__ == "__main__":
         print(f"ORB prep for {TODAY:%Y-%m-%d} (previous session {PREV_DAY:%Y-%m-%d}): {len(P)} stocks pass price/value/ATR, "
               f"{len(U)} also liquid (>= Rs{MIN_LIQ_L} lakh/5m) with a first-bar volume history | {time.time()-t0:.0f}s")
         if stale: print(f"STALE DATA: {stale} stocks' caches end before {PREV_DAY:%Y-%m-%d} -- run eod_checklist.sh first")
+        # 2026-11-03: morning catch-up of the F&O bhavcopy (yesterday's OI for the walls), in case the EOD run was too early
+        import subprocess; subprocess.run([sys.executable, str(HERE.parent / "data" / "fetch_fo_bhav.py")], cwd=HERE.parent, timeout=180)
         sys.exit()
     if stale > len(P) * 0.2: print(f"WARNING: {stale} of {len(P)} stocks have STALE caches (before {PREV_DAY:%Y-%m-%d}) -- run eod_checklist.sh", flush=True)
     if not REPLAY and ASOF < TODAY + pd.Timedelta("9h20min"):

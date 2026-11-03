@@ -39,7 +39,7 @@ fetcher.
 - **Critical** (Part B stops if they fail): daily prices for >= 98% of the Nifty 500, and the Nifty regime file.
   The rest are WARN only.
 - **Logs:** `data/logs/refresh_YYYYMMDD_HHMM.log` per run; `data/logs/last_check.json` = latest health check.
-- **Not refreshed here (by hand):** `nse_fo_bhav/`, `nse_cash_close/`, `nse_bhav/`, `nse_bands/`,
+- **Not refreshed here (by hand):** `nse_cash_close/`, `nse_bhav/`, `nse_bands/`,
   `nse_corp_actions.csv`. The health check prints their latest file date.
 
 ## Quick map
@@ -50,7 +50,7 @@ fetcher.
 | `INTRADAY_5M_DIR` | `intraday_5m/` | Yahoo 5-min | 2,319 files; start 2026-06-10 (Nifty-500 names) or ~2026-07-09 (rest) → now | split-adjusted at fetch time |
 | `INTRADAY_60M_DIR` | `intraday_60m/` | Yahoo native 60-min | 2,266 files; 2023-10-23 → now | split-adjusted at fetch time |
 | `INDEX_INTRADAY_DIR` | `index_intraday/` | Yahoo | `_NIFTY_1h`, `_BANKNIFTY_1h`, `_NIFTY_5m_60d` | index levels |
-| `NSE_FO_BHAV_DIR` | `nse_fo_bhav/` | NSE F&O bhavcopy | 1,070 sessions, 2022-06-01 → 2026-09-30 | raw contract prices, OI, volume |
+| `NSE_FO_BHAV_DIR` | `nse_fo_bhav/` | NSE F&O bhavcopy | 2022-06-01 → refreshed daily (EOD step 7) | raw contract prices, OI, volume |
 | `NSE_CASH_CLOSE_DIR` | `nse_cash_close/` | NSE cash bhavcopy, close only | 351 sparse dates, 2022-08-01 → 2026-09-30 | raw unadjusted close |
 | `NSE_BHAV_DIR` | `nse_bhav/` | NSE full cash bhavcopy | 1,203 sessions, 2021-11-22 → 2026-10-01, every equity series | raw unadjusted OHLC + PREVCLOSE + volume |
 | `NSE_BANDS_DIR` | `nse_bands/` | NSE `sec_list_DDMMYYYY` | 1,200 sessions, 2021-11-22 → 2026-10-01 | price-band % per symbol |
@@ -132,6 +132,9 @@ fetcher.
 ## nse_fo_bhav/ — NSE F&O bhavcopy (owner: production)
 
 - **Fetchers:** `fetch_stock_options.py` (2024+) and `fetch_stock_options_pre2024.py`.
+- **Refreshed by the EOD run since 2026-11-03** (step 7, `data/fetch_fo_bhav.py`: every weekday after the latest file up to
+  today; WARN only, NSE publishes it after the close) and by the ORB `--prep` run as a morning catch-up. Used daily by the
+  intraday OI-wall tools.
 - **Columns:** TradDt, TckrSymb, XpryDt, StrkPric, OptnTp, prices, OpnIntrst, TtlTradgVol,
   NewBrdLotQty, FinInstrmTp. STO = stock options, IDO = index options, STF/IDF = futures.
 - **Point-in-time F&O membership:** stock options listed on date T. Used by
