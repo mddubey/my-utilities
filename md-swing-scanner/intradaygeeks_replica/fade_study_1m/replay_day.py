@@ -1,9 +1,13 @@
-"""Replay one live day's 09:21 ORB list on 1-minute bars, every type (2026-10-21). Usage: python3 replay_day.py YYYY-MM-DD scan.csv
+"""Replay one live day's 09:21 ORB list on 1-minute bars (2026-10-21; shapes A/B removed 2026-11-02). Usage: python3 replay_day.py YYYY-MM-DD scan.csv
 1) fetch that day's 1-min bars for the list (MERGED into m1/, never overwriting the older days -- Yahoo keeps ~30 days only);
 2) the day table (09:15 candle, hit 09:15 close / low, day high / low);
-3) morning fade shapes A / B exactly as shapes.py, held to 14:15 or the stop, plus package (a) (stop to entry after +2R);
+3) FLAGGED LEVELS -- held or broke: the nearest 4 levels above the 09:21 price -- the scan's FADE LEVELS (09:15 high,
+   yday high / close, daily R1 / R2, daily 8) plus weekly / monthly PP R1 R2; STACK = another level within 0.3%. First tag 09:21-10:30, then whichever comes
+   first by 14:14: HELD = a 1% fall below the level before any high 0.5% over it (the user's buffer stop); BROKE = 0.5% over it
+   first; STALL = neither. Also the overshoot before the fall, the deepest fall to 14:14 and Nifty's move from its 09:15 open
+   at the tag (squeeze context). Descriptive -- which levels held, not a strategy;
 4) ORB sell-stop / buy-stop for every row not SKIPped: trigger from 09:30, tight and wide stops, out 14:15 and 15:15.
-Descriptive replay of already-agreed definitions -- results only."""
+Shapes A / B (mechanical first-touch fades) removed 2026-11-02: the user does not trade them (and B had lookahead)."""
 import sys, re, os, warnings
 import pandas as pd, yfinance as yf
 warnings.filterwarnings('ignore')
@@ -29,6 +33,9 @@ for t in sc.ticker:
         x.to_csv(fn)
     except KeyError: miss.append(t)
 print('1-min missing:', miss or 'none')
+nf = yf.download('^NSEI', start=date, end=nxt, interval='1m', progress=False, auto_adjust=False)
+nf.columns = nf.columns.get_level_values(0); nf.index = nf.index.tz_convert('Asia/Kolkata').tz_localize(None)
+n_open = nf.Open.iloc[0] if len(nf) else None
 
 
 def day1m(t):
@@ -59,7 +66,31 @@ def outcome(day, ei, entry, stop, c915, l915, side=-1, cut='14:14'):
                 best_R=round(fav / R, 1), hold1415_R=round(hold, 2), pkgA_R=round(pa, 2), risk_pct=round(R / entry * 100, 2))
 
 
-rows, A, B, ORB = [], [], [], []
+def level_fate(day, L, p0):
+    """First tag 09:21-10:30, then HELD (1% fall first) / BROKE (0.5% over first) / STALL by 14:14."""
+    tm = day.index.strftime('%H:%M')
+    w = day[(tm >= '09:21') & (tm <= '10:30') & (day.High >= L)]
+    if not len(w): return dict(tagged='no')
+    tt = w.index[0]; a = day[(day.index >= tt) & (tm <= '14:14')]
+    br = a[a.High >= L * 1.005]; fl = a[a.Low <= L * 0.99]
+    bt = br.index[0] if len(br) else None; ft = fl.index[0] if len(fl) else None
+    if ft is not None and (bt is None or ft < bt): fate, at = 'HELD', ft
+    elif bt is not None: fate, at = 'BROKE', bt
+    else: fate, at = 'STALL', None
+    pre = a[a.index <= at] if at is not None else a
+    nif = day_nifty_chg(tt)
+    return dict(tagged=tt.strftime('%H:%M'), fate=fate, at=at.strftime('%H:%M') if at is not None else '',
+                over_pct=round((pre.High.max() / L - 1) * 100, 2), max_fall_pct=round((1 - a.Low.min() / L) * 100, 2),
+                nifty_at_tag=f'{nif:+.2f}%' if nif is not None else '')
+
+
+def day_nifty_chg(ts):
+    if n_open is None: return None
+    x = nf[nf.index <= ts]
+    return (x.Close.iloc[-1] / n_open - 1) * 100 if len(x) else None
+
+
+rows, LV, ORB = [], [], []
 for _, r in sc.iterrows():
     t = r.ticker; o, c, l, h = map(float, rx.search(r.c915).groups())
     day = day1m(t) if os.path.exists(os.path.join(HERE, 'm1', f'{t}.csv')) else pd.DataFrame()
@@ -76,33 +107,19 @@ for _, r in sc.iterrows():
     y = dd.iloc[-1]; pp = (y.High + y.Low + y.Close) / 3
     lv = {'09:15 high': h, 'yday high': y.High, 'yday close': y.Close, 'R1': 2 * pp - y.Low, 'R2': pp + (y.High - y.Low),
           'daily 8': dd.Close.ewm(span=8, adjust=False).mean().iloc[-1]}
-    w = day[(tm >= '09:20') & (tm <= '09:45')]
-    # B (as shapes.py)
-    if c < o and len(w):
-        pk = w.High.max(); pt = w.High.idxmax()
-        if pk < h:
-            before = day[(day.index <= pt) & (tm >= '09:20')]; L0 = min(l, before.Low.min())
-            if pk / L0 - 1 >= 0.003:
-                aft = day[(day.index > pt) & (day.index.strftime('%H:%M') <= '10:00')]
-                e = aft[aft.Close <= pk * 0.998]; nh = aft[aft.High > pk]
-                if len(e) and (not len(nh) or nh.index[0] > e.index[0]):
-                    et = e.index[0]; entry = e.Close.iloc[0]; stop = pk * 1.0005
-                    B.append(dict(t=t, rank=r['rank'], peak=f'{pk:.2f} {pt:%H:%M}', bounce_pct=round((pk / L0 - 1) * 100, 2), entry=round(entry, 2),
-                                  at=et.strftime('%H:%M'), stop=round(stop, 2), **outcome(day, idx[et.strftime('%H:%M')], entry, stop, c, l)))
-    # A (as shapes.py) -- 2026-10-23 (user): the list is only seen at 09:21, so a poke counts only if it starts from 09:21 with price
-    # still under the level at 09:21 (a 09:15 / 09:20 poke cannot be traded); EVERY level is its own event (a later stack poke counts too)
-    w21 = day[(tm >= '09:21') & (tm <= '09:45')]
+    # weekly / monthly pivots too (the user's 1H / 1D chart levels -- MUTHOOTFIN 11-02 was a W-R1 stack, not on the scan)
+    dt = pd.Timestamp(date); di = dd.set_index('Date')
+    wk = di[di.index < dt - pd.Timedelta(days=dt.weekday())]; wk = wk[wk.index >= wk.index[-1] - pd.Timedelta(days=wk.index[-1].weekday())]
+    mo = di[di.index < dt.replace(day=1)]; mo = mo[mo.index >= mo.index[-1].replace(day=1)]
+    for tf, (hh, ll, cc) in (('W', (wk.High.max(), wk.Low.min(), wk.Close.iloc[-1])), ('M', (mo.High.max(), mo.Low.min(), mo.Close.iloc[-1]))):
+        p_ = (hh + ll + cc) / 3; lv.update({f'{tf}-PP': p_, f'{tf}-R1': 2 * p_ - ll, f'{tf}-R2': p_ + (hh - ll)})
+    # flagged levels (the scan's FADE LEVELS + W/M pivots: nearest 4 above the 09:21 price) -- held or broke
     p0 = day.iloc[idx.get('09:21', 6)].Open
-    for name, L in lv.items():
-        if L <= p0: continue
-        cr = w21[w21.High > L]
-        if not len(cr): continue
-        ct = cr.index[0]; win = day[(day.index >= ct) & (day.index <= ct + pd.Timedelta('10min'))]
-        back = win[win.Close < L]
-        if not len(back): continue
-        et = back.index[0]; sp = day[(day.index >= ct) & (day.index <= et)].High.max(); entry = day.loc[et].Close; stop = sp * 1.0005
-        A.append(dict(t=t, rank=r['rank'], first915='red' if c < o else 'green', level=f'{name} {L:.2f}', crossed=ct.strftime('%H:%M'), spike=round(sp, 2),
-                      entry=round(entry, 2), at=et.strftime('%H:%M'), stop=round(stop, 2), **outcome(day, idx[et.strftime('%H:%M')], entry, stop, c, l)))
+    above = sorted((L, name) for name, L in lv.items() if L > p0)[:4]
+    for L, name in above:
+        near = [n for v, n in above if n != name and abs(v / L - 1) <= 0.003]
+        LV.append(dict(t=t, rank=r['rank'], c915='red' if c < o else 'green', level=f'{name} {L:.2f}', dist_pct=round((L / p0 - 1) * 100, 2),
+                       stack='+'.join(near), **level_fate(day, L, p0)))
     # ORB stop orders (rows not skipped), live from 09:30
     if not str(r.status).startswith('SKIP'):
         short = str(r.side).upper().startswith('SHORT'); trig = float(r.trigger)
@@ -119,5 +136,9 @@ for _, r in sc.iterrows():
             ORB.append(dict(t=t, rank=r['rank'], side='short' if short else 'long(info)', stop_kind='-', trigger=trig, at='never'))
 
 pd.set_option('display.width', 300); pd.set_option('display.max_rows', 300)
-for nm, X in (('DAY', rows), ('SHAPE B', B), ('SHAPE A', A), ('ORB STOP ORDERS', ORB)):
+for nm, X in (('DAY', rows), ('FLAGGED LEVELS -- held or broke (tag 09:21-10:30; HELD = -1% before +0.5%)', LV), ('ORB STOP ORDERS', ORB)):
     x = pd.DataFrame(X); print(f'\n{nm} ({len(x)})'); print(x.to_string(index=False) if len(x) else '  none')
+x = pd.DataFrame(LV)
+if len(x) and 'fate' in x:
+    tg = x[x.tagged != 'no']; tg = tg.assign(kind=(tg['stack'] != '').map({True: 'stacked', False: 'single'}))
+    print('\nSUMMARY (tagged levels):'); print(tg.groupby('kind').fate.value_counts().unstack(fill_value=0).to_string())
