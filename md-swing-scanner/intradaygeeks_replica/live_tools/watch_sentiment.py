@@ -20,11 +20,25 @@ YH = {"INDIA_VIX": ("^INDIAVIX", (6, 10, 15), 4, "fear easing", "fear rising")}
 SECT = {"IT": "^CNXIT", "BANK": "^NSEBANK", "METAL": "^CNXMETAL", "ENERGY": "^CNXENERGY", "AUTO": "^CNXAUTO", "FMCG": "^CNXFMCG", "PHARMA": "^CNXPHARMA"}
 HEAVY = ["RELIANCE", "HDFCBANK", "ICICIBANK", "INFY", "BHARTIARTL", "TCS", "LT", "ITC", "SBIN", "AXISBANK"]
 SECT_STEPS, HEAVY_STEPS = (1.5, 2.5), (2.5, 4.0)
-NEWS_Q = ('India (SEBI OR RBI OR LTCG OR "capital gains" OR STT OR FPI OR "Finance Ministry" OR "repo rate" OR Sensex OR Nifty '
+NEWS_Q = ('India ("SBI results" OR "HDFC AMC" OR "AMC stocks" OR "capital market stocks" OR SEBI OR RBI OR LTCG OR "capital gains" OR STT OR FPI OR "Finance Ministry" OR "repo rate" OR Sensex OR Nifty '
           'OR "F&O" OR tariff OR Hormuz OR Iran OR OPEC) when:1h')
-POLICY = re.compile(r"\b(sebi|rbi|ltcg|capital gains|stt|fpi|fii|finance minist\w*|repo|rate cut|rate hike|tax\w*|ban\w*|"
-                    r"circular|curb\w*|tariff\w*|hormuz|ceasefire|opec|sanction\w*|budget|gst)\b", re.I)
-fired, seen = set(), set()
+POLICY = re.compile(r"\b(ltcg|capital gains tax|stt|securities transaction|repo rate (cut|hike)|rbi (cuts|hikes|policy)|"
+                    r"rate (cut|hike)|ban(s|ned)? .*(f&o|derivative|trading)|f&o curbs?|hormuz|ceasefire|strikes? on|attack(s|ed)? on|"
+                    r"opec|tariffs? on india|sbi .*(profit|q2|results|net)|nifty .*(crash|plunge|tank|soar|surge)|"
+                    r"sensex .*(crash|plunge|tank|soar|surge)|fpi .*(tax|outflow|selling)|emergency|resign|hdfc amc|amc (stocks|shares))", re.I)
+# instant alerts = market-moving EVENTS only (tightened 2026-11-03 09:15: SEBI / RBI explainers and recaps were noise)
+import json, os, email.utils
+STATE = f"/tmp/watch_sentiment_{dt.date.today():%Y%m%d}.json"   # survives a restart: no re-fired headlines
+try: _st = json.load(open(STATE)); seen = set(_st["seen"]); told = [(pd.Timestamp(a), set(b)) for a, b in _st["told"]]
+except Exception: seen, told = set(), []
+try: fired = {tuple(x) for x in json.load(open(STATE)).get("fired", [])}   # macro steps already alerted (a restart re-fired them)
+except Exception: fired = set()
+def save():
+    try: json.dump({"seen": sorted(seen), "told": [(str(a), sorted(b)) for a, b in told],
+                   "fired": [list(f) for f in fired if all(isinstance(z, (str, int, float, bool)) for z in f)]}, open(STATE, "w"))
+    except Exception: pass
+_unused, _unused2, _unused3 = set(), set(), []   # told = (time, significant words) of headlines already alerted
+STOP = {"india", "indian", "stock", "stocks", "market", "markets", "after", "amid", "says", "report", "reports", "news", "today", "their", "about"}
 
 
 def alert(now, msg):
@@ -54,9 +68,10 @@ def yh(syms, day):
 
 
 def steps(now, key, chg, levels, dn, up, extra=""):
-    new = [lv for lv in levels if abs(chg) >= lv and (key, lv, chg > 0) not in fired]
+    chg = float(chg); pos = bool(chg > 0)   # plain types so the step keys survive the JSON state file
+    new = [lv for lv in levels if abs(chg) >= lv and (key, lv, pos) not in fired]
     if new:   # one line for the highest step crossed
-        fired.update((key, lv, chg > 0) for lv in new)
+        fired.update((key, lv, pos) for lv in new)
         alert(now, f"{key} {chg:+.2f}%{'' if 'since' in key else ' from 09:15'}{extra} -> {up if chg > 0 else dn}")
 
 
@@ -113,7 +128,15 @@ def news(now, first):
         k = re.sub(r"\W+", " ", t.lower())[:90]
         if not t or k in seen: continue
         seen.add(k)
-        if not first and POLICY.search(t): alert(now, f"NEWS {t[:200]}")
+        try: age = now - pd.Timestamp(email.utils.parsedate_to_datetime(it.findtext("pubDate"))).tz_convert(IST).tz_localize(None)
+        except Exception: age = pd.Timedelta(0)
+        if first or not POLICY.search(t) or age > pd.Timedelta("45min"): continue   # fresh headlines only (recaps get re-served)
+        if re.search(r"ltcg|capital gains", t, re.I) and not re.search(r"\b(approv|announc|notif|reject|cabinet|scrapped|cleared|decid)", t, re.I):
+            continue   # LTCG commentary was re-worded by every outlet (2026-11-03): alert only on an actual decision
+        w = {x for x in re.findall(r"[a-z]{5,}", t.lower().split(" - ")[0]) if x not in STOP}
+        if any(now - tt < pd.Timedelta("3h") and len(w & ww) >= 2 for tt, ww in told): continue   # same story re-worded
+        told.append((now, w)); alert(now, f"NEWS {t[:200]} ({int(age.total_seconds() // 60)} min old)")
+    save()
 
 
 if replay:
@@ -126,6 +149,6 @@ while True:
     if now.time() >= dt.time(15, 30): break
     if now.time() < dt.time(9, 15): news(now, first); first = False; time.sleep(120); continue
     news(now, first); first = False
-    macro(now, now.strftime("%Y-%m-%d"))
+    macro(now, now.strftime("%Y-%m-%d")); save()
     time.sleep(300 - time.time() % 300 + 20)
 print("END sentiment watch", flush=True)
