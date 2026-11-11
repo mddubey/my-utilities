@@ -52,7 +52,9 @@ def tv(sym, n=900):   # ~3 days of 5-min bars: reaches the prior 15:30 even afte
     if replay and sym in _cache: return _cache[sym]
     out = subprocess.run([sys.executable, TV, sym, "5", str(n)], capture_output=True, text=True, timeout=60).stdout.split("\n")
     r = [(pd.Timestamp(f"{p[0]} {p[1]}"), float(p[5])) for p in (l.split() for l in out) if len(p) == 6]
-    _cache[sym] = pd.Series(dict(r)).sort_index(); return _cache[sym]
+    # an empty fetch (TV hiccup, 2026-11-11 10:05) must still carry a DatetimeIndex, else `s.index <= now` throws
+    _cache[sym] = pd.Series([v for _, v in r], index=pd.DatetimeIndex([t for t, _ in r]), dtype=float)
+    _cache[sym] = _cache[sym][~_cache[sym].index.duplicated(keep="last")].sort_index(); return _cache[sym]
 
 
 def yh(syms, day):
