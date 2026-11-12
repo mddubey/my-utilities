@@ -97,8 +97,9 @@ def macro(now, day):
             back = s[s.index <= s.index[-1] - pd.Timedelta("15min")]
             if len(back):
                 f = (c / back.iloc[-1] - 1) * 100
-                if abs(f) >= fast and (k, "fast", s.index[-1] // pd.Timedelta("30min")) not in fired:
-                    fired.add((k, "fast", s.index[-1] // pd.Timedelta("30min")))
+                slot = str(s.index[-1].floor("30min"))   # Timestamp // Timedelta is unsupported (2026-11-12 11:50 BRENT error)
+                if abs(f) >= fast and (k, "fast", slot) not in fired:
+                    fired.add((k, "fast", slot))
                     alert(now, f"{k} fast move {f:+.2f}% in 15 min ({c:g}) -> {up if f > 0 else dn}")
         except Exception as e: print(f"ERR {now:%H:%M} {k} {e}", flush=True)
     syms = [v[0] for v in YH.values()] + list(SECT.values()) + [h + ".NS" for h in HEAVY]
